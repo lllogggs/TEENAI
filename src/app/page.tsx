@@ -19,6 +19,7 @@ export default function Home() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
+  const [step, setStep] = useState<'landing' | 'login'>('landing');
 
   useEffect(() => {
     if (!sessionId) {
@@ -29,6 +30,10 @@ export default function Home() {
   const handleLogin = async () => {
     if (!role || !name.trim()) {
       setStatus('역할과 이름을 입력해주세요.');
+      return;
+    }
+    if (!supabase) {
+      setStatus('Supabase 연결이 설정되지 않았습니다. .env.local을 확인해주세요.');
       return;
     }
 
@@ -54,38 +59,86 @@ export default function Home() {
   };
 
   const headerTitle = useMemo(() => {
-    if (!user) return 'TEENAI 새 학습 공간';
+    if (!user) return 'TEENAI 로그인';
     return user.role === 'student' ? `${user.name} 학생 전용 채팅` : `${user.name} 보호자 대시보드`;
   }, [user]);
 
   return (
     <main className="container">
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div>
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>AI 멘토와 보호자 리포트가 함께 있는 TEENAI</p>
-          <h1 style={{ margin: '0.35rem 0', fontSize: '2rem' }}>{headerTitle}</h1>
-        </div>
-        {user && (
-          <span style={{ padding: '0.4rem 0.75rem', background: 'rgba(255,255,255,0.06)', borderRadius: 12, fontSize: '0.9rem' }}>
-            {user.role === 'student' ? '학생 모드' : '보호자 모드'}
-          </span>
-        )}
-      </header>
+      {!user && step === 'landing' && (
+        <section className="landing">
+          <header className="landing-header">
+            <h1 className="landing-title">TEENAI</h1>
+            <p className="landing-subtitle">청소년을 위한 안전하고 똑똑한 AI 멘토링 서비스</p>
+          </header>
 
-      {!user && (
-        <section className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="landing-grid">
+            <button
+              type="button"
+              className="landing-card primary"
+              onClick={() => {
+                setRole('student');
+                setStep('login');
+              }}
+            >
+              <span className="landing-card-icon" aria-hidden="true">
+                🎓
+              </span>
+              <h2 className="landing-card-title">학생 시작하기</h2>
+              <p className="landing-card-description">부모님께 받은 코드를 입력하고 나만의 AI 멘토를 만나보세요.</p>
+            </button>
+
+            <button
+              type="button"
+              className="landing-card"
+              onClick={() => {
+                setRole('parent');
+                setStep('login');
+              }}
+            >
+              <span className="landing-card-icon" aria-hidden="true">
+                🛡️
+              </span>
+              <h2 className="landing-card-title">학부모 시작하기</h2>
+              <p className="landing-card-description">회원가입 후 코드를 생성하여 자녀와 연결하세요.</p>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {(user || step === 'login') && (
+        <header className="glass-nav" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>AI 멘토와 보호자 리포트가 함께 있는 TEENAI</p>
+            <h1 style={{ margin: '0.35rem 0', fontSize: '2rem', fontWeight: 800, color: 'var(--brand-900)' }}>{headerTitle}</h1>
+          </div>
+          {user && (
+            <span style={{ padding: '0.4rem 0.75rem', background: 'var(--brand-50)', borderRadius: 999, fontSize: '0.9rem', fontWeight: 700, color: 'var(--brand-900)' }}>
+              {user.role === 'student' ? '학생 모드' : '보호자 모드'}
+            </span>
+          )}
+        </header>
+      )}
+
+      {!user && step === 'login' && (
+        <section className="premium-card" style={{ marginBottom: '1.5rem' }}>
+          <button type="button" className="back-button button-base" onClick={() => setStep('landing')}>
+            ← 시작 화면으로 돌아가기
+          </button>
           <h2 style={{ marginTop: 0 }}>로그인</h2>
           <p style={{ color: 'var(--muted)', marginTop: 0 }}>역할을 선택하고 이름과 이메일을 입력하세요.</p>
 
           <div style={{ display: 'flex', gap: '1rem', margin: '1rem 0' }}>
             <button
-              style={{ flex: 1, padding: '0.9rem', borderRadius: 12, border: role === 'student' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'inherit' }}
+              className="button-base"
+              style={{ flex: 1, padding: '0.95rem', borderRadius: 16, border: role === 'student' ? '2px solid var(--brand-500)' : '1px solid rgba(148, 163, 184, 0.3)', background: 'var(--brand-50)', color: 'var(--brand-900)', fontWeight: 700 }}
               onClick={() => setRole('student')}
             >
               학생으로 사용
             </button>
             <button
-              style={{ flex: 1, padding: '0.9rem', borderRadius: 12, border: role === 'parent' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'inherit' }}
+              className="button-base"
+              style={{ flex: 1, padding: '0.95rem', borderRadius: 16, border: role === 'parent' ? '2px solid var(--brand-500)' : '1px solid rgba(148, 163, 184, 0.3)', background: 'var(--brand-50)', color: 'var(--brand-900)', fontWeight: 700 }}
               onClick={() => setRole('parent')}
             >
               보호자로 보기
@@ -96,7 +149,7 @@ export default function Home() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span>이름</span>
               <input
-                style={{ padding: '0.85rem', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'inherit' }}
+                style={{ padding: '0.9rem 1rem', borderRadius: 16, border: '1px solid rgba(148, 163, 184, 0.35)', background: '#ffffff', color: 'inherit' }}
                 placeholder="예: 홍길동"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -105,7 +158,7 @@ export default function Home() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span>이메일 (선택)</span>
               <input
-                style={{ padding: '0.85rem', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'inherit' }}
+                style={{ padding: '0.9rem 1rem', borderRadius: 16, border: '1px solid rgba(148, 163, 184, 0.35)', background: '#ffffff', color: 'inherit' }}
                 placeholder="parent@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -115,7 +168,8 @@ export default function Home() {
           </div>
 
           <button
-            style={{ marginTop: '1rem', padding: '0.95rem 1.25rem', borderRadius: 12, border: 'none', background: 'linear-gradient(90deg, #7c3aed, #a855f7)', color: 'white', fontWeight: 700, fontSize: '1rem' }}
+            className="button-base button-primary"
+            style={{ marginTop: '1rem' }}
             onClick={handleLogin}
           >
             {role === 'parent' ? '보호자 대시보드 열기' : '학생 채팅 시작하기'}

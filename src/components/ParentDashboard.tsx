@@ -23,7 +23,13 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
 
   const fetchMessages = async () => {
     setLoading(true);
-    
+    if (!supabase) {
+      console.warn('Supabase 환경변수가 설정되지 않아 대화를 불러올 수 없습니다.');
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('messages')
       .select('id, role, content, created_at, session_id, profiles(name)')
@@ -63,7 +69,7 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
   };
 
   return (
-    <section className="card" style={{ display: 'grid', gap: '1rem' }}>
+    <section className="parent-panel" style={{ display: 'grid', gap: '1rem', padding: '2.25rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.9rem' }}>보호자 리포트</p>
@@ -71,7 +77,7 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
         </div>
         <button
           onClick={fetchMessages}
-          style={{ padding: '0.55rem 0.9rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'inherit' }}
+          className="button-base button-secondary"
         >
           새로고침
         </button>
@@ -86,13 +92,13 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
           const studentName = getStudentName(sessionMessages[0]?.profiles);
           
           return (
-            <article key={sessionId} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1rem', background: 'rgba(255,255,255,0.02)' }}>
+            <article key={sessionId} style={{ border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: 24, padding: '1.25rem', background: 'var(--slate-100)' }}>
               <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <div>
                   <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>세션 {sessionId.slice(0, 8)}...</p>
                   <strong>{studentName}</strong>
                 </div>
-                <span style={{ padding: '0.35rem 0.75rem', borderRadius: 10, background: 'rgba(124,58,237,0.16)', color: '#e9d5ff', fontWeight: 700, fontSize: '0.9rem' }}>
+                <span style={{ padding: '0.4rem 0.85rem', borderRadius: 999, background: 'var(--brand-50)', color: 'var(--brand-900)', fontWeight: 700, fontSize: '0.9rem' }}>
                   {sessionMessages.length}개 메시지
                 </span>
               </header>
@@ -103,7 +109,14 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
                     <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
                       {new Date(message.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <div style={{ padding: '0.75rem', borderRadius: 10, background: message.role === 'assistant' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59,130,246,0.12)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div
+                      style={{
+                        padding: '0.9rem',
+                        borderRadius: 16,
+                        background: message.role === 'assistant' ? 'rgba(99, 102, 241, 0.12)' : '#ffffff',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                      }}
+                    >
                       <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
                         {message.role === 'assistant' ? 'AI 응답' : `${getStudentName(message.profiles)} 입력`}
                       </p>

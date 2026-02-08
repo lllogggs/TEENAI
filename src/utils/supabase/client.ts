@@ -7,4 +7,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase 환경변수가 설정되지 않았습니다. .env.local을 확인하세요.');
 }
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+export const supabase =
+  supabaseUrl && supabaseAnonKey ? createBrowserClient(supabaseUrl, supabaseAnonKey) : null;
