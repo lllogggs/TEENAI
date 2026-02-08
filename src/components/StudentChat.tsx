@@ -8,19 +8,25 @@ type Props = {
   sessionId: string;
   userId: string;
   studentName: string;
+  accessCode: string;
 };
 
-export default function StudentChat({ sessionId, userId, studentName }: Props) {
+export default function StudentChat({ sessionId, userId, studentName, accessCode }: Props) {
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } = useChat({
     api: '/api/chat',
-    body: { sessionId, userId, studentName },
+    body: { sessionId, userId, studentName, accessCode },
   });
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionId || !userId || !supabase) return;
-    supabase.from('sessions').upsert({ id: sessionId, user_id: userId, title: `${studentName}의 학습 세션` });
-  }, [sessionId, userId, studentName]);
+    supabase.from('sessions').upsert({
+      id: sessionId,
+      user_id: userId,
+      title: `${studentName}의 학습 세션`,
+      access_code: accessCode,
+    });
+  }, [sessionId, userId, studentName, accessCode]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,7 +38,13 @@ export default function StudentChat({ sessionId, userId, studentName }: Props) {
     if (!content) return;
 
     if (supabase) {
-      await supabase.from('messages').insert({ session_id: sessionId, user_id: userId, role: 'user', content });
+      await supabase.from('messages').insert({
+        session_id: sessionId,
+        user_id: userId,
+        role: 'user',
+        content,
+        access_code: accessCode,
+      });
     }
     await handleSubmit(event);
     setInput('');

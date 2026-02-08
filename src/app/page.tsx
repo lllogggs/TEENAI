@@ -10,7 +10,11 @@ interface UserProfile {
   name: string;
   email: string;
   role: 'student' | 'parent';
+  accessCode: string;
+  sessionId?: string;
 }
+
+const STORAGE_KEY = 'teenai-user';
 
 export default function Home() {
   const [role, setRole] = useState<'student' | 'parent' | ''>('');
@@ -28,13 +32,60 @@ export default function Home() {
     }
   }, [sessionId]);
 
-  const handleGenerateCode = () => {
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored) as UserProfile;
+      if (!parsed?.id || !parsed?.role || !parsed?.accessCode) return;
+      setUser(parsed);
+      setRole(parsed.role);
+      setEmail(parsed.email);
+      if (parsed.sessionId) {
+        setSessionId(parsed.sessionId);
+      }
+      setStep('login');
+    } catch (error) {
+      console.warn('저장된 사용자 정보를 불러오지 못했습니다.', error);
+    }
+  }, []);
+
+  const createAccessCode = async (attempt = 0): Promise<string | null> => {
+    if (!supabase) {
+      setStatus('Supabase 연결이 설정되지 않았습니다. .env.local을 확인해주세요.');
+      return null;
+    }
+    if (attempt > 3) {
+      setStatus('인증코드 생성에 실패했습니다. 다시 시도해주세요.');
+      return null;
+    }
+
+    const code = `${Math.floor(100000 + Math.random() * 900000)}`;
+    const { error } = await supabase.from('access_codes').insert({ code });
+
+    if (!error) {
+      return code;
+    }
+
+    if (error.code === '23505') {
+      return createAccessCode(attempt + 1);
+    }
+
+    console.error('인증코드 생성 실패:', error);
+    setStatus('인증코드 생성에 실패했습니다. 다시 시도해주세요.');
+    return null;
+  };
+
+  const handleGenerateCode = async () => {
     if (!email.trim()) {
       setStatus('부모 이메일을 입력해주세요.');
       return;
     }
 
-    const code = `${Math.floor(100000 + Math.random() * 900000)}`;
+    const code = await createAccessCode();
+    if (!code) return;
+
     setGeneratedCode(code);
     setStatus('인증코드가 발급되었습니다. 학생에게 전달해주세요.');
   };
@@ -48,36 +99,65 @@ export default function Home() {
       setStatus('이메일을 입력해주세요.');
       return;
     }
-    if (role === 'parent' && !generatedCode) {
-      setStatus('먼저 인증코드를 발급해주세요.');
-      return;
-    }
-    if (role === 'student') {
-      if (!authCode.trim()) {
-        setStatus('부모님께 받은 인증코드를 입력해주세요.');
-        return;
-      }
-      if (!generatedCode || authCode.trim() !== generatedCode) {
-        setStatus('인증코드가 일치하지 않습니다.');
-        return;
-      }
-    }
     if (!supabase) {
       setStatus('Supabase 연결이 설정되지 않았습니다. .env.local을 확인해주세요.');
       return;
     }
 
-    const userId = crypto.randomUUID();
-    const displayName = email.trim();
-    setUser({ id: userId, name: displayName, email: email.trim(), role });
-    setStatus('프로필이 생성되었습니다. Supabase에 동기화 중...');
+    const trimmedEmail = email.trim();
+    const accessCode = role === 'parent' ? generatedCode : authCode.trim();
 
-    await supabase.from('profiles').upsert({ id: userId, name: displayName, email: email.trim(), role });
+    if (role === 'parent' && !accessCode) {
+      setStatus('먼저 인증코드를 발급해주세요.');
+      return;
+    }
 
     if (role === 'student') {
+      if (!accessCode) {
+        setStatus('부모님께 받은 인증코드를 입력해주세요.');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('access_codes')
+        .select('code')
+        .eq('code', accessCode);
+
+      if (error || !data || data.length === 0) {
+        setStatus('인증코드를 찾을 수 없습니다. 다시 확인해주세요.');
+        return;
+      }
+    }
+
+    const userId = user?.id ?? crypto.randomUUID();
+    const displayName = trimmedEmail;
+    const newSessionId = role === 'student' ? sessionId || crypto.randomUUID() : undefined;
+
+    setStatus('프로필이 생성되었습니다. Supabase에 동기화 중...');
+
+    const { error: profileError } = await supabase.from('profiles').upsert({
+      id: userId,
+      name: displayName,
+      email: trimmedEmail,
+      role,
+      access_code: accessCode,
+    });
+
+    if (profileError) {
+      console.error('프로필 저장 실패:', profileError);
+      setStatus('프로필 저장에 실패했습니다. 다시 시도해주세요.');
+      return;
+    }
+
+    if (role === 'student' && newSessionId) {
       const { data } = await supabase
         .from('sessions')
-        .insert({ id: sessionId || crypto.randomUUID(), user_id: userId, title: `${displayName}님의 학습 세션` })
+        .upsert({
+          id: newSessionId,
+          user_id: userId,
+          title: `${displayName}님의 학습 세션`,
+          access_code: accessCode,
+        })
         .select('id')
         .single();
 
@@ -86,6 +166,17 @@ export default function Home() {
       }
     }
 
+    const updatedUser: UserProfile = {
+      id: userId,
+      name: displayName,
+      email: trimmedEmail,
+      role,
+      accessCode,
+      sessionId: newSessionId,
+    };
+
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
     setStatus('로그인 완료! 대시보드를 불러옵니다.');
   };
 
@@ -205,11 +296,7 @@ export default function Home() {
             </div>
           )}
 
-          <button
-            className="auth-submit"
-            type="button"
-            onClick={handleLogin}
-          >
+          <button className="auth-submit" type="button" onClick={handleLogin}>
             {role === 'parent' ? '보호자 대시보드 열기' : '학생 채팅 시작하기'}
           </button>
           {status && <p className="auth-status">{status}</p>}
@@ -217,10 +304,17 @@ export default function Home() {
       )}
 
       {user && role === 'student' && (
-        <StudentChat sessionId={sessionId} userId={user.id} studentName={user.name} />
+        <StudentChat
+          sessionId={user.sessionId ?? sessionId}
+          userId={user.id}
+          studentName={user.name}
+          accessCode={user.accessCode}
+        />
       )}
 
-      {user && role === 'parent' && <ParentDashboard parentName={user.name} />}
+      {user && role === 'parent' && (
+        <ParentDashboard parentName={user.name} accessCode={user.accessCode} />
+      )}
     </main>
   );
 }
