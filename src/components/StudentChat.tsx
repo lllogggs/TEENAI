@@ -55,7 +55,7 @@ export default function StudentChat({ sessionId, userId, studentName }: Props) {
           background: 'rgba(255,255,255,0.02)',
         }}
       >
-        {conversation.length === 0 && <p style={{ color: 'var(--muted)' }}>오늘의 질문을 시작하세요. 예) "기말고사 대비 계획 세워줘"</p>}
+        {conversation.length === 0 && <p style={{ color: 'var(--muted)' }}>오늘의 질문을 시작하세요. 예: &quot;기말고사 대비 계획 세워줘&quot;</p>}
         {conversation.map((message) => (
           <article key={message.id} style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: 12, background: message.role === 'user' ? 'rgba(124, 58, 237, 0.1)' : 'rgba(255,255,255,0.04)' }}>
             <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
