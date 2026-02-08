@@ -57,6 +57,21 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
     }, {});
   }, [messages]);
 
+  const sessions = useMemo(() => {
+    return Object.entries(bySession)
+      .map(([sessionId, sessionMessages]) => {
+        const sorted = [...sessionMessages].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        return {
+          id: sessionId,
+          messages: sorted,
+          lastMessage: sorted[0],
+        };
+      })
+      .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
+  }, [bySession]);
+
   // 수정: 이름 가져오기 헬퍼 함수 (배열/객체 모두 처리)
   const getStudentName = (profiles: any) => {
     if (!profiles) return '알 수 없는 학생';
@@ -69,65 +84,79 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
   };
 
   return (
-    <section className="parent-panel" style={{ display: 'grid', gap: '1rem', padding: '2.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.9rem' }}>보호자 리포트</p>
-          <h2 style={{ margin: '0.25rem 0 0' }}>{parentName} 님을 위한 학습 대시보드</h2>
+    <section className="parent-shell">
+      <nav className="parent-nav">
+        <h1>
+          TEENAI
+          <span>Parent</span>
+        </h1>
+        <div className="parent-nav-actions">
+          <div>
+            <p>Parent Account</p>
+            <strong>{parentName}님</strong>
+          </div>
+          <button type="button" onClick={fetchMessages} className="parent-refresh">
+            새로고침
+          </button>
         </div>
-        <button
-          onClick={fetchMessages}
-          className="button-base button-secondary"
-        >
-          새로고침
-        </button>
-      </div>
+      </nav>
 
-      {loading && <p style={{ color: 'var(--muted)' }}>최근 대화 불러오는 중...</p>}
-      {!loading && messages.length === 0 && <p style={{ color: 'var(--muted)' }}>아직 기록된 대화가 없습니다.</p>}
+      <main className="parent-main">
+        <section className="parent-hero">
+          <div>
+            <h2>{parentName} 님의 학습 리포트</h2>
+            <p>최근 대화 기록과 세션 흐름을 한눈에 확인하세요.</p>
+          </div>
+          <div className="parent-hero-badge">
+            <span>총 대화 {messages.length}회</span>
+          </div>
+        </section>
 
-      {!loading &&
-        Object.entries(bySession).map(([sessionId, sessionMessages]) => {
-          // 세션의 첫 번째 메시지에서 학생 정보를 가져옴
-          const studentName = getStudentName(sessionMessages[0]?.profiles);
-          
-          return (
-            <article key={sessionId} style={{ border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: 24, padding: '1.25rem', background: 'var(--slate-100)' }}>
-              <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <div>
-                  <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>세션 {sessionId.slice(0, 8)}...</p>
-                  <strong>{studentName}</strong>
-                </div>
-                <span style={{ padding: '0.4rem 0.85rem', borderRadius: 999, background: 'var(--brand-50)', color: 'var(--brand-900)', fontWeight: 700, fontSize: '0.9rem' }}>
-                  {sessionMessages.length}개 메시지
-                </span>
-              </header>
+        <section className="parent-stats">
+          <article>
+            <p>Total Sessions</p>
+            <h3>{sessions.length}회</h3>
+          </article>
+          <article>
+            <p>Total Interactions</p>
+            <h3>{messages.length}개</h3>
+          </article>
+          <article>
+            <p>최근 업데이트</p>
+            <h3>{messages[0] ? new Date(messages[0].created_at).toLocaleDateString() : '-'}</h3>
+          </article>
+        </section>
 
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                {sessionMessages.map((message) => (
-                  <div key={message.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
-                      {new Date(message.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <div
-                      style={{
-                        padding: '0.9rem',
-                        borderRadius: 16,
-                        background: message.role === 'assistant' ? 'rgba(99, 102, 241, 0.12)' : '#ffffff',
-                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                      }}
-                    >
-                      <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
-                        {message.role === 'assistant' ? 'AI 응답' : `${getStudentName(message.profiles)} 입력`}
-                      </p>
-                      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{message.content}</div>
+        <section className="parent-timeline">
+          <header>
+            <h3>Timeline Analysis</h3>
+            <span>Recent 5 Sessions</span>
+          </header>
+
+          {loading && <p className="parent-muted">최근 대화 불러오는 중...</p>}
+          {!loading && sessions.length === 0 && <p className="parent-muted">아직 기록된 대화가 없습니다.</p>}
+
+          {!loading && (
+            <div className="parent-timeline-list">
+              {sessions.slice(0, 5).map((session) => {
+                const studentName = getStudentName(session.messages[0]?.profiles);
+                const lastMessage = session.lastMessage?.content ?? '새로운 대화가 시작되었습니다.';
+
+                return (
+                  <article key={session.id}>
+                    <div>
+                      <p>{new Date(session.lastMessage.created_at).toLocaleDateString()}</p>
+                      <strong>{studentName}</strong>
+                      <span>{lastMessage}</span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          );
-        })}
+                    <span>{session.messages.length} Messages</span>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </main>
     </section>
   );
 }
