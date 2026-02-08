@@ -30,7 +30,7 @@ export default function Home() {
 
   // 기존 세션 복구 로직 (인증코드 기반)
   const restoreSession = async (userId: string, accessCode: string) => {
-    if (!supabase) return;
+    if (!supabase) return sessionId;
     
     // 1. 해당 코드로 생성된 가장 최근 세션 조회
     const { data: existingSessions } = await supabase
@@ -45,7 +45,7 @@ export default function Home() {
       return existingSessions[0].id;
     }
     
-    // 2. 없으면 현재 sessionId 사용 (이미 생성됨)
+    // 2. 없으면 현재 sessionId 유지
     return sessionId;
   };
 
@@ -59,7 +59,7 @@ export default function Home() {
   // 로그인 및 DB 저장 함수
   const handleLogin = async () => {
     if (!email.trim()) return setStatus('이메일을 입력해주세요.');
-    if (!role) return setStatus('역할을 선택해주세요.'); // 역할 체크 추가
+    if (!role) return setStatus('역할을 선택해주세요.');
     
     // 코드 검증 로직
     const finalAccessCode = role === 'parent' ? generatedCode : authCode;
@@ -87,7 +87,7 @@ export default function Home() {
       name: displayName,
       email: email,
       role: role,
-      access_code: finalAccessCode // DB에 코드 저장
+      access_code: finalAccessCode
     });
 
     if (error) {
@@ -95,7 +95,7 @@ export default function Home() {
       return setStatus('로그인 실패. 다시 시도해주세요.');
     }
 
-    // 2. 부모면 코드 테이블에도 저장 (중복 체크 생략 - 간편 모드)
+    // 2. 부모면 코드 테이블에도 저장
     if (role === 'parent') {
       await supabase.from('access_codes').upsert({
         code: finalAccessCode,
@@ -103,7 +103,7 @@ export default function Home() {
       });
     }
 
-    // 3. 학생이면 세션 생성 (이미 존재하면 무시하거나 업데이트)
+    // 3. 학생이면 세션 생성/업데이트
     if (role === 'student') {
       await supabase.from('sessions').upsert({
         id: activeSessionId,
@@ -114,7 +114,7 @@ export default function Home() {
     }
 
     // 상태 업데이트 (화면 전환)
-    // 수정됨: role을 강제로 'student' | 'parent'로 캐스팅하여 타입 에러 해결
+    // [핵심 수정] role을 강제로 'student' | 'parent'로 변환하여 타입 에러 해결
     setUser({ 
         id: userId, 
         name: displayName, 
@@ -183,7 +183,7 @@ export default function Home() {
         <StudentChat sessionId={sessionId} userId={user.id} studentName={user.name} accessCode={user.access_code} />
       )}
       {user && role === 'parent' && (
-        <ParentDashboard parentName={user.name} />
+        <ParentDashboard parentName={user.name} accessCode={user.access_code} />
       )}
     </main>
   );
