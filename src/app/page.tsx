@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ParentDashboard from '@/components/ParentDashboard';
 import StudentChat from '@/components/StudentChat';
 import { supabase } from '@/utils/supabase/client';
@@ -23,6 +23,32 @@ export default function Home() {
   const [status, setStatus] = useState<string>('');
   const [step, setStep] = useState<'landing' | 'login'>('landing');
 
+  // 세션 ID 초기화
+  useEffect(() => {
+    if (!sessionId) setSessionId(crypto.randomUUID());
+  }, [sessionId]);
+
+  // 기존 세션 복구 로직 (인증코드 기반)
+  const restoreSession = async (userId: string, accessCode: string) => {
+    if (!supabase) return;
+    
+    // 1. 해당 코드로 생성된 가장 최근 세션 조회
+    const { data: existingSessions } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('access_code', accessCode)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (existingSessions && existingSessions.length > 0) {
+      setSessionId(existingSessions[0].id);
+      return existingSessions[0].id;
+    }
+    
+    // 2. 없으면 현재 sessionId 사용 (이미 생성됨)
+    return sessionId;
+  };
+
   // 부모: 인증코드 생성 함수
   const handleGenerateCode = () => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -33,6 +59,7 @@ export default function Home() {
   // 로그인 및 DB 저장 함수
   const handleLogin = async () => {
     if (!email.trim()) return setStatus('이메일을 입력해주세요.');
+    if (!role) return setStatus('역할을 선택해주세요.'); // 역할 체크 추가
     
     // 코드 검증 로직
     const finalAccessCode = role === 'parent' ? generatedCode : authCode;
@@ -46,6 +73,13 @@ export default function Home() {
     
     const userId = crypto.randomUUID();
     const displayName = email.split('@')[0];
+
+    // 0. 학생의 경우, 기존 세션이 있는지 확인하고 복구
+    let activeSessionId = sessionId;
+    if (role === 'student') {
+        const restoredId = await restoreSession(userId, finalAccessCode);
+        if (restoredId) activeSessionId = restoredId;
+    }
 
     // 1. 프로필 저장 (중요: access_code 포함!)
     const { error } = await supabase.from('profiles').upsert({
@@ -69,43 +103,25 @@ export default function Home() {
       });
     }
 
-    // 3. 학생이면 기존 세션 확인 후 이어하기 또는 새 세션 생성
+    // 3. 학생이면 세션 생성 (이미 존재하면 무시하거나 업데이트)
     if (role === 'student') {
-      const { data: existingSession, error: sessionLookupError } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('access_code', finalAccessCode)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (sessionLookupError) {
-        console.error('세션 조회 에러:', sessionLookupError);
-        return setStatus('세션 확인 중 오류가 발생했습니다.');
-      }
-
-      if (existingSession?.id) {
-        setSessionId(existingSession.id);
-      } else {
-        const newSessionId = crypto.randomUUID();
-        const { error: sessionCreateError } = await supabase.from('sessions').insert({
-          id: newSessionId,
-          user_id: userId,
-          title: `${displayName}의 세션`,
-          access_code: finalAccessCode,
-        });
-
-        if (sessionCreateError) {
-          console.error('세션 생성 에러:', sessionCreateError);
-          return setStatus('세션 생성에 실패했습니다. 다시 시도해주세요.');
-        }
-
-        setSessionId(newSessionId);
-      }
+      await supabase.from('sessions').upsert({
+        id: activeSessionId,
+        user_id: userId,
+        title: `${displayName}의 세션`,
+        access_code: finalAccessCode
+      });
     }
 
     // 상태 업데이트 (화면 전환)
-    setUser({ id: userId, name: displayName, email, role, access_code: finalAccessCode });
+    // 수정됨: role을 강제로 'student' | 'parent'로 캐스팅하여 타입 에러 해결
+    setUser({ 
+        id: userId, 
+        name: displayName, 
+        email, 
+        role: role as 'student' | 'parent', 
+        access_code: finalAccessCode 
+    });
   };
 
   const headerTitle = useMemo(() => {
@@ -167,7 +183,7 @@ export default function Home() {
         <StudentChat sessionId={sessionId} userId={user.id} studentName={user.name} accessCode={user.access_code} />
       )}
       {user && role === 'parent' && (
-        <ParentDashboard parentName={user.name} accessCode={user.access_code} />
+        <ParentDashboard parentName={user.name} />
       )}
     </main>
   );
