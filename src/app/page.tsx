@@ -14,8 +14,9 @@ interface UserProfile {
 
 export default function Home() {
   const [role, setRole] = useState<'student' | 'parent' | ''>('');
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [authCode, setAuthCode] = useState('');
+  const [generatedCode, setGeneratedCode] = useState('');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
@@ -27,10 +28,39 @@ export default function Home() {
     }
   }, [sessionId]);
 
-  const handleLogin = async () => {
-    if (!role || !name.trim()) {
-      setStatus('역할과 이름을 입력해주세요.');
+  const handleGenerateCode = () => {
+    if (!email.trim()) {
+      setStatus('부모 이메일을 입력해주세요.');
       return;
+    }
+
+    const code = `${Math.floor(100000 + Math.random() * 900000)}`;
+    setGeneratedCode(code);
+    setStatus('인증코드가 발급되었습니다. 학생에게 전달해주세요.');
+  };
+
+  const handleLogin = async () => {
+    if (!role) {
+      setStatus('역할을 선택해주세요.');
+      return;
+    }
+    if (!email.trim()) {
+      setStatus('이메일을 입력해주세요.');
+      return;
+    }
+    if (role === 'parent' && !generatedCode) {
+      setStatus('먼저 인증코드를 발급해주세요.');
+      return;
+    }
+    if (role === 'student') {
+      if (!authCode.trim()) {
+        setStatus('부모님께 받은 인증코드를 입력해주세요.');
+        return;
+      }
+      if (!generatedCode || authCode.trim() !== generatedCode) {
+        setStatus('인증코드가 일치하지 않습니다.');
+        return;
+      }
     }
     if (!supabase) {
       setStatus('Supabase 연결이 설정되지 않았습니다. .env.local을 확인해주세요.');
@@ -38,15 +68,16 @@ export default function Home() {
     }
 
     const userId = crypto.randomUUID();
-    setUser({ id: userId, name: name.trim(), email, role });
+    const displayName = email.trim();
+    setUser({ id: userId, name: displayName, email: email.trim(), role });
     setStatus('프로필이 생성되었습니다. Supabase에 동기화 중...');
 
-    await supabase.from('profiles').upsert({ id: userId, name: name.trim(), email, role });
+    await supabase.from('profiles').upsert({ id: userId, name: displayName, email: email.trim(), role });
 
     if (role === 'student') {
       const { data } = await supabase
         .from('sessions')
-        .insert({ id: sessionId || crypto.randomUUID(), user_id: userId, title: `${name.trim()}님의 학습 세션` })
+        .insert({ id: sessionId || crypto.randomUUID(), user_id: userId, title: `${displayName}님의 학습 세션` })
         .select('id')
         .single();
 
@@ -85,7 +116,7 @@ export default function Home() {
                 🎓
               </span>
               <h2 className="landing-card-title">학생 시작하기</h2>
-              <p className="landing-card-description">부모님께 받은 코드를 입력하고 나만의 AI 멘토를 만나보세요.</p>
+              <p className="landing-card-description">부모님께 받은 인증코드를 입력하고 멘토와 대화를 시작하세요.</p>
             </button>
 
             <button
@@ -100,7 +131,7 @@ export default function Home() {
                 🛡️
               </span>
               <h2 className="landing-card-title">학부모 시작하기</h2>
-              <p className="landing-card-description">회원가입 후 코드를 생성하여 자녀와 연결하세요.</p>
+              <p className="landing-card-description">부모 이메일을 등록하고 인증코드를 발급해 자녀와 연결하세요.</p>
             </button>
           </div>
         </section>
@@ -126,7 +157,7 @@ export default function Home() {
             ← 시작 화면으로 돌아가기
           </button>
           <h2 style={{ marginTop: 0 }}>로그인</h2>
-          <p style={{ color: 'var(--muted)', marginTop: 0 }}>역할을 선택하고 이름과 이메일을 입력하세요.</p>
+          <p style={{ color: 'var(--muted)', marginTop: 0 }}>이메일만 입력해 부모-학생 계정을 연결하세요.</p>
 
           <div style={{ display: 'flex', gap: '1rem', margin: '1rem 0' }}>
             <button
@@ -147,25 +178,42 @@ export default function Home() {
 
           <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span>이름</span>
+              <span>{role === 'parent' ? '부모 이메일' : '학생 이메일'}</span>
               <input
                 style={{ padding: '0.9rem 1rem', borderRadius: 16, border: '1px solid rgba(148, 163, 184, 0.35)', background: '#ffffff', color: 'inherit' }}
-                placeholder="예: 홍길동"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span>이메일 (선택)</span>
-              <input
-                style={{ padding: '0.9rem 1rem', borderRadius: 16, border: '1px solid rgba(148, 163, 184, 0.35)', background: '#ffffff', color: 'inherit' }}
-                placeholder="parent@example.com"
+                placeholder={role === 'parent' ? 'parent@example.com' : 'student@example.com'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
               />
             </label>
+            {role === 'student' && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <span>인증코드</span>
+                <input
+                  style={{ padding: '0.9rem 1rem', borderRadius: 16, border: '1px solid rgba(148, 163, 184, 0.35)', background: '#ffffff', color: 'inherit' }}
+                  placeholder="부모님께 받은 6자리 코드"
+                  value={authCode}
+                  onChange={(e) => setAuthCode(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                />
+              </label>
+            )}
           </div>
+
+          {role === 'parent' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', alignItems: 'center' }}>
+              <button type="button" className="button-base" onClick={handleGenerateCode}>
+                인증코드 발급
+              </button>
+              {generatedCode && (
+                <span style={{ padding: '0.4rem 0.75rem', borderRadius: 999, background: 'var(--brand-50)', color: 'var(--brand-900)', fontWeight: 700 }}>
+                  인증코드: {generatedCode}
+                </span>
+              )}
+            </div>
+          )}
 
           <button
             className="button-base button-primary"
