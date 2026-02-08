@@ -10,310 +10,144 @@ interface UserProfile {
   name: string;
   email: string;
   role: 'student' | 'parent';
-  accessCode: string;
-  sessionId?: string;
+  access_code?: string;
 }
-
-const STORAGE_KEY = 'teenai-user';
 
 export default function Home() {
   const [role, setRole] = useState<'student' | 'parent' | ''>('');
   const [email, setEmail] = useState('');
-  const [authCode, setAuthCode] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('');
+  const [authCode, setAuthCode] = useState(''); // 학생이 입력하는 코드
+  const [generatedCode, setGeneratedCode] = useState(''); // 부모가 만든 코드
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [step, setStep] = useState<'landing' | 'login'>('landing');
 
+  // 세션 ID 초기화
   useEffect(() => {
-    if (!sessionId) {
-      setSessionId(crypto.randomUUID());
-    }
+    if (!sessionId) setSessionId(crypto.randomUUID());
   }, [sessionId]);
 
-  useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (!stored) return;
-
-    try {
-      const parsed = JSON.parse(stored) as UserProfile;
-      if (!parsed?.id || !parsed?.role || !parsed?.accessCode) return;
-      setUser(parsed);
-      setRole(parsed.role);
-      setEmail(parsed.email);
-      if (parsed.sessionId) {
-        setSessionId(parsed.sessionId);
-      }
-      setStep('login');
-    } catch (error) {
-      console.warn('저장된 사용자 정보를 불러오지 못했습니다.', error);
-    }
-  }, []);
-
-  const createAccessCode = async (attempt = 0): Promise<string | null> => {
-    if (!supabase) {
-      setStatus('Supabase 연결이 설정되지 않았습니다. .env.local을 확인해주세요.');
-      return null;
-    }
-    if (attempt > 3) {
-      setStatus('인증코드 생성에 실패했습니다. 다시 시도해주세요.');
-      return null;
-    }
-
-    const code = `${Math.floor(100000 + Math.random() * 900000)}`;
-    const { error } = await supabase.from('access_codes').insert({ code });
-
-    if (!error) {
-      return code;
-    }
-
-    if (error.code === '23505') {
-      return createAccessCode(attempt + 1);
-    }
-
-    console.error('인증코드 생성 실패:', error);
-    setStatus('인증코드 생성에 실패했습니다. 다시 시도해주세요.');
-    return null;
-  };
-
-  const handleGenerateCode = async () => {
-    if (!email.trim()) {
-      setStatus('부모 이메일을 입력해주세요.');
-      return;
-    }
-
-    const code = await createAccessCode();
-    if (!code) return;
-
+  // 부모: 인증코드 생성 함수
+  const handleGenerateCode = () => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedCode(code);
-    setStatus('인증코드가 발급되었습니다. 학생에게 전달해주세요.');
+    setStatus('인증코드가 발급되었습니다. 학생에게 알려주세요!');
   };
 
+  // 로그인 및 DB 저장 함수
   const handleLogin = async () => {
-    if (!role) {
-      setStatus('역할을 선택해주세요.');
-      return;
-    }
-    if (!email.trim()) {
-      setStatus('이메일을 입력해주세요.');
-      return;
-    }
-    if (!supabase) {
-      setStatus('Supabase 연결이 설정되지 않았습니다. .env.local을 확인해주세요.');
-      return;
-    }
+    if (!email.trim()) return setStatus('이메일을 입력해주세요.');
+    
+    // 코드 검증 로직
+    const finalAccessCode = role === 'parent' ? generatedCode : authCode;
 
-    const trimmedEmail = email.trim();
-    const accessCode = role === 'parent' ? generatedCode : authCode.trim();
+    if (role === 'parent' && !generatedCode) return setStatus('먼저 인증코드를 발급해주세요.');
+    if (role === 'student' && !authCode) return setStatus('인증코드를 입력해주세요.');
+    
+    if (!supabase) return setStatus('Supabase 연결 오류.');
 
-    if (role === 'parent' && !accessCode) {
-      setStatus('먼저 인증코드를 발급해주세요.');
-      return;
-    }
+    setStatus('입장 중...');
+    
+    const userId = crypto.randomUUID();
+    const displayName = email.split('@')[0];
 
-    if (role === 'student') {
-      if (!accessCode) {
-        setStatus('부모님께 받은 인증코드를 입력해주세요.');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('access_codes')
-        .select('code')
-        .eq('code', accessCode);
-
-      if (error || !data || data.length === 0) {
-        setStatus('인증코드를 찾을 수 없습니다. 다시 확인해주세요.');
-        return;
-      }
-    }
-
-    const userId = user?.id ?? crypto.randomUUID();
-    const displayName = trimmedEmail;
-    const newSessionId = role === 'student' ? sessionId || crypto.randomUUID() : undefined;
-
-    setStatus('프로필이 생성되었습니다. Supabase에 동기화 중...');
-
-    const { error: profileError } = await supabase.from('profiles').upsert({
+    // 1. 프로필 저장 (중요: access_code 포함!)
+    const { error } = await supabase.from('profiles').upsert({
       id: userId,
       name: displayName,
-      email: trimmedEmail,
-      role,
-      access_code: accessCode,
+      email: email,
+      role: role,
+      access_code: finalAccessCode // DB에 코드 저장
     });
 
-    if (profileError) {
-      console.error('프로필 저장 실패:', profileError);
-      setStatus('프로필 저장에 실패했습니다. 다시 시도해주세요.');
-      return;
+    if (error) {
+      console.error('프로필 저장 에러:', error);
+      return setStatus('로그인 실패. 다시 시도해주세요.');
     }
 
-    if (role === 'student' && newSessionId) {
-      const { data } = await supabase
-        .from('sessions')
-        .upsert({
-          id: newSessionId,
-          user_id: userId,
-          title: `${displayName}님의 학습 세션`,
-          access_code: accessCode,
-        })
-        .select('id')
-        .single();
-
-      if (data?.id) {
-        setSessionId(data.id);
-      }
+    // 2. 부모면 코드 테이블에도 저장 (중복 체크 생략 - 간편 모드)
+    if (role === 'parent') {
+      await supabase.from('access_codes').upsert({
+        code: finalAccessCode,
+        creator_role: 'parent'
+      });
     }
 
-    const updatedUser: UserProfile = {
-      id: userId,
-      name: displayName,
-      email: trimmedEmail,
-      role,
-      accessCode,
-      sessionId: newSessionId,
-    };
+    // 3. 학생이면 세션 생성
+    if (role === 'student') {
+      await supabase.from('sessions').insert({
+        id: sessionId,
+        user_id: userId,
+        title: `${displayName}의 세션`,
+        access_code: finalAccessCode
+      });
+    }
 
-    setUser(updatedUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
-    setStatus('로그인 완료! 대시보드를 불러옵니다.');
+    // 상태 업데이트 (화면 전환)
+    setUser({ id: userId, name: displayName, email, role, access_code: finalAccessCode });
   };
 
   const headerTitle = useMemo(() => {
-    if (!user) return 'TEENAI 로그인';
-    return user.role === 'student' ? `${user.name} 학생 전용 채팅` : `${user.name} 보호자 대시보드`;
+    if (!user) return 'TEENAI';
+    return user.role === 'student' ? `${user.name} 학생` : `${user.name} 부모님`;
   }, [user]);
 
   return (
     <main className="container">
+      {/* 1. 랜딩 페이지 */}
       {!user && step === 'landing' && (
         <section className="auth-selection">
-          <header className="auth-selection-header">
-            <h1>TEENAI</h1>
-            <p>청소년을 위한 가장 안전한 AI 성장의 공간</p>
-          </header>
-
+          <h1>TEENAI</h1>
           <div className="auth-selection-grid">
-            <button
-              type="button"
-              className="auth-card auth-card-student"
-              onClick={() => {
-                setRole('student');
-                setStep('login');
-              }}
-            >
-              <span className="auth-card-orbit" aria-hidden="true" />
-              <span className="auth-card-icon">🎓</span>
-              <h2>학생 시작하기</h2>
-              <p>부모님께 받은 인증코드를 입력하고 멘토와 대화를 시작하세요.</p>
-              <span className="auth-card-cta">Start Now →</span>
+            <button className="auth-card auth-card-student" onClick={() => { setRole('student'); setStep('login'); }}>
+              <h2>🎓 학생 시작하기</h2>
+              <p>부모님께 받은 코드로 입장하세요.</p>
             </button>
-
-            <button
-              type="button"
-              className="auth-card auth-card-parent"
-              onClick={() => {
-                setRole('parent');
-                setStep('login');
-              }}
-            >
-              <span className="auth-card-orbit" aria-hidden="true" />
-              <span className="auth-card-icon">🛡️</span>
-              <h2>학부모 시작하기</h2>
-              <p>부모 이메일을 등록하고 인증코드를 발급해 자녀와 연결하세요.</p>
-              <span className="auth-card-cta">Parent Portal →</span>
+            <button className="auth-card auth-card-parent" onClick={() => { setRole('parent'); setStep('login'); }}>
+              <h2>🛡️ 부모님 시작하기</h2>
+              <p>코드를 만들고 자녀와 연결하세요.</p>
             </button>
           </div>
         </section>
       )}
 
-      {(user || step === 'login') && (
-        <header className="glass-nav auth-title">
-          <div>
-            <p>AI 멘토와 보호자 리포트가 함께 있는 TEENAI</p>
-            <h1>{headerTitle}</h1>
-          </div>
-          {user && <span>{user.role === 'student' ? '학생 모드' : '보호자 모드'}</span>}
-        </header>
-      )}
-
+      {/* 2. 로그인 입력 화면 */}
       {!user && step === 'login' && (
         <section className="auth-panel">
-          <button type="button" className="auth-back" onClick={() => setStep('landing')}>
-            ← 시작 화면으로 돌아가기
-          </button>
-          <h2>{role === 'parent' ? 'Parent Login' : 'Student Login'}</h2>
-          <p>이메일만 입력해 부모-학생 계정을 연결하세요.</p>
-
-          <div className="auth-role-toggle">
-            <button
-              type="button"
-              className={role === 'student' ? 'active' : ''}
-              onClick={() => setRole('student')}
-            >
-              학생으로 사용
-            </button>
-            <button
-              type="button"
-              className={role === 'parent' ? 'active' : ''}
-              onClick={() => setRole('parent')}
-            >
-              보호자로 보기
-            </button>
-          </div>
-
-          <div className="auth-form-grid">
-            <label>
-              <span>{role === 'parent' ? '부모 이메일' : '학생 이메일'}</span>
-              <input
-                placeholder={role === 'parent' ? 'parent@example.com' : 'student@example.com'}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-              />
-            </label>
-            {role === 'student' && (
-              <label>
-                <span>인증코드</span>
-                <input
-                  placeholder="부모님께 받은 6자리 코드"
-                  value={authCode}
-                  onChange={(e) => setAuthCode(e.target.value)}
-                  type="text"
-                  inputMode="numeric"
-                />
-              </label>
-            )}
-          </div>
+          <button onClick={() => setStep('landing')}>← 뒤로</button>
+          <h2>{role === 'parent' ? '부모님 입장' : '학생 입장'}</h2>
+          
+          <label>
+            이메일
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+          </label>
 
           {role === 'parent' && (
             <div className="auth-code-row">
-              <button type="button" onClick={handleGenerateCode}>
-                인증코드 발급
-              </button>
-              {generatedCode && <span>인증코드: {generatedCode}</span>}
+              <button onClick={handleGenerateCode}>코드 발급</button>
+              {generatedCode && <strong>{generatedCode}</strong>}
             </div>
           )}
 
-          <button className="auth-submit" type="button" onClick={handleLogin}>
-            {role === 'parent' ? '보호자 대시보드 열기' : '학생 채팅 시작하기'}
-          </button>
-          {status && <p className="auth-status">{status}</p>}
+          {role === 'student' && (
+            <label>
+              인증코드 (부모님께 받은 6자리)
+              <input type="text" value={authCode} onChange={(e) => setAuthCode(e.target.value)} placeholder="123456" />
+            </label>
+          )}
+
+          <button className="auth-submit" onClick={handleLogin}>입장하기</button>
+          <p>{status}</p>
         </section>
       )}
 
+      {/* 3. 메인 화면 */}
       {user && role === 'student' && (
-        <StudentChat
-          sessionId={user.sessionId ?? sessionId}
-          userId={user.id}
-          studentName={user.name}
-          accessCode={user.accessCode}
-        />
+        <StudentChat sessionId={sessionId} userId={user.id} studentName={user.name} accessCode={user.access_code} />
       )}
-
       {user && role === 'parent' && (
-        <ParentDashboard parentName={user.name} accessCode={user.accessCode} />
+        <ParentDashboard parentName={user.name} accessCode={user.access_code} />
       )}
     </main>
   );
