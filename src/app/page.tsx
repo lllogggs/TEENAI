@@ -81,7 +81,7 @@ export default function Home() {
         if (restoredId) activeSessionId = restoredId;
     }
 
-    // 1. 프로필 저장 (중요: access_code 포함!)
+    // 1. 프로필 저장
     const { error } = await supabase.from('profiles').upsert({
       id: userId,
       name: displayName,
@@ -114,7 +114,7 @@ export default function Home() {
     }
 
     // 상태 업데이트 (화면 전환)
-    // [핵심 수정] role을 강제로 'student' | 'parent'로 변환하여 타입 에러 해결
+    // [중요] 여기서 as 'student' | 'parent'를 붙여서 타입 에러를 방지함
     setUser({ 
         id: userId, 
         name: displayName, 
@@ -131,7 +131,6 @@ export default function Home() {
 
   return (
     <main className="container">
-      {/* 1. 랜딩 페이지 */}
       {!user && step === 'landing' && (
         <section className="auth-selection">
           <h1>TEENAI</h1>
@@ -148,7 +147,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* 2. 로그인 입력 화면 */}
       {!user && step === 'login' && (
         <section className="auth-panel">
           <button onClick={() => setStep('landing')}>← 뒤로</button>
@@ -178,7 +176,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* 3. 메인 화면 */}
       {user && role === 'student' && (
         <StudentChat sessionId={sessionId} userId={user.id} studentName={user.name} accessCode={user.access_code} />
       )}
