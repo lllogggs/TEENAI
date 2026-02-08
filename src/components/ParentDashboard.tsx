@@ -5,6 +5,7 @@ import { supabase } from '@/utils/supabase/client';
 
 interface ParentDashboardProps {
   parentName: string;
+  accessCode: string;
 }
 
 interface MessageRow {
@@ -13,12 +14,16 @@ interface MessageRow {
   content: string;
   created_at: string;
   session_id: string;
-  // 수정: Supabase 조인 결과가 배열일 수도, 객체일 수도 있으므로 유연하게 any로 처리
-  profiles?: any;
 }
 
-export default function ParentDashboard({ parentName }: ParentDashboardProps) {
+interface ProfileRow {
+  name: string;
+  role: 'student' | 'parent';
+}
+
+export default function ParentDashboard({ parentName, accessCode }: ParentDashboardProps) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [studentNames, setStudentNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchMessages = async () => {
@@ -32,7 +37,8 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
 
     const { data, error } = await supabase
       .from('messages')
-      .select('id, role, content, created_at, session_id, profiles(name)')
+      .select('id, role, content, created_at, session_id')
+      .eq('access_code', accessCode)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -40,14 +46,31 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
       console.error('Error fetching messages:', error);
     }
 
-    // 수정: 타입 에러 방지를 위해 (data as any)로 강제 변환
-    setMessages((data as any) ?? []);
+    setMessages(data ?? []);
     setLoading(false);
+  };
+
+  const fetchStudents = async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('access_code', accessCode)
+      .eq('role', 'student');
+
+    if (error) {
+      console.error('Error fetching profiles:', error);
+      return;
+    }
+
+    const names = (data as ProfileRow[])?.map((profile) => profile.name).filter(Boolean) ?? [];
+    setStudentNames(names);
   };
 
   useEffect(() => {
     fetchMessages();
-  }, []);
+    fetchStudents();
+  }, [accessCode]);
 
   const bySession = useMemo(() => {
     return messages.reduce<Record<string, MessageRow[]>>((acc, message) => {
@@ -72,16 +95,7 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
       .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
   }, [bySession]);
 
-  // 수정: 이름 가져오기 헬퍼 함수 (배열/객체 모두 처리)
-  const getStudentName = (profiles: any) => {
-    if (!profiles) return '알 수 없는 학생';
-    // 배열인 경우 첫 번째 요소의 이름을 반환
-    if (Array.isArray(profiles)) {
-      return profiles[0]?.name ?? '알 수 없는 학생';
-    }
-    // 객체인 경우 바로 이름을 반환
-    return profiles.name ?? '알 수 없는 학생';
-  };
+  const displayStudentName = studentNames.length > 0 ? studentNames[0] : '학생';
 
   return (
     <section className="parent-shell">
@@ -139,14 +153,13 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
           {!loading && (
             <div className="parent-timeline-list">
               {sessions.slice(0, 5).map((session) => {
-                const studentName = getStudentName(session.messages[0]?.profiles);
                 const lastMessage = session.lastMessage?.content ?? '새로운 대화가 시작되었습니다.';
 
                 return (
                   <article key={session.id}>
                     <div>
                       <p>{new Date(session.lastMessage.created_at).toLocaleDateString()}</p>
-                      <strong>{studentName}</strong>
+                      <strong>{displayStudentName}</strong>
                       <span>{lastMessage}</span>
                     </div>
                     <span>{session.messages.length} Messages</span>
