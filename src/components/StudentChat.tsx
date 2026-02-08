@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo } from 'react';
+import { FormEvent, useEffect, useMemo, useRef } from 'react';
 import { useChat } from 'ai/react';
 import { supabase } from '@/utils/supabase/client';
 
@@ -15,11 +15,16 @@ export default function StudentChat({ sessionId, userId, studentName }: Props) {
     api: '/api/chat',
     body: { sessionId, userId, studentName },
   });
+  const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionId || !userId || !supabase) return;
     supabase.from('sessions').upsert({ id: sessionId, user_id: userId, title: `${studentName}의 학습 세션` });
   }, [sessionId, userId, studentName]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleLocalSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -36,59 +41,56 @@ export default function StudentChat({ sessionId, userId, studentName }: Props) {
   const conversation = useMemo(() => messages, [messages]);
 
   return (
-    <section className="student-panel" style={{ display: 'grid', gap: '1rem', padding: '2.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>학습 파트너 Gemini 1.5</p>
-          <h2 style={{ margin: '0.25rem 0 0' }}>{studentName} 학생 상담</h2>
+    <section className="chat-shell">
+      <header className="chat-header">
+        <div className="chat-title">
+          <span className="chat-icon" aria-hidden="true">💜</span>
+          <div>
+            <h2>TEENAI 멘토</h2>
+            <div className="chat-status">
+              <span aria-hidden="true" />
+              <p>LIVE MENTORING</p>
+            </div>
+          </div>
         </div>
-        <span style={{ padding: '0.35rem 0.75rem', background: 'rgba(255, 255, 255, 0.12)', borderRadius: 999, fontSize: '0.85rem' }}>
-          세션 ID: {sessionId.slice(0, 8)}...
-        </span>
-      </div>
+        <span className="chat-session">세션 ID: {sessionId.slice(0, 8)}...</span>
+      </header>
 
-      <div
-        style={{
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: 20,
-          padding: '1rem',
-          maxHeight: 420,
-          overflowY: 'auto',
-          background: 'rgba(255, 255, 255, 0.08)',
-        }}
-      >
-        {conversation.length === 0 && <p className="muted">오늘의 질문을 시작하세요. 예: &quot;기말고사 대비 계획 세워줘&quot;</p>}
+      <div className="chat-body">
+        {conversation.length === 0 && (
+          <div className="chat-empty">
+            <div>💬</div>
+            <p>당신의 이야기를 들려주세요.</p>
+          </div>
+        )}
         {conversation.map((message) => (
-          <article
-            key={message.id}
-            style={{
-              marginBottom: '1rem',
-              padding: '0.75rem',
-              borderRadius: 12,
-              background: message.role === 'user' ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.16)',
-            }}
-          >
-            <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-              {message.role === 'user' ? `${studentName} 학생` : 'TEENAI 멘토'}
-            </p>
-            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{message.content}</div>
-          </article>
+          <div key={message.id} className={`chat-message ${message.role === 'user' ? 'user' : 'assistant'}`}>
+            <div className="chat-bubble">
+              <p>{message.content}</p>
+            </div>
+          </div>
         ))}
+        {isLoading && (
+          <div className="chat-loading">
+            <span />
+            <span />
+            <span />
+            <p>답변 생성 중...</p>
+          </div>
+        )}
+        <div ref={endRef} />
       </div>
 
-      <form onSubmit={handleLocalSubmit} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-        <textarea
-          placeholder="공부 계획, 고민, 목표를 입력하세요"
-          style={{ flex: 1, padding: '1rem', borderRadius: 16, border: '1px solid rgba(255, 255, 255, 0.2)', background: 'rgba(255, 255, 255, 0.12)', color: '#ffffff', minHeight: 80 }}
+      <form className="chat-input-wrap" onSubmit={handleLocalSubmit}>
+        <input
+          placeholder="멘토에게 고민을 털어놓아 보세요..."
           value={input}
           onChange={handleInputChange}
         />
-        <button
-          type="submit"
-          className="button-base button-primary button-compact"
-          disabled={isLoading}
-        >
-          {isLoading ? '응답 중...' : '보내기'}
+        <button type="submit" disabled={isLoading || !input.trim()}>
+          <svg className="chat-send-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+          </svg>
         </button>
       </form>
     </section>
