@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ParentDashboard from '@/components/ParentDashboard';
 import StudentChat from '@/components/StudentChat';
-import { supabase } from '@/utils/supabase';
+import { supabase } from '@/utils/supabase/client';
 
 interface UserProfile {
   id: string;
@@ -36,7 +36,7 @@ export default function Home() {
     setUser({ id: userId, name: name.trim(), email, role });
     setStatus('프로필이 생성되었습니다. Supabase에 동기화 중...');
 
-    await supabase.from('users').upsert({ id: userId, name: name.trim(), email, role });
+    await supabase.from('profiles').upsert({ id: userId, name: name.trim(), email, role });
 
     if (role === 'student') {
       const { data } = await supabase
