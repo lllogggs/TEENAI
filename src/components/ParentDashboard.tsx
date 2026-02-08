@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/utils/supabase';
+import { supabase } from '@/utils/supabase/client';
 
 interface ParentDashboardProps {
   parentName: string;
@@ -13,7 +13,7 @@ interface MessageRow {
   content: string;
   created_at: string;
   session_id: string;
-  users?: { name: string | null } | null;
+  profiles?: { name: string | null } | null;
 }
 
 export default function ParentDashboard({ parentName }: ParentDashboardProps) {
@@ -24,11 +24,11 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
     setLoading(true);
     const { data } = await supabase
       .from('messages')
-      .select('id, role, content, created_at, session_id, users(name)')
+      .select('id, role, content, created_at, session_id, profiles(name)')
       .order('created_at', { ascending: false })
       .limit(50);
 
-    setMessages(data ?? []);
+    setMessages((data ?? []) as MessageRow[]);
     setLoading(false);
   };
 
@@ -68,7 +68,7 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <div>
                 <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>세션 {sessionId.slice(0, 8)}...</p>
-                <strong>{sessionMessages[0]?.users?.name ?? '알 수 없는 학생'}</strong>
+                <strong>{sessionMessages[0]?.profiles?.name ?? '알 수 없는 학생'}</strong>
               </div>
               <span style={{ padding: '0.35rem 0.75rem', borderRadius: 10, background: 'rgba(124,58,237,0.16)', color: '#e9d5ff', fontWeight: 700, fontSize: '0.9rem' }}>
                 {sessionMessages.length}개 메시지
@@ -83,7 +83,7 @@ export default function ParentDashboard({ parentName }: ParentDashboardProps) {
                   </span>
                   <div style={{ padding: '0.75rem', borderRadius: 10, background: message.role === 'assistant' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59,130,246,0.12)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }}>
-                      {message.role === 'assistant' ? 'AI 응답' : `${message.users?.name ?? '학생'} 입력`}
+                      {message.role === 'assistant' ? 'AI 응답' : `${message.profiles?.name ?? '학생'} 입력`}
                     </p>
                     <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{message.content}</div>
                   </div>

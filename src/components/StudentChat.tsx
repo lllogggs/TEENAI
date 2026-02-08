@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo } from 'react';
 import { useChat } from 'ai/react';
-import { supabase } from '@/utils/supabase';
+import { supabase } from '@/utils/supabase/client';
 
 type Props = {
   sessionId: string;
