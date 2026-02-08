@@ -1,23 +1,27 @@
 'use client';
 
-import { FormEvent, useEffect, useRef } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useChat } from 'ai/react';
 import { supabase } from '@/utils/supabase/client';
 
 type Props = {
-  sessionId: string;
+  initialSessionId: string;
   userId: string;
   studentName: string;
-  accessCode?: string; // 추가된 Props
+  accessCode?: string;
 };
 
-export default function StudentChat({ sessionId, userId, studentName, accessCode }: Props) {
-  // api 호출 시 accessCode도 같이 보냄
+export default function StudentChat({ initialSessionId, userId, studentName, accessCode }: Props) {
+  const [sessionId, setSessionId] = useState(initialSessionId);
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, setMessages } = useChat({
     api: '/api/chat',
     body: { sessionId, userId, studentName, accessCode },
   });
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSessionId(initialSessionId);
+  }, [initialSessionId]);
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -45,7 +49,6 @@ export default function StudentChat({ sessionId, userId, studentName, accessCode
     fetchMessages();
   }, [sessionId, setMessages]);
 
-  // 화면 스크롤 자동 이동
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -55,16 +58,16 @@ export default function StudentChat({ sessionId, userId, studentName, accessCode
     const content = input.trim();
     if (!content) return;
 
-    // 내 메시지 먼저 DB에 저장 (access_code 포함)
     if (supabase) {
       await supabase.from('messages').insert({
         session_id: sessionId,
         user_id: userId,
         role: 'user',
         content,
-        access_code: accessCode, // 중요!
+        access_code: accessCode,
       });
     }
+
     await handleSubmit(event);
     setInput('');
   };
@@ -89,7 +92,9 @@ export default function StudentChat({ sessionId, userId, studentName, accessCode
 
       <form className="chat-input-wrap" onSubmit={handleLocalSubmit}>
         <input value={input} onChange={handleInputChange} placeholder="메시지 입력..." />
-        <button type="submit" disabled={isLoading}>전송</button>
+        <button type="submit" disabled={isLoading}>
+          전송
+        </button>
       </form>
     </section>
   );

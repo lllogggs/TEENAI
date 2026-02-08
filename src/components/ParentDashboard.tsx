@@ -22,7 +22,6 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // useCallback으로 감싸서 무한 루프 및 경고 방지
   const fetchMessages = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -33,7 +32,6 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
       .order('created_at', { ascending: false })
       .limit(100);
 
-    // 인증 코드가 있으면 해당 가족의 대화만 필터링
     if (accessCode) {
       query = query.eq('access_code', accessCode);
     }
@@ -43,7 +41,7 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
     if (error) {
       console.error('Error fetching messages:', error);
     } else {
-      setMessages((data as any[]) ?? []);
+      setMessages((data as MessageRow[]) ?? []);
     }
     setLoading(false);
   }, [accessCode]);
@@ -70,7 +68,9 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
         <div className="parent-nav-actions">
           <div>
             <p>Parent Account</p>
-            <strong>{parentName}님 ({accessCode})</strong>
+            <strong>
+              {parentName}님 ({accessCode})
+            </strong>
           </div>
           <button type="button" onClick={fetchMessages} className="parent-refresh">
             새로고침
@@ -93,7 +93,9 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
           </header>
 
           {loading && <p className="parent-muted">데이터를 불러오는 중입니다...</p>}
-          {!loading && messages.length === 0 && <p className="parent-muted">아직 자녀와의 대화 기록이 없습니다.</p>}
+          {!loading && messages.length === 0 && (
+            <p className="parent-muted">아직 자녀와의 대화 기록이 없습니다.</p>
+          )}
 
           {!loading &&
             Object.entries(bySession).map(([sessionId, sessionMessages]) => {
@@ -104,28 +106,39 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
               const studentName = lastMsg.notes ? lastMsg.notes.replace('학생: ', '') : '자녀';
 
               return (
-                <article key={sessionId} className="parent-timeline-item" style={{ padding: '1.5rem', borderBottom: '1px solid #eee' }}>
-                  <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                <article
+                  key={sessionId}
+                  className="parent-timeline-item"
+                  style={{ padding: '1.5rem', borderBottom: '1px solid #eee' }}
+                >
+                  <div
+                    style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <strong>{studentName}의 세션</strong>
                     <span style={{ fontSize: '0.8rem', color: '#888' }}>
                       {new Date(lastMsg.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {sortedMsgs.map((msg) => (
-                      <div key={msg.id} style={{ 
-                        display: 'flex', 
-                        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' 
-                      }}>
-                        <span style={{
-                          background: msg.role === 'user' ? '#eef2ff' : '#f0fdf4',
-                          color: msg.role === 'user' ? '#3730a3' : '#166534',
-                          padding: '0.5rem 0.8rem',
-                          borderRadius: '8px',
-                          fontSize: '0.9rem',
-                          maxWidth: '80%'
-                        }}>
+                      <div
+                        key={msg.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: msg.role === 'user' ? '#eef2ff' : '#f0fdf4',
+                            color: msg.role === 'user' ? '#3730a3' : '#166534',
+                            padding: '0.5rem 0.8rem',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem',
+                            maxWidth: '80%',
+                          }}
+                        >
                           {msg.role === 'assistant' && '🤖 '}
                           {msg.content}
                         </span>
