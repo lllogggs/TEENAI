@@ -22,7 +22,7 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 메시지 가져오기 함수 (useCallback으로 감싸서 useEffect 의존성 문제 해결)
+  // useCallback으로 감싸서 무한 루프 및 경고 방지
   const fetchMessages = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -97,7 +97,6 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
 
           {!loading &&
             Object.entries(bySession).map(([sessionId, sessionMessages]) => {
-              // 최신순 정렬
               const sortedMsgs = [...sessionMessages].sort(
                 (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
               );
