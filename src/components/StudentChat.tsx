@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef } from 'react';
+import { FormEvent, useEffect, useRef } from 'react';
 import { useChat } from 'ai/react';
 import { supabase } from '@/utils/supabase/client';
 
@@ -13,11 +13,37 @@ type Props = {
 
 export default function StudentChat({ sessionId, userId, studentName, accessCode }: Props) {
   // api 호출 시 accessCode도 같이 보냄
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, setMessages } = useChat({
     api: '/api/chat',
     body: { sessionId, userId, studentName, accessCode },
   });
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!supabase || !sessionId) return;
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, role, content, created_at')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      if (error || !data) {
+        console.error('대화 내역 불러오기 실패:', error);
+        return;
+      }
+
+      setMessages(
+        data.map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+        }))
+      );
+    };
+
+    fetchMessages();
+  }, [sessionId, setMessages]);
 
   // 화면 스크롤 자동 이동
   useEffect(() => {
@@ -36,7 +62,7 @@ export default function StudentChat({ sessionId, userId, studentName, accessCode
         user_id: userId,
         role: 'user',
         content,
-        access_code: accessCode // 중요!
+        access_code: accessCode, // 중요!
       });
     }
     await handleSubmit(event);
