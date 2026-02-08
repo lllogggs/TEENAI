@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/utils/supabase/client';
 
 interface ParentDashboardProps {
   parentName: string;
-  accessCode: string;
+  accessCode?: string;
 }
 
 interface MessageRow {
@@ -14,63 +14,43 @@ interface MessageRow {
   content: string;
   created_at: string;
   session_id: string;
-}
-
-interface ProfileRow {
-  name: string;
-  role: 'student' | 'parent';
+  access_code: string;
+  notes?: string;
 }
 
 export default function ParentDashboard({ parentName, accessCode }: ParentDashboardProps) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [studentNames, setStudentNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchMessages = async () => {
+  // 메시지 가져오기 함수 (useCallback으로 감싸서 useEffect 의존성 문제 해결)
+  const fetchMessages = useCallback(async () => {
+    if (!supabase) return;
     setLoading(true);
-    if (!supabase) {
-      console.warn('Supabase 환경변수가 설정되지 않아 대화를 불러올 수 없습니다.');
-      setMessages([]);
-      setLoading(false);
-      return;
+
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    // 인증 코드가 있으면 해당 가족의 대화만 필터링
+    if (accessCode) {
+      query = query.eq('access_code', accessCode);
     }
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, role, content, created_at, session_id')
-      .eq('access_code', accessCode)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching messages:', error);
+    } else {
+      setMessages((data as any[]) ?? []);
     }
-
-    setMessages(data ?? []);
     setLoading(false);
-  };
-
-  const fetchStudents = async () => {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('name, role')
-      .eq('access_code', accessCode)
-      .eq('role', 'student');
-
-    if (error) {
-      console.error('Error fetching profiles:', error);
-      return;
-    }
-
-    const names = (data as ProfileRow[])?.map((profile) => profile.name).filter(Boolean) ?? [];
-    setStudentNames(names);
-  };
+  }, [accessCode]);
 
   useEffect(() => {
     fetchMessages();
-    fetchStudents();
-  }, [accessCode]);
+  }, [fetchMessages]);
 
   const bySession = useMemo(() => {
     return messages.reduce<Record<string, MessageRow[]>>((acc, message) => {
@@ -79,23 +59,6 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
       return acc;
     }, {});
   }, [messages]);
-
-  const sessions = useMemo(() => {
-    return Object.entries(bySession)
-      .map(([sessionId, sessionMessages]) => {
-        const sorted = [...sessionMessages].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        );
-        return {
-          id: sessionId,
-          messages: sorted,
-          lastMessage: sorted[0],
-        };
-      })
-      .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
-  }, [bySession]);
-
-  const displayStudentName = studentNames.length > 0 ? studentNames[0] : '학생';
 
   return (
     <section className="parent-shell">
@@ -107,7 +70,7 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
         <div className="parent-nav-actions">
           <div>
             <p>Parent Account</p>
-            <strong>{parentName}님</strong>
+            <strong>{parentName}님 ({accessCode})</strong>
           </div>
           <button type="button" onClick={fetchMessages} className="parent-refresh">
             새로고침
@@ -118,56 +81,61 @@ export default function ParentDashboard({ parentName, accessCode }: ParentDashbo
       <main className="parent-main">
         <section className="parent-hero">
           <div>
-            <h2>{parentName} 님의 학습 리포트</h2>
-            <p>최근 대화 기록과 세션 흐름을 한눈에 확인하세요.</p>
+            <h2>자녀 학습 리포트</h2>
+            <p>우리 가족 인증코드({accessCode})로 연결된 대화 내역입니다.</p>
           </div>
-          <div className="parent-hero-badge">
-            <span>총 대화 {messages.length}회</span>
-          </div>
-        </section>
-
-        <section className="parent-stats">
-          <article>
-            <p>Total Sessions</p>
-            <h3>{sessions.length}회</h3>
-          </article>
-          <article>
-            <p>Total Interactions</p>
-            <h3>{messages.length}개</h3>
-          </article>
-          <article>
-            <p>최근 업데이트</p>
-            <h3>{messages[0] ? new Date(messages[0].created_at).toLocaleDateString() : '-'}</h3>
-          </article>
         </section>
 
         <section className="parent-timeline">
           <header>
-            <h3>Timeline Analysis</h3>
-            <span>Recent 5 Sessions</span>
+            <h3>타임라인</h3>
+            <span>최근 대화 목록</span>
           </header>
 
-          {loading && <p className="parent-muted">최근 대화 불러오는 중...</p>}
-          {!loading && sessions.length === 0 && <p className="parent-muted">아직 기록된 대화가 없습니다.</p>}
+          {loading && <p className="parent-muted">데이터를 불러오는 중입니다...</p>}
+          {!loading && messages.length === 0 && <p className="parent-muted">아직 자녀와의 대화 기록이 없습니다.</p>}
 
-          {!loading && (
-            <div className="parent-timeline-list">
-              {sessions.slice(0, 5).map((session) => {
-                const lastMessage = session.lastMessage?.content ?? '새로운 대화가 시작되었습니다.';
+          {!loading &&
+            Object.entries(bySession).map(([sessionId, sessionMessages]) => {
+              // 최신순 정렬
+              const sortedMsgs = [...sessionMessages].sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+              const lastMsg = sortedMsgs[sortedMsgs.length - 1];
+              const studentName = lastMsg.notes ? lastMsg.notes.replace('학생: ', '') : '자녀';
 
-                return (
-                  <article key={session.id}>
-                    <div>
-                      <p>{new Date(session.lastMessage.created_at).toLocaleDateString()}</p>
-                      <strong>{displayStudentName}</strong>
-                      <span>{lastMessage}</span>
-                    </div>
-                    <span>{session.messages.length} Messages</span>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+              return (
+                <article key={sessionId} className="parent-timeline-item" style={{ padding: '1.5rem', borderBottom: '1px solid #eee' }}>
+                  <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <strong>{studentName}의 세션</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                      {new Date(lastMsg.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {sortedMsgs.map((msg) => (
+                      <div key={msg.id} style={{ 
+                        display: 'flex', 
+                        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' 
+                      }}>
+                        <span style={{
+                          background: msg.role === 'user' ? '#eef2ff' : '#f0fdf4',
+                          color: msg.role === 'user' ? '#3730a3' : '#166534',
+                          padding: '0.5rem 0.8rem',
+                          borderRadius: '8px',
+                          fontSize: '0.9rem',
+                          maxWidth: '80%'
+                        }}>
+                          {msg.role === 'assistant' && '🤖 '}
+                          {msg.content}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              );
+            })}
         </section>
       </main>
     </section>
