@@ -1,84 +1,181 @@
-
-import React, { useState, useEffect } from 'react';
-import { User, ChatSession, SafetyAlert } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User, ChatSession } from '../types';
 import { supabase } from '../utils/supabase';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface ParentDashboardProps {
   user: User;
   onLogout: () => void;
 }
 
+interface StudentOption {
+  user_id: string;
+  name: string;
+  email: string;
+  settings: Record<string, unknown> | null;
+}
+
+interface SessionMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  created_at: string;
+}
+
 const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => {
+  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [sessionMessages, setSessionMessages] = useState<SessionMessage[]>([]);
+  const [stylePrompt, setStylePrompt] = useState('');
   const [loading, setLoading] = useState(true);
-  const [connectedStudentCount, setConnectedStudentCount] = useState(0);
-  
-  const [inviteCode, setInviteCode] = useState(user.my_invite_code);
-  const [generating, setGenerating] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
+
+  const selectedStudent = useMemo(
+    () => students.find((student) => student.user_id === selectedStudentId) || null,
+    [students, selectedStudentId]
+  );
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchStudents = async () => {
       const { data: profiles, error: profileError } = await supabase
         .from('student_profiles')
-        .select('user_id')
+        .select('user_id, settings')
         .eq('parent_user_id', user.id);
 
-      if (!profileError && profiles && profiles.length > 0) {
-        setConnectedStudentCount(profiles.length);
-        const studentId = profiles[0].user_id;
+      if (profileError) {
+        console.error('student_profiles fetch error:', profileError);
+        setLoading(false);
+        return;
+      }
 
-        const [sessionRes, alertRes] = await Promise.all([
-          supabase.from('chat_sessions').select('*').eq('student_id', studentId).order('started_at', { ascending: false }),
-          supabase.from('safety_alerts').select('*').eq('student_id', studentId).order('created_at', { ascending: false })
-        ]);
+      const studentIds = (profiles || []).map((profile) => profile.user_id);
+      if (!studentIds.length) {
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
 
-        if (sessionRes.data) setSessions(sessionRes.data as any);
-        if (alertRes.data) setAlerts(alertRes.data as any);
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', studentIds);
+
+      if (usersError) {
+        console.error('users fetch error:', usersError);
+        setLoading(false);
+        return;
+      }
+
+      const mapped = studentIds
+        .map((studentId) => {
+          const profile = (profiles || []).find((p) => p.user_id === studentId);
+          const account = (usersData || []).find((u) => u.id === studentId);
+          if (!account) return null;
+
+          return {
+            user_id: studentId,
+            name: account.name,
+            email: account.email,
+            settings: (profile?.settings as Record<string, unknown> | null) || {},
+          };
+        })
+        .filter(Boolean) as StudentOption[];
+
+      setStudents(mapped);
+      if (mapped.length > 0) {
+        setSelectedStudentId(mapped[0].user_id);
       }
       setLoading(false);
     };
 
-    fetchData();
+    fetchStudents();
   }, [user.id]);
 
-  const handleGenerateCode = async () => {
-    if (inviteCode && inviteCode !== 'CODE-ERR') {
-        if (!confirm('이미 연결 코드가 존재합니다. 재생성하시겠습니까? (기존 연결은 유지됩니다)')) return;
-    }
-    
-    try {
-      setGenerating(true);
-      const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      let newCode = '';
-      for (let i = 0; i < 6; i++) {
-        newCode += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      
-      const { error } = await supabase.from('users').update({ my_invite_code: newCode }).eq('id', user.id);
-      
-      const currentUserStr = localStorage.getItem('teenai_current_user');
-      if (currentUserStr) {
-        const currentUser = JSON.parse(currentUserStr);
-        currentUser.my_invite_code = newCode;
-        localStorage.setItem('teenai_current_user', JSON.stringify(currentUser));
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (!selectedStudentId) {
+        setSessions([]);
+        return;
       }
 
-      setInviteCode(newCode);
-      alert(`새로운 코드가 발급되었습니다: ${newCode}`);
-    } catch (e: any) {
-      alert('코드 생성 중 오류: ' + e.message);
-    } finally {
-      setGenerating(false);
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('student_id', selectedStudentId)
+        .order('started_at', { ascending: false });
+
+      if (error) {
+        console.error('chat_sessions fetch error:', error);
+        setSessions([]);
+        return;
+      }
+
+      setSessions((data || []) as ChatSession[]);
+      setSelectedSessionId(data?.[0]?.id || '');
+    };
+
+    fetchSessions();
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    const profileStylePrompt = (selectedStudent?.settings?.ai_style_prompt as string) || '';
+    setStylePrompt(profileStylePrompt);
+  }, [selectedStudent]);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!selectedSessionId) {
+        setSessionMessages([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, role, content, created_at')
+        .eq('session_id', selectedSessionId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('messages fetch error:', error);
+        setSessionMessages([]);
+        return;
+      }
+
+      setSessionMessages((data || []) as SessionMessage[]);
+    };
+
+    fetchMessages();
+  }, [selectedSessionId]);
+
+  const saveStylePrompt = async () => {
+    if (!selectedStudentId) return;
+
+    setSavingPrompt(true);
+    const currentSettings = selectedStudent?.settings || {};
+    const mergedSettings = { ...currentSettings, ai_style_prompt: stylePrompt };
+    const { error } = await supabase
+      .from('student_profiles')
+      .update({ settings: mergedSettings })
+      .eq('user_id', selectedStudentId);
+
+    if (error) {
+      console.error('student_profiles update error:', error);
+      alert('스타일 프롬프트 저장에 실패했습니다.');
+      setSavingPrompt(false);
+      return;
     }
+
+    setStudents((prev) =>
+      prev.map((student) =>
+        student.user_id === selectedStudentId
+          ? { ...student, settings: { ...(student.settings || {}), ai_style_prompt: stylePrompt } }
+          : student
+      )
+    );
+    alert('스타일 프롬프트가 저장되었습니다.');
+    setSavingPrompt(false);
   };
-
-  const toneData = [
-    { name: '안정', value: sessions.filter(s => s.tone_level === 'low').length, color: '#10b981' },
-    { name: '보통', value: sessions.filter(s => s.tone_level === 'medium').length, color: '#f59e0b' },
-    { name: '주의', value: sessions.filter(s => s.tone_level === 'high').length, color: '#ef4444' },
-  ];
 
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
@@ -86,104 +183,72 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     <div className="min-h-screen bg-[#F8FAFC]">
       <nav className="sticky top-0 z-40 px-10 py-6 flex justify-between items-center bg-white/80 backdrop-blur-xl border-b border-slate-100">
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">TEENAI <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded ml-1 uppercase tracking-tighter">Parent</span></h1>
-        <div className="flex items-center gap-6">
-            <div className="text-right hidden sm:block">
-                <p className="text-xs font-black text-slate-400 uppercase">Parent Account</p>
-                <p className="text-sm font-bold text-slate-900">{user.name}님</p>
-            </div>
-            <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-            </button>
-        </div>
+        <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-10 py-12 space-y-10">
-        
-        {/* 초대 코드 섹션 리디자인 */}
-        <div className="bg-brand-900 rounded-[2.5rem] p-12 text-white flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/20 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none group-hover:bg-brand-500/30 transition-all duration-1000"></div>
-            <div className="relative z-10 text-center md:text-left">
-                <h2 className="text-3xl font-black mb-3 tracking-tight">자녀 연결 코드</h2>
-                <p className="text-brand-200 text-sm font-medium leading-relaxed">자녀의 회원가입 화면에서 아래 코드를 입력하세요.<br/>연결된 후에도 코드는 재생성 가능하며 기존 연결은 유지됩니다.</p>
-            </div>
-            <div className="mt-8 md:mt-0 relative z-10 flex flex-col items-center gap-4">
-                <div className="bg-white/10 px-10 py-6 rounded-[2rem] border border-white/20 backdrop-blur-xl flex items-center gap-6 shadow-inner">
-                    <span className="text-5xl font-black tracking-[0.25em] font-mono">{inviteCode || 'CODE-ERR'}</span>
-                    <button 
-                        onClick={handleGenerateCode} 
-                        disabled={generating}
-                        className="bg-white text-brand-900 hover:bg-brand-50 text-[10px] font-black px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95"
-                    >
-                        {generating ? '...' : 'REGEN'}
-                    </button>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${connectedStudentCount > 0 ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'bg-amber-400'}`}></span>
-                    <span className="text-[11px] font-black uppercase tracking-[0.15em] opacity-70">
-                        {connectedStudentCount > 0 ? `${connectedStudentCount} Student Connected` : 'Waiting for connection'}
-                    </span>
-                </div>
-            </div>
-        </div>
+      <main className="max-w-7xl mx-auto px-10 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <section className="premium-card p-6 space-y-4">
+          <h2 className="font-black text-lg">연결된 학생</h2>
+          {students.length === 0 && <p className="text-sm text-slate-400">아직 연결된 학생이 없습니다.</p>}
+          {students.map((student) => (
+            <button
+              key={student.user_id}
+              onClick={() => setSelectedStudentId(student.user_id)}
+              className={`w-full text-left p-4 rounded-2xl border ${selectedStudentId === student.user_id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white'}`}
+            >
+              <p className="font-bold text-slate-900">{student.name}</p>
+              <p className="text-xs text-slate-500">{student.email}</p>
+            </button>
+          ))}
 
-        {alerts.length > 0 && (
-          <div className="bg-red-500 text-white p-8 rounded-[2rem] shadow-xl shadow-red-500/20 flex items-center gap-6 animate-in slide-in-from-top duration-700">
-            <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">⚠️</div>
-            <div>
-                <h3 className="font-black text-lg">보호 조치 필요 알림</h3>
-                <p className="text-sm font-medium opacity-90">자녀의 대화에서 정서적 주의가 필요한 표현이 감지되었습니다. 멘토 리포트를 확인해주세요.</p>
-            </div>
+          <div className="pt-4 border-t border-slate-100">
+            <label className="block text-sm font-bold mb-2">AI 답변 스타일(프롬프트 주입)</label>
+            <textarea
+              value={stylePrompt}
+              onChange={(e) => setStylePrompt(e.target.value)}
+              disabled={!selectedStudentId}
+              className="w-full h-36 rounded-xl border border-slate-200 p-3 text-sm"
+              placeholder="예) 짧고 따뜻한 문장으로 공감 먼저, 마지막에 실천 질문 1개"
+            />
+            <button
+              onClick={saveStylePrompt}
+              disabled={!selectedStudentId || savingPrompt}
+              className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold disabled:bg-slate-300"
+            >
+              {savingPrompt ? '저장 중...' : '저장'}
+            </button>
           </div>
-        )}
+        </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="premium-card p-10 hover:shadow-xl transition-all">
-                <h3 className="text-slate-400 text-[11px] font-black uppercase tracking-widest mb-6">Total Interactions</h3>
-                <p className="text-6xl font-black text-slate-900">{sessions.length}<span className="text-xl text-slate-300 ml-2 font-bold">회</span></p>
-            </div>
-            <div className="premium-card p-10 md:col-span-2 hover:shadow-xl transition-all">
-                <h3 className="text-slate-400 text-[11px] font-black uppercase tracking-widest mb-6">Psychological Balance</h3>
-                <div className="h-40">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={toneData}>
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: '900', fill: '#94a3b8'}} />
-                            <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
-                            <Bar dataKey="value" radius={[10, 10, 10, 10]} barSize={50}>
-                                {toneData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        </div>
+        <section className="premium-card p-6 space-y-4">
+          <h2 className="font-black text-lg">세션 목록</h2>
+          {sessions.length === 0 && <p className="text-sm text-slate-400">세션이 없습니다.</p>}
+          {sessions.map((session) => (
+            <button
+              key={session.id}
+              onClick={() => setSelectedSessionId(session.id)}
+              className={`w-full text-left p-4 rounded-2xl border ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white'}`}
+            >
+              <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString()}</p>
+              <p className="text-sm font-bold text-slate-900 mt-1">{session.session_summary || '요약 없음'}</p>
+              <p className="text-xs text-slate-600 mt-1">tone: {session.tone_level}</p>
+              <p className="text-xs text-slate-600">tags: {(session.topic_tags || []).join(', ') || '-'}</p>
+            </button>
+          ))}
+        </section>
 
-        <div className="premium-card overflow-hidden">
-            <div className="px-10 py-7 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
-                <h3 className="font-black text-slate-900 tracking-tight">Timeline Analysis</h3>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent 5 Sessions</span>
-            </div>
-            <div className="divide-y divide-slate-50">
-                {sessions.length === 0 && <div className="p-32 text-center text-slate-300 font-black italic tracking-tighter">No data available yet.</div>}
-                {sessions.slice(0, 5).map(s => (
-                    <div key={s.id} className="px-10 py-7 hover:bg-slate-50/80 transition-all flex justify-between items-center group">
-                        <div className="flex items-center gap-6">
-                            <div className={`w-3 h-3 rounded-full ${s.tone_level === 'high' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'bg-emerald-500'}`}></div>
-                            <div>
-                                <p className="text-[11px] text-slate-400 font-black mb-1">{new Date(s.started_at).toLocaleDateString()}</p>
-                                <p className="text-base font-bold text-slate-800 group-hover:text-brand-900 transition-colors">{s.student_intent || '일상적인 소통 및 정서 환기'}</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                                s.tone_level === 'high' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
-                            }`}>
-                                {s.tone_level === 'high' ? 'Critical' : 'Stable'}
-                            </span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
+        <section className="premium-card p-6">
+          <h2 className="font-black text-lg mb-4">세션 원문</h2>
+          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
+            {sessionMessages.length === 0 && <p className="text-sm text-slate-400">메시지가 없습니다.</p>}
+            {sessionMessages.map((message) => (
+              <div key={message.id} className={`p-3 rounded-xl text-sm ${message.role === 'user' ? 'bg-brand-900 text-white ml-8' : 'bg-slate-100 text-slate-800 mr-8'}`}>
+                <p className="text-[10px] opacity-70 mb-1">{message.role} · {new Date(message.created_at).toLocaleTimeString()}</p>
+                <p>{message.content}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   );

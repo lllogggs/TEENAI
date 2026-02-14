@@ -1,4 +1,3 @@
-
 export enum UserRole {
   STUDENT = 'student',
   PARENT = 'parent'
@@ -16,28 +15,19 @@ export interface User {
   role: UserRole;
   name: string;
   avatar_url?: string;
-  my_invite_code?: string; // 학부모용 초대 코드
+  my_invite_code?: string;
 }
 
-export interface AISettings {
-  toneType: 'gentle' | 'logical' | 'casual';
-  strictSafety: boolean; 
-  eduMode: boolean; 
-  socialBalance: boolean; 
-  cleanLanguage: boolean; 
-  lateNightLimit: boolean; 
-  curiosityMode: boolean; 
-  criticalThinking: boolean; 
-  praiseIntensity: 'normal' | 'high'; 
-  interestTopic: string; 
-  parentDirectives: string[];
+export interface StudentSettings {
+  ai_style_prompt?: string;
+  [key: string]: unknown;
 }
 
 export interface StudentProfile {
   user_id: string;
   invite_code: string;
   parent_user_id?: string;
-  settings?: AISettings;
+  settings?: StudentSettings;
 }
 
 export interface ChatMessage {
@@ -49,25 +39,35 @@ export interface ChatMessage {
 export interface SafetyAlert {
   id: string;
   student_id: string;
-  session_id: string;
-  created_at: number;
+  created_at: string;
   message: string;
-  read: boolean;
 }
 
 export interface ChatSession {
   id: string;
   student_id: string;
-  share_mode: boolean;
-  started_at: number;
-  ended_at?: number;
-  messages: ChatMessage[];
+  started_at: string;
   topic_tags: string[];
   output_types: string[];
   tone_level: ToneLevel;
-  summary?: string;
+  session_summary?: string;
   student_intent?: string;
   ai_intervention?: string;
+}
+
+
+export interface AISettings {
+  toneType: 'gentle' | 'logical' | 'casual';
+  strictSafety: boolean;
+  eduMode: boolean;
+  socialBalance: boolean;
+  cleanLanguage: boolean;
+  lateNightLimit: boolean;
+  curiosityMode: boolean;
+  criticalThinking: boolean;
+  praiseIntensity: 'normal' | 'high';
+  interestTopic: string;
+  parentDirectives: string[];
 }
 
 export interface AnalysisResult {

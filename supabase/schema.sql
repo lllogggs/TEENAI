@@ -1,5 +1,4 @@
 -- TEENAI Supabase schema (run in Supabase SQL Editor)
--- Required extension for random UUIDs
 create extension if not exists pgcrypto;
 
 -- 1) App users profile table (linked to Supabase Auth)
@@ -43,7 +42,22 @@ create table if not exists public.chat_sessions (
 create index if not exists idx_chat_sessions_student_id_started_at
   on public.chat_sessions(student_id, started_at desc);
 
--- 4) Safety alerts table
+-- 4) Messages table (full raw transcript)
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.chat_sessions(id) on delete cascade,
+  student_id uuid not null references public.users(id) on delete cascade,
+  role text not null check (role in ('user', 'model')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_messages_session_id_created_at
+  on public.messages(session_id, created_at asc);
+create index if not exists idx_messages_student_id_created_at
+  on public.messages(student_id, created_at desc);
+
+-- 5) Safety alerts table
 create table if not exists public.safety_alerts (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null references public.users(id) on delete cascade,
@@ -54,7 +68,6 @@ create table if not exists public.safety_alerts (
 create index if not exists idx_safety_alerts_student_id_created_at
   on public.safety_alerts(student_id, created_at desc);
 
--- Optional: enforce 6-char invite code format when present
 alter table public.users
   drop constraint if exists users_my_invite_code_format_chk;
 
@@ -68,29 +81,32 @@ alter table public.users
 alter table public.users enable row level security;
 alter table public.student_profiles enable row level security;
 alter table public.chat_sessions enable row level security;
+alter table public.messages enable row level security;
 alter table public.safety_alerts enable row level security;
 
--- users: a logged-in user can see/update only own row
-create policy if not exists "users_select_own"
+-- users policies
+ drop policy if exists "users_select_own" on public.users;
+create policy "users_select_own"
   on public.users for select
   to authenticated
   using (auth.uid() = id);
 
-create policy if not exists "users_insert_own"
+ drop policy if exists "users_insert_own" on public.users;
+create policy "users_insert_own"
   on public.users for insert
   to authenticated
   with check (auth.uid() = id);
 
-create policy if not exists "users_update_own"
+ drop policy if exists "users_update_own" on public.users;
+create policy "users_update_own"
   on public.users for update
   to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
--- student_profiles:
--- - student can read/update own profile
--- - parent can read connected students' profiles
-create policy if not exists "student_profiles_select_own_or_parent"
+-- student_profiles policies
+ drop policy if exists "student_profiles_select_own_or_parent" on public.student_profiles;
+create policy "student_profiles_select_own_or_parent"
   on public.student_profiles for select
   to authenticated
   using (
@@ -98,21 +114,29 @@ create policy if not exists "student_profiles_select_own_or_parent"
     or auth.uid() = parent_user_id
   );
 
-create policy if not exists "student_profiles_insert_own"
+ drop policy if exists "student_profiles_insert_own" on public.student_profiles;
+create policy "student_profiles_insert_own"
   on public.student_profiles for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy if not exists "student_profiles_update_own"
+ drop policy if exists "student_profiles_update_own" on public.student_profiles;
+create policy "student_profiles_update_own"
   on public.student_profiles for update
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- chat_sessions:
--- - student can insert/select own sessions
--- - parent can select connected student's sessions
-create policy if not exists "chat_sessions_select_student_or_parent"
+ drop policy if exists "student_profiles_update_own_or_parent" on public.student_profiles;
+create policy "student_profiles_update_own_or_parent"
+  on public.student_profiles for update
+  to authenticated
+  using (auth.uid() = user_id or auth.uid() = parent_user_id)
+  with check (auth.uid() = user_id or auth.uid() = parent_user_id);
+
+-- chat_sessions policies
+ drop policy if exists "chat_sessions_select_student_or_parent" on public.chat_sessions;
+create policy "chat_sessions_select_student_or_parent"
   on public.chat_sessions for select
   to authenticated
   using (
@@ -124,15 +148,42 @@ create policy if not exists "chat_sessions_select_student_or_parent"
     )
   );
 
-create policy if not exists "chat_sessions_insert_student"
+ drop policy if exists "chat_sessions_insert_student" on public.chat_sessions;
+create policy "chat_sessions_insert_student"
   on public.chat_sessions for insert
   to authenticated
   with check (auth.uid() = student_id);
 
--- safety_alerts:
--- - student can insert/select own alerts
--- - parent can select connected student's alerts
-create policy if not exists "safety_alerts_select_student_or_parent"
+ drop policy if exists "chat_sessions_update_student" on public.chat_sessions;
+create policy "chat_sessions_update_student"
+  on public.chat_sessions for update
+  to authenticated
+  using (auth.uid() = student_id)
+  with check (auth.uid() = student_id);
+
+-- messages policies
+ drop policy if exists "messages_select_student_or_parent" on public.messages;
+create policy "messages_select_student_or_parent"
+  on public.messages for select
+  to authenticated
+  using (
+    auth.uid() = student_id
+    or exists (
+      select 1 from public.student_profiles sp
+      where sp.user_id = messages.student_id
+        and sp.parent_user_id = auth.uid()
+    )
+  );
+
+ drop policy if exists "messages_insert_student" on public.messages;
+create policy "messages_insert_student"
+  on public.messages for insert
+  to authenticated
+  with check (auth.uid() = student_id);
+
+-- safety_alerts policies
+ drop policy if exists "safety_alerts_select_student_or_parent" on public.safety_alerts;
+create policy "safety_alerts_select_student_or_parent"
   on public.safety_alerts for select
   to authenticated
   using (
@@ -144,7 +195,8 @@ create policy if not exists "safety_alerts_select_student_or_parent"
     )
   );
 
-create policy if not exists "safety_alerts_insert_student"
+ drop policy if exists "safety_alerts_insert_student" on public.safety_alerts;
+create policy "safety_alerts_insert_student"
   on public.safety_alerts for insert
   to authenticated
   with check (auth.uid() = student_id);

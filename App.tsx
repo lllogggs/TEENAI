@@ -26,7 +26,7 @@ function App() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await loadUserProfile(session.user.id);
+        await loadUserProfile(session.user.id, session.user.email || '');
       } else {
         setLoading(false);
       }
@@ -35,25 +35,50 @@ function App() {
     checkSession();
   }, []);
 
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = async (userId: string, fallbackEmail: string) => {
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (profile) {
+      if (!error && profile) {
         if (profile.role === UserRole.PARENT && !profile.my_invite_code) {
           const newCode = createInviteCode();
           await supabase.from('users').update({ my_invite_code: newCode }).eq('id', userId);
           profile.my_invite_code = newCode;
         }
-
         setUser(profile as User);
+        return;
       }
-    } catch (error) {
-      console.error('Profile load error:', error);
+
+      console.error('users profile lookup error:', error);
+      if (fallbackEmail) {
+        const recoveredUser: Partial<User> = {
+          id: userId,
+          email: fallbackEmail,
+          role: UserRole.STUDENT,
+          name: fallbackEmail.split('@')[0],
+        };
+
+        const { data: upserted, error: upsertError } = await supabase
+          .from('users')
+          .upsert(recoveredUser, { onConflict: 'id' })
+          .select('*')
+          .single();
+
+        if (upsertError) {
+          console.error('users upsert error:', upsertError);
+          return;
+        }
+
+        if (upserted) {
+          setUser(upserted as User);
+        }
+      }
+    } catch (loadError) {
+      console.error('Profile load error:', loadError);
     } finally {
       setLoading(false);
     }
@@ -95,34 +120,79 @@ function App() {
         if (authError) throw authError;
         if (!authData.user) throw new Error('가입 실패');
 
+        const hasSession = Boolean(authData.session);
+        if (!hasSession) {
+          alert('이메일 인증 후 로그인하면 계정 설정이 완료됩니다.');
+          return;
+        }
+
         const myInviteCode = role === UserRole.PARENT ? createInviteCode() : null;
 
-        const { error: userInsertError } = await supabase.from('users').insert({
+        const { error: userUpsertError } = await supabase.from('users').upsert({
           id: authData.user.id,
           email,
           role,
           name: email.split('@')[0],
           my_invite_code: myInviteCode,
-        });
+        }, { onConflict: 'id' });
 
-        if (userInsertError) throw userInsertError;
+        if (userUpsertError) throw userUpsertError;
 
         if (role === UserRole.STUDENT && parentId) {
-          const { error: profileInsertError } = await supabase.from('student_profiles').insert({
+          const { error: profileUpsertError } = await supabase.from('student_profiles').upsert({
             user_id: authData.user.id,
             invite_code: code?.trim().toUpperCase(),
             parent_user_id: parentId,
             settings: {},
-          });
+          }, { onConflict: 'user_id' });
 
-          if (profileInsertError) throw profileInsertError;
+          if (profileUpsertError) throw profileUpsertError;
         }
 
-        await loadUserProfile(authData.user.id);
+        await loadUserProfile(authData.user.id, email);
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (data.user) await loadUserProfile(data.user.id);
+
+        if (data.user) {
+          const myInviteCode = createInviteCode();
+          const defaultPayload = {
+            id: data.user.id,
+            email,
+            role,
+            name: email.split('@')[0],
+            my_invite_code: role === UserRole.PARENT ? myInviteCode : null,
+          };
+
+          const { error: upsertError } = await supabase.from('users').upsert(defaultPayload, { onConflict: 'id' });
+          if (upsertError) {
+            console.error('users login upsert error:', upsertError);
+          }
+
+          if (role === UserRole.STUDENT && code) {
+            const { data: parents } = await supabase
+              .from('users')
+              .select('id')
+              .eq('my_invite_code', code.trim().toUpperCase())
+              .eq('role', UserRole.PARENT)
+              .limit(1);
+
+            if (parents?.[0]?.id) {
+              const { error: studentProfileError } = await supabase.from('student_profiles').upsert({
+                user_id: data.user.id,
+                invite_code: code.trim().toUpperCase(),
+                parent_user_id: parents[0].id,
+                settings: {},
+              }, { onConflict: 'user_id' });
+
+              if (studentProfileError) {
+                console.error('student_profiles login upsert error:', studentProfileError);
+              }
+            }
+          }
+
+          await loadUserProfile(data.user.id, data.user.email || email);
+        }
       }
     } catch (err: any) {
       alert(err.message || '오류가 발생했습니다.');
