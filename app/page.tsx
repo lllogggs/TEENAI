@@ -30,6 +30,11 @@ export default function Home() {
     checkSession();
   }, []);
 
+  const getSignupName = (email: string) => {
+    const emailPrefix = email.split('@')[0]?.trim();
+    return emailPrefix || 'User';
+  };
+
   const ensureProfileLoaded = async (userId: string, fallbackEmail: string) => {
     try {
       let profile: any = null;
@@ -52,12 +57,6 @@ export default function Home() {
       }
 
       if (profile) {
-        if (profile.role === UserRole.PARENT && !profile.my_invite_code) {
-          const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-          await supabase.from('users').update({ my_invite_code: newCode }).eq('id', userId);
-          profile.my_invite_code = newCode;
-        }
-
         setUser(profile as User);
         return;
       }
@@ -112,13 +111,14 @@ export default function Home() {
         }
 
         const normalizedInviteCode = code?.trim().toUpperCase();
+        const signupName = getSignupName(email);
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: pass,
           options: {
             data: {
               role,
-              name: email.split('@')[0],
+              name: signupName,
               ...(role === UserRole.STUDENT
                 ? {
                     parent_user_id: parentId,
