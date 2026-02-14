@@ -36,6 +36,15 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface MessageRow {
+  id: string;
+  session_id: string;
+  student_id: string;
+  role: 'user' | 'model';
+  content: string;
+  created_at: string;
+}
+
 export interface SafetyAlert {
   id: string;
   student_id: string;
