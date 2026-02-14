@@ -5,11 +5,9 @@ import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
-const createInviteCode = () => {
-  const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const randomValues = new Uint32Array(6);
-  crypto.getRandomValues(randomValues);
-  return Array.from(randomValues, (value) => alphabet[value % alphabet.length]).join('');
+const getSignupName = (email: string) => {
+  const emailPrefix = email.split('@')[0]?.trim();
+  return emailPrefix || 'User';
 };
 
 function App() {
@@ -57,11 +55,6 @@ function App() {
       }
 
       if (profile) {
-        if (profile.role === UserRole.PARENT && !profile.my_invite_code) {
-          const newCode = createInviteCode();
-          await supabase.from('users').update({ my_invite_code: newCode }).eq('id', userId);
-          profile.my_invite_code = newCode;
-        }
         setUser(profile as User);
         return;
       }
@@ -110,13 +103,14 @@ function App() {
         }
 
         const normalizedInviteCode = code?.trim().toUpperCase();
+        const signupName = getSignupName(email);
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               role,
-              name: email.split('@')[0],
+              name: signupName,
               ...(role === UserRole.STUDENT
                 ? {
                     parent_user_id: parentId,
