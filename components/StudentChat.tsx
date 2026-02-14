@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, ChatMessage } from '../types';
+import { User, ChatMessage, StudentProfile } from '../types';
 import { supabase } from '../utils/supabase';
 import { DANGER_KEYWORDS } from '../constants';
 
@@ -13,28 +13,27 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [stylePrompt, setStylePrompt] = useState('');
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [errorNotice, setErrorNotice] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchStylePrompt = async () => {
+    const fetchProfile = async () => {
       const { data, error } = await supabase
         .from('student_profiles')
-        .select('settings')
+        .select('user_id, invite_code, parent_user_id, settings')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('student_profiles fetch error:', error);
         return;
       }
 
-      const aiStylePrompt = (data?.settings as { ai_style_prompt?: string } | null)?.ai_style_prompt;
-      setStylePrompt(aiStylePrompt || '');
+      setProfile((data as StudentProfile | null) || null);
     };
 
-    fetchStylePrompt();
+    fetchProfile();
   }, [user.id]);
 
   useEffect(() => {
@@ -83,6 +82,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setErrorNotice('');
     const userText = input.trim();
     const userMsg: ChatMessage = { role: 'user', text: userText, timestamp: Date.now() };
+    const nextHistory = messages.map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
 
     setInput('');
     setLoading(true);
@@ -108,13 +108,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     try {
+      const parentStylePrompt = profile?.settings?.ai_style_prompt ?? '';
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           newMessage: userText,
-          history: messages.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
-          parentStylePrompt: stylePrompt,
+          history: nextHistory,
+          parentStylePrompt,
         }),
       });
 
@@ -136,6 +137,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
+  const handleNewSession = () => {
+    setMessages([]);
+    setCurrentSessionId(null);
+    setErrorNotice('');
+  };
+
   return (
     <div className="flex h-screen bg-[#F8FAFC] flex-col overflow-hidden">
       <header className="px-10 py-7 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
@@ -149,7 +156,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             </div>
           </div>
         </div>
-        <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-xs uppercase tracking-tighter transition-colors">Logout</button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors">New Session</button>
+          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-xs uppercase tracking-tighter transition-colors">Logout</button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-10 space-y-10 bg-slate-50/50 custom-scrollbar pb-40">

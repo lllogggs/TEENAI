@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, ChatSession } from '../types';
+import { User, ChatSession, MessageRow, SafetyAlert, StudentSettings } from '../types';
 import { supabase } from '../utils/supabase';
 
 interface ParentDashboardProps {
@@ -7,33 +7,31 @@ interface ParentDashboardProps {
   onLogout: () => void;
 }
 
-interface StudentOption {
+interface ConnectedStudent {
   user_id: string;
-  name: string;
-  email: string;
-  settings: Record<string, unknown> | null;
+  settings: StudentSettings;
 }
 
-interface SessionMessage {
-  id: string;
-  role: 'user' | 'model';
-  content: string;
-  created_at: string;
+interface StudentAccount {
+  name: string;
+  email: string;
 }
 
 const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => {
-  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [connectedStudents, setConnectedStudents] = useState<ConnectedStudent[]>([]);
+  const [studentAccounts, setStudentAccounts] = useState<Record<string, StudentAccount>>({});
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
-  const [sessionMessages, setSessionMessages] = useState<SessionMessage[]>([]);
+  const [sessionMessages, setSessionMessages] = useState<MessageRow[]>([]);
   const [stylePrompt, setStylePrompt] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingPrompt, setSavingPrompt] = useState(false);
 
   const selectedStudent = useMemo(
-    () => students.find((student) => student.user_id === selectedStudentId) || null,
-    [students, selectedStudentId]
+    () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
+    [connectedStudents, selectedStudentId]
   );
 
   useEffect(() => {
@@ -49,9 +47,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         return;
       }
 
-      const studentIds = (profiles || []).map((profile) => profile.user_id);
+      const mappedProfiles: ConnectedStudent[] = (profiles || []).map((profile) => ({
+        user_id: profile.user_id,
+        settings: (profile.settings as StudentSettings) || {},
+      }));
+      setConnectedStudents(mappedProfiles);
+
+      const studentIds = mappedProfiles.map((profile) => profile.user_id);
       if (!studentIds.length) {
-        setStudents([]);
+        setStudentAccounts({});
         setLoading(false);
         return;
       }
@@ -67,25 +71,16 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         return;
       }
 
-      const mapped = studentIds
-        .map((studentId) => {
-          const profile = (profiles || []).find((p) => p.user_id === studentId);
-          const account = (usersData || []).find((u) => u.id === studentId);
-          if (!account) return null;
+      const accountMap = (usersData || []).reduce<Record<string, StudentAccount>>((acc, account) => {
+        acc[account.id] = {
+          name: account.name,
+          email: account.email,
+        };
+        return acc;
+      }, {});
 
-          return {
-            user_id: studentId,
-            name: account.name,
-            email: account.email,
-            settings: (profile?.settings as Record<string, unknown> | null) || {},
-          };
-        })
-        .filter(Boolean) as StudentOption[];
-
-      setStudents(mapped);
-      if (mapped.length > 0) {
-        setSelectedStudentId(mapped[0].user_id);
-      }
+      setStudentAccounts(accountMap);
+      setSelectedStudentId(studentIds[0] || '');
       setLoading(false);
     };
 
@@ -93,33 +88,49 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   }, [user.id]);
 
   useEffect(() => {
-    const fetchSessions = async () => {
+    const fetchStudentData = async () => {
       if (!selectedStudentId) {
         setSessions([]);
+        setAlerts([]);
+        setSelectedSessionId('');
         return;
       }
 
-      const { data, error } = await supabase
-        .from('chat_sessions')
-        .select('*')
-        .eq('student_id', selectedStudentId)
-        .order('started_at', { ascending: false });
+      const [sessionsResult, alertsResult] = await Promise.all([
+        supabase
+          .from('chat_sessions')
+          .select('*')
+          .eq('student_id', selectedStudentId)
+          .order('started_at', { ascending: false }),
+        supabase
+          .from('safety_alerts')
+          .select('*')
+          .eq('student_id', selectedStudentId)
+          .order('created_at', { ascending: false }),
+      ]);
 
-      if (error) {
-        console.error('chat_sessions fetch error:', error);
+      if (sessionsResult.error) {
+        console.error('chat_sessions fetch error:', sessionsResult.error);
         setSessions([]);
-        return;
+      } else {
+        const fetchedSessions = (sessionsResult.data || []) as ChatSession[];
+        setSessions(fetchedSessions);
+        setSelectedSessionId(fetchedSessions[0]?.id || '');
       }
 
-      setSessions((data || []) as ChatSession[]);
-      setSelectedSessionId(data?.[0]?.id || '');
+      if (alertsResult.error) {
+        console.error('safety_alerts fetch error:', alertsResult.error);
+        setAlerts([]);
+      } else {
+        setAlerts((alertsResult.data || []) as SafetyAlert[]);
+      }
     };
 
-    fetchSessions();
+    fetchStudentData();
   }, [selectedStudentId]);
 
   useEffect(() => {
-    const profileStylePrompt = (selectedStudent?.settings?.ai_style_prompt as string) || '';
+    const profileStylePrompt = selectedStudent?.settings?.ai_style_prompt || '';
     setStylePrompt(profileStylePrompt);
   }, [selectedStudent]);
 
@@ -132,7 +143,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
       const { data, error } = await supabase
         .from('messages')
-        .select('id, role, content, created_at')
+        .select('*')
         .eq('session_id', selectedSessionId)
         .order('created_at', { ascending: true });
 
@@ -142,18 +153,21 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         return;
       }
 
-      setSessionMessages((data || []) as SessionMessage[]);
+      setSessionMessages((data || []) as MessageRow[]);
     };
 
     fetchMessages();
   }, [selectedSessionId]);
 
   const saveStylePrompt = async () => {
-    if (!selectedStudentId) return;
+    if (!selectedStudentId || !selectedStudent) return;
 
     setSavingPrompt(true);
-    const currentSettings = selectedStudent?.settings || {};
-    const mergedSettings = { ...currentSettings, ai_style_prompt: stylePrompt };
+    const mergedSettings: StudentSettings = {
+      ...(selectedStudent.settings || {}),
+      ai_style_prompt: stylePrompt,
+    };
+
     const { error } = await supabase
       .from('student_profiles')
       .update({ settings: mergedSettings })
@@ -166,14 +180,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       return;
     }
 
-    setStudents((prev) =>
+    setConnectedStudents((prev) =>
       prev.map((student) =>
         student.user_id === selectedStudentId
-          ? { ...student, settings: { ...(student.settings || {}), ai_style_prompt: stylePrompt } }
+          ? { ...student, settings: mergedSettings }
           : student
       )
     );
-    alert('스타일 프롬프트가 저장되었습니다.');
+
+    alert('Saved');
     setSavingPrompt(false);
   };
 
@@ -189,17 +204,20 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       <main className="max-w-7xl mx-auto px-10 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <section className="premium-card p-6 space-y-4">
           <h2 className="font-black text-lg">연결된 학생</h2>
-          {students.length === 0 && <p className="text-sm text-slate-400">아직 연결된 학생이 없습니다.</p>}
-          {students.map((student) => (
-            <button
-              key={student.user_id}
-              onClick={() => setSelectedStudentId(student.user_id)}
-              className={`w-full text-left p-4 rounded-2xl border ${selectedStudentId === student.user_id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white'}`}
+          {connectedStudents.length === 0 && <p className="text-sm text-slate-400">아직 연결된 학생이 없습니다.</p>}
+          {connectedStudents.length > 0 && (
+            <select
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm"
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
             >
-              <p className="font-bold text-slate-900">{student.name}</p>
-              <p className="text-xs text-slate-500">{student.email}</p>
-            </button>
-          ))}
+              {connectedStudents.map((student) => (
+                <option key={student.user_id} value={student.user_id}>
+                  {(studentAccounts[student.user_id]?.name || 'Unknown')} ({studentAccounts[student.user_id]?.email || student.user_id})
+                </option>
+              ))}
+            </select>
+          )}
 
           <div className="pt-4 border-t border-slate-100">
             <label className="block text-sm font-bold mb-2">AI 답변 스타일(프롬프트 주입)</label>
@@ -217,6 +235,19 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             >
               {savingPrompt ? '저장 중...' : '저장'}
             </button>
+          </div>
+
+          <div className="pt-4 border-t border-slate-100">
+            <h3 className="font-bold text-sm mb-2">안전 알림</h3>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {alerts.length === 0 && <p className="text-xs text-slate-400">안전 알림이 없습니다.</p>}
+              {alerts.map((alert) => (
+                <div key={alert.id} className="bg-amber-50 border border-amber-100 rounded-lg p-2">
+                  <p className="text-xs text-amber-700">{new Date(alert.created_at).toLocaleString()}</p>
+                  <p className="text-xs text-slate-700 mt-1">{alert.message}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
