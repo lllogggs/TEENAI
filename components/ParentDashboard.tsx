@@ -112,6 +112,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [saveStatus, setSaveStatus] = useState('');
   const [instructionInput, setInstructionInput] = useState('');
   const [activeTab, setActiveTab] = useState<'report' | 'settings'>('settings');
+  const [inviteCode, setInviteCode] = useState('');
+  const [showInviteCode, setShowInviteCode] = useState(false);
+  const [copyToast, setCopyToast] = useState('');
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -122,6 +125,62 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     () => normalizeSettings(selectedStudent?.settings),
     [selectedStudent]
   );
+
+  useEffect(() => {
+    const fetchParentInviteCode = async () => {
+      try {
+        const { data: authResult, error: authError } = await supabase.auth.getUser();
+        if (authError || !authResult.user) return;
+
+        const { data: userRow, error: userError } = await supabase
+          .from('users')
+          .select('my_invite_code, role')
+          .eq('id', authResult.user.id)
+          .single();
+
+        if (userError || !userRow || userRow.role !== 'parent') {
+          return;
+        }
+
+        let resolvedCode = userRow.my_invite_code || '';
+
+        if (!resolvedCode) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const accessToken = sessionData.session?.access_token;
+
+          const response = await fetch('/api/ensure-invite-code', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+          });
+
+          if (response.ok) {
+            const payload = await response.json();
+            if (typeof payload?.code === 'string') {
+              resolvedCode = payload.code;
+            }
+          }
+        }
+
+        if (resolvedCode) {
+          setInviteCode(resolvedCode.toUpperCase());
+          setShowInviteCode(true);
+        }
+      } catch (error) {
+        console.error('invite code fetch error:', error);
+      }
+    };
+
+    fetchParentInviteCode();
+  }, []);
+
+  useEffect(() => {
+    if (!copyToast) return;
+    const timer = setTimeout(() => setCopyToast(''), 1800);
+    return () => clearTimeout(timer);
+  }, [copyToast]);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -259,6 +318,16 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     fetchMessages();
   }, [selectedSessionId]);
 
+  const copyInviteCode = async () => {
+    if (!inviteCode) return;
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      setCopyToast('인증코드를 복사했어요.');
+    } catch (error) {
+      console.error('invite code copy error:', error);
+    }
+  };
+
   const updateStudentSettings = async (nextSettings: NormalizedSettings) => {
     if (!selectedStudentId) return;
     setSaveStatus('');
@@ -337,8 +406,31 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     <div className="min-h-screen bg-[#F4F7FC]">
       <nav className="sticky top-0 z-40 px-8 md:px-10 py-6 flex justify-between items-center bg-white/90 backdrop-blur-xl border-b border-slate-100">
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">TEENAI <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded ml-1 uppercase tracking-tighter">Parent</span></h1>
-        <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
+          <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
+
+          {showInviteCode && inviteCode && (
+            <div className="flex items-center gap-2 rounded-2xl border border-brand-100 bg-brand-50 px-3 py-2">
+              <span className="text-[11px] md:text-xs font-black text-brand-900 whitespace-nowrap">학생 인증코드:</span>
+              <span className="text-sm md:text-base font-black tracking-[0.18em] text-brand-900">{inviteCode}</span>
+              <button
+                onClick={copyInviteCode}
+                className="text-[11px] md:text-xs font-black text-brand-700 hover:text-brand-900 bg-white px-2 py-1 rounded-lg border border-brand-100"
+              >
+                복사
+              </button>
+            </div>
+          )}
+
+          <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>
+        </div>
       </nav>
+
+      {copyToast && (
+        <div className="fixed right-6 top-24 z-50 rounded-xl bg-slate-900 text-white text-xs font-bold px-4 py-2 shadow-lg">
+          {copyToast}
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
         <section className="premium-card p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
