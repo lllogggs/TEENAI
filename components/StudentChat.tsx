@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, ChatMessage, StudentProfile } from '../types';
+import { User, ChatMessage } from '../types';
 import { supabase } from '../utils/supabase';
 import { DANGER_KEYWORDS } from '../constants';
 
@@ -13,28 +13,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [errorNotice, setErrorNotice] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from('student_profiles')
-        .select('user_id, invite_code, parent_user_id, settings')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('student_profiles fetch error:', error);
-        return;
-      }
-
-      setProfile((data as StudentProfile | null) || null);
-    };
-
-    fetchProfile();
-  }, [user.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,13 +57,29 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
+  const loadParentStylePrompt = async () => {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .select('settings')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) {
+      console.error('student_profiles style fetch error:', error);
+      return '';
+    }
+
+    const settings = data?.settings as Record<string, unknown> | null;
+    return typeof settings?.ai_style_prompt === 'string' ? settings.ai_style_prompt : '';
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
     setErrorNotice('');
     const userText = input.trim();
     const userMsg: ChatMessage = { role: 'user', text: userText, timestamp: Date.now() };
-    const nextHistory = messages.map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
+    const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
 
     setInput('');
     setLoading(true);
@@ -108,7 +105,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     try {
-      const parentStylePrompt = profile?.settings?.ai_style_prompt ?? '';
+      const parentStylePrompt = await loadParentStylePrompt();
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,7 +154,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors">New Session</button>
+          <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors">New Chat</button>
           <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-xs uppercase tracking-tighter transition-colors">Logout</button>
         </div>
       </header>

@@ -22,7 +22,7 @@ export default function Home() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await loadUserProfile(session.user.id);
+        await ensureProfileLoaded(session.user.id, session.user.email || '');
       } else {
         setLoading(false);
       }
@@ -30,33 +30,44 @@ export default function Home() {
     checkSession();
   }, []);
 
-  const loadUserProfile = async (userId: string) => {
+  const ensureProfileLoaded = async (userId: string, fallbackEmail: string) => {
     try {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
+      let profile: any = null;
+      let lastError: any = null;
+
+      for (let i = 0; i < 10; i += 1) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (data) {
+          profile = data;
+          break;
+        }
+
+        lastError = error;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
       if (profile) {
-        // [수정] 학부모인데 코드가 없는 경우(기존 가입자 등), 자동으로 생성하여 저장
         if (profile.role === UserRole.PARENT && !profile.my_invite_code) {
-            const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            
-            // DB 업데이트
-            await supabase
-                .from('users')
-                .update({ my_invite_code: newCode })
-                .eq('id', userId);
-            
-            // 로컬 상태에도 반영
-            profile.my_invite_code = newCode;
+          const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          await supabase.from('users').update({ my_invite_code: newCode }).eq('id', userId);
+          profile.my_invite_code = newCode;
         }
 
         setUser(profile as User);
+        return;
+      }
+
+      console.error('users profile lookup error:', lastError);
+      if (fallbackEmail) {
+        alert('프로필 생성이 아직 완료되지 않았습니다. 잠시 후 다시 로그인해주세요.');
       }
     } catch (error) {
-      console.error("Profile load error:", error);
+      console.error('Profile load error:', error);
     } finally {
       setLoading(false);
     }
@@ -72,7 +83,7 @@ export default function Home() {
   // 실제 로그인/가입 처리 로직
   const handleAuth = async (email: string, pass: string, role: UserRole, code?: string, isSignup?: boolean) => {
     if (!isSupabaseConfigured) {
-      alert("Supabase가 연결되지 않았습니다.");
+      alert('Supabase가 연결되지 않았습니다.');
       return;
     }
 
@@ -80,73 +91,64 @@ export default function Home() {
       setAuthLoading(true);
 
       if (isSignup) {
-        // --- 회원가입 로직 ---
-        
-        // 1. 학생 가입 시 초대 코드 검증 (부모 찾기)
-        let parentId = null;
+        let parentId: string | null = null;
+
         if (role === UserRole.STUDENT) {
-            if (!code) throw new Error("초대 코드가 필요합니다.");
-            const { data: parents } = await supabase
-                .from('users')
-                .select('id')
-                .eq('my_invite_code', code) // 부모의 코드로 검색
-                .eq('role', 'parent');
-            
-            if (!parents || parents.length === 0) {
-                throw new Error("유효하지 않은 초대 코드입니다.");
-            }
-            parentId = parents[0].id;
+          if (!code) throw new Error('초대 코드가 필요합니다.');
+
+          const normalizedCode = code.trim().toUpperCase();
+          const { data: parents } = await supabase
+            .from('users')
+            .select('id')
+            .eq('my_invite_code', normalizedCode)
+            .eq('role', UserRole.PARENT)
+            .limit(1);
+
+          if (!parents || parents.length === 0) {
+            throw new Error('유효하지 않은 초대 코드입니다.');
+          }
+
+          parentId = parents[0].id;
         }
 
-        // 2. Supabase Auth 가입
+        const normalizedInviteCode = code?.trim().toUpperCase();
         const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password: pass,
+          email,
+          password: pass,
+          options: {
+            data: {
+              role,
+              name: email.split('@')[0],
+              ...(role === UserRole.STUDENT
+                ? {
+                    parent_user_id: parentId,
+                    invite_code: normalizedInviteCode,
+                  }
+                : {}),
+            },
+          },
         });
 
         if (authError) throw authError;
-        if (!authData.user) throw new Error("가입 실패");
+        if (!authData.user) throw new Error('가입 실패');
 
-        // 3. 사용자 정보 DB 저장
-        // 학부모라면 본인의 초대 코드 생성 (랜덤 6자리)
-        const myInviteCode = role === UserRole.PARENT 
-            ? Math.random().toString(36).substring(2, 8).toUpperCase() 
-            : undefined;
-
-        const { error: dbError } = await supabase.from('users').insert({
-            id: authData.user.id,
-            email: email,
-            role: role,
-            name: email.split('@')[0], // 이메일 앞부분을 이름으로
-            my_invite_code: myInviteCode
-        });
-
-        if (dbError) throw dbError;
-
-        // 4. 학생 프로필 생성 및 부모 연결
-        if (role === UserRole.STUDENT && parentId) {
-            await supabase.from('student_profiles').insert({
-                user_id: authData.user.id,
-                invite_code: code, // 사용한 코드 기록
-                parent_user_id: parentId,
-                settings: {}
-            });
+        if (authData.session?.user) {
+          await ensureProfileLoaded(authData.session.user.id, email);
+          return;
         }
 
-        await loadUserProfile(authData.user.id);
-
+        alert('가입이 완료되었습니다. 이메일 확인 후 로그인해주세요. (이메일 인증 OFF 환경에서는 바로 로그인될 수 있어요.)');
       } else {
-        // --- 로그인 로직 ---
         const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password: pass,
+          email,
+          password: pass,
         });
-        if (error) throw error;
-        if (data.user) await loadUserProfile(data.user.id);
-      }
 
+        if (error) throw error;
+        if (data.user) await ensureProfileLoaded(data.user.id, data.user.email || email);
+      }
     } catch (err: any) {
-      alert(err.message || "오류가 발생했습니다.");
+      alert(err.message || '오류가 발생했습니다.');
     } finally {
       setAuthLoading(false);
     }

@@ -23,13 +23,28 @@ export default async function handler(req: any, res: any) {
       '유해하거나 위험한 요청은 정중히 거절하고 안전한 대안을 제시하세요.',
     ].join('\n');
 
-    const mergedInstruction = `${baseInstruction}\n\nPARENT_STYLE_PROMPT: ${parentStylePrompt || ''}`;
+    const mergedInstruction = `${baseInstruction}\n\n[Parent Style Prompt]\n${String(parentStylePrompt || '')}`;
 
     const ai = new GoogleGenAI({ apiKey });
+    const normalizedHistory = Array.isArray(history)
+      ? history
+          .map((item: any) => {
+            if (!item || (item.role !== 'user' && item.role !== 'model')) return null;
+            if (typeof item.content === 'string') {
+              return { role: item.role, parts: [{ text: item.content }] };
+            }
+            if (Array.isArray(item.parts)) {
+              return { role: item.role, parts: item.parts };
+            }
+            return null;
+          })
+          .filter(Boolean)
+      : [];
+
     const chat = ai.chats.create({
       model: 'gemini-2.5-flash',
       config: { systemInstruction: mergedInstruction, temperature: 0.7 },
-      history: Array.isArray(history) ? history : [],
+      history: normalizedHistory as any,
     });
 
     const result = await chat.sendMessage({ message: String(newMessage || '') });
