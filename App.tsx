@@ -26,7 +26,7 @@ function App() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await loadUserProfile(session.user.id, session.user.email || '');
+        await ensureProfileLoaded(session.user.id, session.user.email || '');
       } else {
         setLoading(false);
       }
@@ -35,17 +35,17 @@ function App() {
     checkSession();
   }, []);
 
-  const loadUserProfile = async (userId: string, fallbackEmail: string) => {
+  const ensureProfileLoaded = async (userId: string, fallbackEmail: string) => {
     try {
       let profile: any = null;
       let lastError: any = null;
 
-      for (let i = 0; i < 8; i += 1) {
+      for (let i = 0; i < 10; i += 1) {
         const { data, error } = await supabase
           .from('users')
           .select('*')
           .eq('id', userId)
-          .maybeSingle();
+          .single();
 
         if (data) {
           profile = data;
@@ -129,19 +129,18 @@ function App() {
         if (authError) throw authError;
         if (!authData.user) throw new Error('가입 실패');
 
-        const hasSession = Boolean(authData.session);
-        if (!hasSession) {
-          alert('이메일 인증 후 로그인해주세요.');
+        if (authData.session?.user) {
+          await ensureProfileLoaded(authData.session.user.id, email);
           return;
         }
 
-        await loadUserProfile(authData.user.id, email);
+        alert('가입이 완료되었습니다. 이메일 확인 후 로그인해주세요. (이메일 인증 OFF 환경에서는 바로 로그인될 수 있어요.)');
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
         if (data.user) {
-          await loadUserProfile(data.user.id, data.user.email || email);
+          await ensureProfileLoaded(data.user.id, data.user.email || email);
         }
       }
     } catch (err: any) {

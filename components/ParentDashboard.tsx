@@ -9,6 +9,7 @@ interface ParentDashboardProps {
 
 interface ConnectedStudent {
   user_id: string;
+  parent_user_id?: string;
   settings: StudentSettings;
 }
 
@@ -28,6 +29,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [stylePrompt, setStylePrompt] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -38,7 +40,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     const fetchStudents = async () => {
       const { data: profiles, error: profileError } = await supabase
         .from('student_profiles')
-        .select('user_id, settings')
+        .select('user_id, settings, parent_user_id')
         .eq('parent_user_id', user.id);
 
       if (profileError) {
@@ -49,6 +51,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
       const mappedProfiles: ConnectedStudent[] = (profiles || []).map((profile) => ({
         user_id: profile.user_id,
+        parent_user_id: profile.parent_user_id || undefined,
         settings: (profile.settings as StudentSettings) || {},
       }));
       setConnectedStudents(mappedProfiles);
@@ -132,6 +135,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   useEffect(() => {
     const profileStylePrompt = selectedStudent?.settings?.ai_style_prompt || '';
     setStylePrompt(profileStylePrompt);
+    setSaveStatus('');
   }, [selectedStudent]);
 
   useEffect(() => {
@@ -163,6 +167,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     if (!selectedStudentId || !selectedStudent) return;
 
     setSavingPrompt(true);
+    setSaveStatus('');
     const mergedSettings: StudentSettings = {
       ...(selectedStudent.settings || {}),
       ai_style_prompt: stylePrompt,
@@ -188,7 +193,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       )
     );
 
-    alert('Saved');
+    setSaveStatus('Saved');
     setSavingPrompt(false);
   };
 
@@ -235,6 +240,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             >
               {savingPrompt ? '저장 중...' : '저장'}
             </button>
+            {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
           </div>
 
           <div className="pt-4 border-t border-slate-100">
