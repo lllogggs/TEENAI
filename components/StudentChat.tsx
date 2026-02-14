@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, ChatMessage } from '../types';
+import { User, ChatMessage, StudentSettings } from '../types';
 import { supabase } from '../utils/supabase';
 import { DANGER_KEYWORDS } from '../constants';
 
@@ -8,6 +8,90 @@ interface StudentChatProps {
   onLogout: () => void;
 }
 
+type MentorStyle = 'kind' | 'rational' | 'friendly';
+
+interface NormalizedSettings {
+  guardrails: {
+    block_harmful: boolean;
+    self_directed: boolean;
+    anti_overuse: boolean;
+    language_filter: boolean;
+  };
+  mentor_style: MentorStyle;
+  parent_instructions: string[];
+  ai_style_prompt: string;
+}
+
+const DEFAULT_SETTINGS: NormalizedSettings = {
+  guardrails: {
+    block_harmful: true,
+    self_directed: true,
+    anti_overuse: true,
+    language_filter: true,
+  },
+  mentor_style: 'kind',
+  parent_instructions: [],
+  ai_style_prompt: '',
+};
+
+const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
+  const guardrails = (settings?.guardrails as Record<string, unknown> | undefined) || {};
+  const mentorStyle = settings?.mentor_style;
+  return {
+    guardrails: {
+      block_harmful: typeof guardrails.block_harmful === 'boolean' ? guardrails.block_harmful : DEFAULT_SETTINGS.guardrails.block_harmful,
+      self_directed: typeof guardrails.self_directed === 'boolean' ? guardrails.self_directed : DEFAULT_SETTINGS.guardrails.self_directed,
+      anti_overuse: typeof guardrails.anti_overuse === 'boolean' ? guardrails.anti_overuse : DEFAULT_SETTINGS.guardrails.anti_overuse,
+      language_filter: typeof guardrails.language_filter === 'boolean' ? guardrails.language_filter : DEFAULT_SETTINGS.guardrails.language_filter,
+    },
+    mentor_style: mentorStyle === 'kind' || mentorStyle === 'rational' || mentorStyle === 'friendly' ? mentorStyle : DEFAULT_SETTINGS.mentor_style,
+    parent_instructions: Array.isArray(settings?.parent_instructions)
+      ? settings.parent_instructions.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [],
+    ai_style_prompt: typeof settings?.ai_style_prompt === 'string' ? settings.ai_style_prompt : '',
+  };
+};
+
+const buildSystemPromptFromSettings = (settings: NormalizedSettings) => {
+  const guardrailLines: string[] = [];
+  if (settings.guardrails.block_harmful) {
+    guardrailLines.push('- 성별/폭력/유해 대화 요청은 안전하게 거절하고 보호자/전문가 도움을 안내하세요.');
+  }
+  if (settings.guardrails.self_directed) {
+    guardrailLines.push('- 문제의 정답을 바로 주기보다 학생이 스스로 생각하도록 질문 중심으로 유도하세요.');
+  }
+  if (settings.guardrails.anti_overuse) {
+    guardrailLines.push('- 대화가 길어지면 정중하게 휴식을 제안하고 현실 활동을 권장하세요.');
+  }
+  if (settings.guardrails.language_filter) {
+    guardrailLines.push('- 공격적이거나 거친 표현에는 차분하고 바른 표현으로 다시 말하도록 도와주세요.');
+  }
+
+  const mentorStyleInstructionMap: Record<MentorStyle, string> = {
+    kind: 'warm, supportive, gentle tone',
+    rational: 'calm, structured, logic-first',
+    friendly: 'casual, approachable, emoji-light',
+  };
+
+  const instructionBlocks = [
+    '[Parent Guardrails]',
+    guardrailLines.length ? guardrailLines.join('\n') : '- 별도 가드레일 없음',
+    '',
+    '[Mentor Style]',
+    `- ${mentorStyleInstructionMap[settings.mentor_style]}`,
+    '',
+    '[Parent Instructions]',
+    settings.parent_instructions.length
+      ? settings.parent_instructions.map((instruction, index) => `${index + 1}. ${instruction}`).join('\n')
+      : '- 없음',
+    '',
+    '[AI Style Prompt Override]',
+    settings.ai_style_prompt || '- 없음',
+  ];
+
+  return instructionBlocks.join('\n');
+};
+
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -15,7 +99,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const settingsCacheRef = useRef<NormalizedSettings | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,7 +141,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const loadParentStylePrompt = async () => {
+  const loadStudentSettings = async () => {
+    if (settingsCacheRef.current) return settingsCacheRef.current;
+
     const { data, error } = await supabase
       .from('student_profiles')
       .select('settings')
@@ -65,12 +151,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       .single();
 
     if (error) {
-      console.error('student_profiles style fetch error:', error);
-      return '';
+      console.error('student_profiles settings fetch error:', error);
+      settingsCacheRef.current = DEFAULT_SETTINGS;
+      return settingsCacheRef.current;
     }
 
-    const settings = data?.settings as Record<string, unknown> | null;
-    return typeof settings?.ai_style_prompt === 'string' ? settings.ai_style_prompt : '';
+    settingsCacheRef.current = normalizeSettings(data?.settings as StudentSettings);
+    return settingsCacheRef.current;
   };
 
   const handleSend = async () => {
@@ -105,7 +192,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     try {
-      const parentStylePrompt = await loadParentStylePrompt();
+      const settings = await loadStudentSettings();
+      const parentStylePrompt = buildSystemPromptFromSettings(settings);
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,6 +227,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setMessages([]);
     setCurrentSessionId(null);
     setErrorNotice('');
+    settingsCacheRef.current = null;
   };
 
   return (

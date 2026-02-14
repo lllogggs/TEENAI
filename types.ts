@@ -19,6 +19,14 @@ export interface User {
 }
 
 export interface StudentSettings {
+  guardrails?: {
+    block_harmful?: boolean;
+    self_directed?: boolean;
+    anti_overuse?: boolean;
+    language_filter?: boolean;
+  };
+  mentor_style?: 'kind' | 'rational' | 'friendly';
+  parent_instructions?: string[];
   ai_style_prompt?: string;
   [key: string]: unknown;
 }
