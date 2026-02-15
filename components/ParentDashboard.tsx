@@ -259,6 +259,42 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
         .limit(50);
 
       setSessions((data || []) as ChatSession[]);
+
+      const missingSummarySessions = ((data || []) as ChatSession[])
+        .filter((session) => !session.summary?.trim())
+        .slice(0, 5);
+
+      if (!missingSummarySessions.length) return;
+
+      try {
+        const { data: authData } = await supabase.auth.getSession();
+        const accessToken = authData.session?.access_token;
+        await Promise.all(missingSummarySessions.map(async (session) => {
+          const endpoint = `/api/session-summary?sessionId=${encodeURIComponent(session.id)}`;
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+          });
+
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            console.error('session summary backfill failed:', { sessionId: session.id, status: response.status, payload });
+          }
+        }));
+
+        const { data: refreshed } = await supabase
+          .from('chat_sessions')
+          .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
+          .in('student_id', studentIds)
+          .order('started_at', { ascending: false })
+          .limit(50);
+
+        if (refreshed) {
+          setSessions(refreshed as ChatSession[]);
+        }
+      } catch (error) {
+        console.error('session summary backfill request failed:', error);
+      }
     };
 
     fetchSessions();
