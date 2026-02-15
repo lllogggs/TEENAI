@@ -1,5 +1,4 @@
 -- TEENAI Supabase schema (run in Supabase SQL Editor)
--- NOTE: schema.sql is reference-only. For CI/deploy, make all DB changes via supabase/migrations.
 create extension if not exists pgcrypto;
 
 -- 1) App users profile table (linked to Supabase Auth)
