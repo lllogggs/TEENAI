@@ -33,7 +33,7 @@ create table if not exists public.chat_sessions (
   tone_level text not null default 'low' check (tone_level in ('low', 'medium', 'high')),
   topic_tags text[] not null default '{}',
   output_types text[] not null default '{}',
-  session_summary text,
+  summary text,
   student_intent text,
   ai_intervention text,
   started_at timestamptz not null default now()
@@ -204,6 +204,28 @@ create policy "safety_alerts_insert_student"
 -- ============================
 -- Additions for chat summary / risk / invite code resiliency
 -- ============================
+alter table public.chat_sessions
+  add column if not exists summary text;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'chat_sessions'
+      and column_name = 'session_summary'
+  ) then
+    update public.chat_sessions
+    set summary = coalesce(summary, session_summary)
+    where session_summary is not null;
+
+    alter table public.chat_sessions
+      drop column if exists session_summary;
+  end if;
+end;
+$$;
+
 alter table public.chat_sessions
   add column if not exists risk_level text not null default 'normal'
   check (risk_level in ('stable', 'normal', 'caution'));
