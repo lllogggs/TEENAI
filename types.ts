@@ -20,11 +20,13 @@ export interface User {
 
 export interface StudentSettings {
   guardrails?: {
-    block_harmful?: boolean;
+    block_inappropriate?: boolean;
     self_directed?: boolean;
     anti_overuse?: boolean;
     language_filter?: boolean;
+    block_harmful?: boolean;
   };
+  mentor_tone?: 'warm' | 'rational' | 'friendly';
   mentor_style?: 'kind' | 'rational' | 'friendly';
   parent_instructions?: string[];
   ai_style_prompt?: string;
@@ -39,6 +41,7 @@ export interface StudentProfile {
 }
 
 export interface ChatMessage {
+  id?: string;
   role: 'user' | 'model';
   text: string;
   timestamp: number;
@@ -64,34 +67,14 @@ export interface ChatSession {
   id: string;
   student_id: string;
   started_at: string;
+  last_message_at?: string;
   topic_tags: string[];
   output_types: string[];
   tone_level: ToneLevel;
   session_summary?: string;
+  summary?: string;
+  stability_label?: 'stable' | 'normal' | 'caution';
+  stability_reason?: string;
   student_intent?: string;
   ai_intervention?: string;
-}
-
-
-export interface AISettings {
-  toneType: 'gentle' | 'logical' | 'casual';
-  strictSafety: boolean;
-  eduMode: boolean;
-  socialBalance: boolean;
-  cleanLanguage: boolean;
-  lateNightLimit: boolean;
-  curiosityMode: boolean;
-  criticalThinking: boolean;
-  praiseIntensity: 'normal' | 'high';
-  interestTopic: string;
-  parentDirectives: string[];
-}
-
-export interface AnalysisResult {
-  topic_tags: string[];
-  output_types: string[];
-  tone_level: 'low' | 'medium' | 'high';
-  session_summary: string;
-  student_intent: string;
-  ai_intervention: string;
 }
