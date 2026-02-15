@@ -9,6 +9,8 @@ export enum ToneLevel {
   HIGH = 'high'
 }
 
+export type SessionRiskLevel = 'stable' | 'normal' | 'caution';
+
 export interface User {
   id: string;
   email: string;
@@ -20,11 +22,16 @@ export interface User {
 
 export interface StudentSettings {
   guardrails?: {
+    sexual_block?: boolean;
+    self_directed_mode?: boolean;
+    overuse_prevent?: boolean;
+    clean_language?: boolean;
     block_harmful?: boolean;
     self_directed?: boolean;
     anti_overuse?: boolean;
     language_filter?: boolean;
   };
+  mentor_tone?: 'kind' | 'rational' | 'friendly';
   mentor_style?: 'kind' | 'rational' | 'friendly';
   parent_instructions?: string[];
   ai_style_prompt?: string;
@@ -70,6 +77,7 @@ export interface ChatSession {
   session_summary?: string;
   student_intent?: string;
   ai_intervention?: string;
+  risk_level?: SessionRiskLevel;
 }
 
 
