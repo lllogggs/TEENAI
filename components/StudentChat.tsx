@@ -269,12 +269,17 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       .select('*', { count: 'exact', head: true })
       .eq('session_id', sessionId);
 
-    if (!count || count < 5 || count % 5 !== 0) return;
+    if (!count || count < 6) return;
 
     try {
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData.session?.access_token;
       const response = await fetch('/api/session-summary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ sessionId }),
       });
 

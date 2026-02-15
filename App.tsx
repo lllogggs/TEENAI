@@ -3,6 +3,7 @@ import { User, UserRole } from './types';
 import Auth from './components/Auth';
 import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
+import ParentSessionDetail from './components/ParentSessionDetail';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
 const getSignupName = (email: string) => {
@@ -14,6 +15,18 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const onPopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const movePath = (path: string) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+  };
 
   useEffect(() => {
     const checkSession = async () => {
@@ -170,9 +183,28 @@ function App() {
     return <Auth onLogin={handleAuth} loading={authLoading} />;
   }
 
-  return user.role === UserRole.STUDENT
-    ? <StudentChat user={user} onLogout={handleLogout} />
-    : <ParentDashboard user={user} onLogout={handleLogout} />;
+  if (user.role === UserRole.STUDENT) {
+    return <StudentChat user={user} onLogout={handleLogout} />;
+  }
+
+  const sessionDetailMatch = currentPath.match(/^\/parent\/sessions\/([^/]+)$/);
+  if (sessionDetailMatch) {
+    return (
+      <ParentSessionDetail
+        user={user}
+        sessionId={sessionDetailMatch[1]}
+        onBack={() => movePath('/')}
+      />
+    );
+  }
+
+  return (
+    <ParentDashboard
+      user={user}
+      onLogout={handleLogout}
+      onOpenSession={(sessionId) => movePath(`/parent/sessions/${sessionId}`)}
+    />
+  );
 }
 
 export default App;
