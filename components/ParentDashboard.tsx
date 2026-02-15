@@ -140,6 +140,18 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     return sessions.filter((session) => (riskFilter === 'all' ? true : (session.risk_level || 'normal') === riskFilter));
   }, [sessions, riskFilter]);
 
+
+  const riskStats = useMemo(() => {
+    const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
+    sessions.forEach((session) => {
+      const level = session.risk_level || 'normal';
+      counts[level] += 1;
+    });
+
+    const maxCount = Math.max(counts.stable, counts.normal, counts.caution, 1);
+    return { counts, maxCount };
+  }, [sessions]);
+
   useEffect(() => {
     const fetchInviteCode = async () => {
       const { data: userRow } = await supabase
@@ -224,7 +236,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
       const { data } = await supabase
         .from('chat_sessions')
-        .select('*')
+        .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
         .eq('student_id', selectedStudentId)
         .order('started_at', { ascending: false });
 
@@ -339,8 +351,71 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <article className="premium-card p-6 lg:col-span-3">
+            <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
+            <div className="flex items-end justify-around gap-4 h-44">
+              {[
+                { key: 'stable' as SessionRiskLevel, label: '안정', color: 'bg-emerald-500' },
+                { key: 'normal' as SessionRiskLevel, label: '보통', color: 'bg-amber-500' },
+                { key: 'caution' as SessionRiskLevel, label: '주의', color: riskStats.counts.caution > 0 ? 'bg-rose-500' : 'bg-slate-200' },
+              ].map((item) => {
+                const count = riskStats.counts[item.key];
+                if (item.key === 'caution' && count === 0) {
+                  return null;
+                }
+
+                const ratio = count / riskStats.maxCount;
+                return (
+                  <div key={item.key} className="flex-1 max-w-[88px] text-center">
+                    <div className="h-28 flex items-end justify-center">
+                      <div
+                        className={`w-10 rounded-2xl ${item.color}`}
+                        style={{ height: `${Math.max(10, Math.round(ratio * 100))}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs font-black text-slate-700">{item.label}</p>
+                    <p className="text-[11px] text-slate-400 font-bold">{count}건</p>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+
+          <article className="premium-card p-6 lg:col-span-2">
+            <h2 className="font-black text-lg mb-4">2) 활동 타임라인</h2>
+            <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
+              {filteredSessions.length === 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>
+                  <button
+                    onClick={() => setRiskFilter('all')}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700"
+                  >
+                    필터 초기화
+                  </button>
+                </div>
+              )}
+              {filteredSessions.map((session) => {
+                const level = session.risk_level || 'normal';
+                return (
+                  <button
+                    key={session.id}
+                    onClick={() => setSelectedSessionId(session.id)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || '요약 없음'}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
+
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">1) 심리 안정도</h2>
+            <h2 className="font-black text-lg mb-4">3) 심리 안정도 필터</h2>
             <div className="space-y-2">
               {riskFilterOptions.map((option) => (
                 <button
@@ -354,31 +429,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </div>
           </article>
 
-          <article className="premium-card p-6 lg:col-span-2">
-            <h2 className="font-black text-lg mb-4">2) 활동 타임라인</h2>
-            <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
-              {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
-              {filteredSessions.map((session) => {
-                const level = session.risk_level || 'normal';
-                return (
-                  <button
-                    key={session.id}
-                    onClick={() => setSelectedSessionId(session.id)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.session_summary || '요약 없음'}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </article>
-
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">3) 필수 안심 가드레일</h2>
+            <h2 className="font-black text-lg mb-4">4) 필수 안심 가드레일</h2>
             <div className="space-y-3">
               {guardrailMeta.map((item) => {
                 const enabled = normalizedSettings.guardrails[item.key];
@@ -400,7 +452,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           </article>
 
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">4) 멘토 말투 성향</h2>
+            <h2 className="font-black text-lg mb-4">5) 멘토 말투 성향</h2>
             <div className="space-y-2">
               {mentorToneOptions.map((option) => (
                 <button
@@ -415,8 +467,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </div>
           </article>
 
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">5) AI 개별 지시사항 관리</h2>
+          <article className="premium-card p-6 lg:col-span-3">
+            <h2 className="font-black text-lg mb-4">6) AI 개별 지시사항 관리</h2>
             <textarea
               value={normalizedSettings.ai_style_prompt}
               onChange={(event) => {

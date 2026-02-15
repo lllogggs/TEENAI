@@ -34,9 +34,11 @@ export async function POST(req: Request) {
       .limit(20);
 
     if (messageError) {
+      console.error('session summary message load failed:', { sessionId, messageCount: 0, error: messageError });
       return NextResponse.json({ error: 'Failed to load messages' }, { status: 500 });
     }
 
+    const messageCount = (messages || []).length;
     const transcript = (messages || []).map((message) => `${message.role}: ${message.content}`).join('\n');
     if (!transcript) {
       return NextResponse.json({ summary: '대화가 아직 충분하지 않습니다.', riskLevel: 'normal' });
@@ -65,16 +67,17 @@ export async function POST(req: Request) {
 
     const { error: updateError } = await supabaseAdmin
       .from('chat_sessions')
-      .update({ session_summary: summary, risk_level: riskLevel })
+      .update({ summary: summary, risk_level: riskLevel })
       .eq('id', sessionId);
 
     if (updateError) {
+      console.error('session summary update failed:', { sessionId, messageCount, error: updateError });
       return NextResponse.json({ error: 'Failed to update session summary' }, { status: 500 });
     }
 
     return NextResponse.json({ summary, riskLevel });
   } catch (error) {
-    console.error('session summary error:', error);
+    console.error('session summary error:', { error });
     return NextResponse.json({ error: 'Failed to summarize session' }, { status: 500 });
   }
 }

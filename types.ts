@@ -74,7 +74,7 @@ export interface ChatSession {
   topic_tags: string[];
   output_types: string[];
   tone_level: ToneLevel;
-  session_summary?: string;
+  summary?: string;
   student_intent?: string;
   ai_intervention?: string;
   risk_level?: SessionRiskLevel;
@@ -99,7 +99,7 @@ export interface AnalysisResult {
   topic_tags: string[];
   output_types: string[];
   tone_level: 'low' | 'medium' | 'high';
-  session_summary: string;
+  summary: string;
   student_intent: string;
   ai_intervention: string;
 }

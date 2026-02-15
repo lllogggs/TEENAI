@@ -148,7 +148,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const fetchSessions = async (forceSessionId?: string) => {
     const { data, error } = await supabase
       .from('chat_sessions')
-      .select('*')
+      .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
       .eq('student_id', user.id)
       .order('started_at', { ascending: false });
 
@@ -269,17 +269,30 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       .select('*', { count: 'exact', head: true })
       .eq('session_id', sessionId);
 
-    if (!count || count < 2 || count % 4 !== 0) return;
+    if (!count || count < 5 || count % 5 !== 0) return;
 
     try {
-      await fetch('/api/session-summary', {
+      const response = await fetch('/api/session-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        console.error('session summary refresh failed:', { sessionId, status: response.status, payload, count });
+        if (process.env.NODE_ENV !== 'production') {
+          window.alert('요약 갱신에 실패했습니다. 개발자 콘솔을 확인해 주세요.');
+        }
+        return;
+      }
+
       await fetchSessions(sessionId);
     } catch (error) {
-      console.error('session summary refresh error:', error);
+      console.error('session summary refresh error:', { sessionId, count, error });
+      if (process.env.NODE_ENV !== 'production') {
+        window.alert('요약 요청 중 오류가 발생했습니다. 개발자 콘솔을 확인해 주세요.');
+      }
     }
   };
 
@@ -395,7 +408,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
                     <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
                   </div>
-                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.session_summary || '새 대화가 시작되었어요.'}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.summary || '새 대화가 시작되었어요.'}</p>
                 </button>
               );
             })}
@@ -406,7 +419,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex flex-col bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
             <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
-            <p className="text-xs text-slate-500 truncate">{activeSession?.session_summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
+            <p className="text-xs text-slate-500 truncate">{activeSession?.summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-36">

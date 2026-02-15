@@ -1,3 +1,26 @@
+-- Normalize summary column naming on sessions
+alter table public.chat_sessions
+  add column if not exists summary text;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'chat_sessions'
+      and column_name = 'session_summary'
+  ) then
+    update public.chat_sessions
+    set summary = coalesce(summary, session_summary)
+    where session_summary is not null;
+
+    alter table public.chat_sessions
+      drop column if exists session_summary;
+  end if;
+end;
+$$;
+
 -- Add risk level on sessions
 alter table public.chat_sessions
   add column if not exists risk_level text not null default 'normal'

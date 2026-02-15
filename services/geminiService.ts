@@ -102,11 +102,11 @@ ${transcript}`;
               topic_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
               output_types: { type: Type.ARRAY, items: { type: Type.STRING } },
               tone_level: { type: Type.STRING, enum: ["low", "medium", "high"] },
-              session_summary: { type: Type.STRING },
+              summary: { type: Type.STRING },
               student_intent: { type: Type.STRING },
               ai_intervention: { type: Type.STRING }
             },
-            required: ["topic_tags", "output_types", "tone_level", "session_summary", "student_intent", "ai_intervention"],
+            required: ["topic_tags", "output_types", "tone_level", "summary", "student_intent", "ai_intervention"],
           },
         },
       });
@@ -116,7 +116,7 @@ ${transcript}`;
         topic_tags: ['미분류'], 
         output_types: ['일반'], 
         tone_level: 'low',
-        session_summary: '분석 오류',
+        summary: '분석 오류',
         student_intent: '파악 불가',
         ai_intervention: '모니터링'
       };
