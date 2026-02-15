@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, ChatSession, MessageRow, StudentSettings, SessionRiskLevel } from '../types';
+import { User, ChatSession, StudentSettings, SessionRiskLevel } from '../types';
 import { supabase } from '../utils/supabase';
 
 interface ParentDashboardProps {
   user: User;
   onLogout: () => void;
+  onOpenSession: (sessionId: string) => void;
 }
 
 interface ConnectedStudent {
@@ -53,13 +54,6 @@ const mentorToneOptions: { value: MentorTone; label: string; description: string
   { value: 'kind', label: '다정한', description: '따뜻하고 공감 중심' },
   { value: 'rational', label: '이성적인', description: '차분하고 논리 중심' },
   { value: 'friendly', label: '친근한', description: '가볍고 편안한 대화' },
-];
-
-const riskFilterOptions: { value: SessionRiskLevel | 'all'; label: string }[] = [
-  { value: 'all', label: '전체' },
-  { value: 'stable', label: '안정' },
-  { value: 'normal', label: '보통' },
-  { value: 'caution', label: '주의' },
 ];
 
 const riskChipColor: Record<SessionRiskLevel, string> = {
@@ -117,17 +111,27 @@ const toStudentSettings = (normalized: NormalizedSettings): StudentSettings => (
   ai_style_prompt: normalized.ai_style_prompt,
 });
 
-const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => {
+const formatSessionTitle = (startedAt: string) => {
+  const date = new Date(startedAt);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `대화 ${yyyy}-${mm}-${dd} ${hh}:${min}`;
+};
+
+const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpenSession }) => {
   const [connectedStudents, setConnectedStudents] = useState<ConnectedStudent[]>([]);
   const [studentAccounts, setStudentAccounts] = useState<Record<string, StudentAccount>>({});
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState('');
-  const [sessionMessages, setSessionMessages] = useState<MessageRow[]>([]);
   const [riskFilter, setRiskFilter] = useState<SessionRiskLevel | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [editingDisplayName, setEditingDisplayName] = useState(false);
+  const [displayNameInput, setDisplayNameInput] = useState('');
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -136,10 +140,23 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
   const normalizedSettings = useMemo(() => normalizeSettings(selectedStudent?.settings), [selectedStudent]);
 
-  const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => (riskFilter === 'all' ? true : (session.risk_level || 'normal') === riskFilter));
-  }, [sessions, riskFilter]);
+  const getStudentDisplayName = (studentId: string) => {
+    const profile = connectedStudents.find((student) => student.user_id === studentId);
+    const parentDisplayName = (profile?.settings?.parent_display_name as string | undefined)?.trim();
+    if (parentDisplayName) return parentDisplayName;
+    return studentAccounts[studentId]?.name || studentId;
+  };
 
+  useEffect(() => {
+    setDisplayNameInput(getStudentDisplayName(selectedStudentId));
+    setEditingDisplayName(false);
+    setSaveStatus('');
+  }, [selectedStudentId, connectedStudents]);
+
+  const filteredSessions = useMemo(() => sessions.filter((session) => {
+    if (riskFilter === 'all') return true;
+    return (session.risk_level || 'normal') === riskFilter;
+  }), [sessions, riskFilter]);
 
   const riskStats = useMemo(() => {
     const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
@@ -198,7 +215,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       const mappedProfiles: ConnectedStudent[] = (profiles || []).map((profile) => ({
         user_id: profile.user_id,
         parent_user_id: profile.parent_user_id || undefined,
-        settings: toStudentSettings(normalizeSettings(profile.settings as StudentSettings)),
+        settings: (profile.settings as StudentSettings) || {},
       }));
 
       setConnectedStudents(mappedProfiles);
@@ -228,50 +245,39 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
   useEffect(() => {
     const fetchSessions = async () => {
-      if (!selectedStudentId) {
+      const studentIds = connectedStudents.map((student) => student.user_id);
+      if (!studentIds.length) {
         setSessions([]);
-        setSelectedSessionId('');
         return;
       }
 
       const { data } = await supabase
         .from('chat_sessions')
         .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
-        .eq('student_id', selectedStudentId)
-        .order('started_at', { ascending: false });
+        .in('student_id', studentIds)
+        .order('started_at', { ascending: false })
+        .limit(50);
 
-      const fetched = (data || []) as ChatSession[];
-      setSessions(fetched);
-      setSelectedSessionId((prev) => prev || fetched[0]?.id || '');
+      setSessions((data || []) as ChatSession[]);
     };
 
     fetchSessions();
-  }, [selectedStudentId]);
-
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!selectedSessionId) {
-        setSessionMessages([]);
-        return;
-      }
-
-      const { data } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('session_id', selectedSessionId)
-        .order('created_at', { ascending: true });
-
-      setSessionMessages((data || []) as MessageRow[]);
-    };
-
-    fetchMessages();
-  }, [selectedSessionId]);
+  }, [connectedStudents]);
 
   const updateStudentSettings = async (nextSettings: NormalizedSettings) => {
     if (!selectedStudentId) return;
     setSaveStatus('');
 
-    const mergedSettings = toStudentSettings(nextSettings);
+    const currentSettings = selectedStudent?.settings || {};
+    const mergedSettings = {
+      ...currentSettings,
+      ...toStudentSettings(nextSettings),
+      guardrails: {
+        ...(currentSettings.guardrails as Record<string, unknown> | undefined),
+        ...toStudentSettings(nextSettings).guardrails,
+      },
+    } as StudentSettings;
+
     const { error } = await supabase
       .from('student_profiles')
       .update({ settings: mergedSettings })
@@ -288,6 +294,42 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       )
     );
     setSaveStatus('저장되었습니다.');
+  };
+
+  const saveParentDisplayName = async () => {
+    if (!selectedStudentId) return;
+
+    const { data, error: selectError } = await supabase
+      .from('student_profiles')
+      .select('settings')
+      .eq('user_id', selectedStudentId)
+      .single();
+
+    if (selectError) {
+      console.error('student_profiles display name select error:', selectError);
+      return;
+    }
+
+    const settings = {
+      ...((data?.settings as StudentSettings) || {}),
+      parent_display_name: displayNameInput.trim(),
+    } as StudentSettings;
+
+    const { error } = await supabase
+      .from('student_profiles')
+      .update({ settings })
+      .eq('user_id', selectedStudentId);
+
+    if (error) {
+      console.error('student_profiles display name update error:', error);
+      return;
+    }
+
+    setConnectedStudents((prev) => prev.map((student) => (
+      student.user_id === selectedStudentId ? { ...student, settings } : student
+    )));
+    setEditingDisplayName(false);
+    setSaveStatus('표시명이 저장되었습니다.');
   };
 
   const toggleGuardrail = async (key: keyof NormalizedSettings['guardrails']) => {
@@ -333,45 +375,60 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       </nav>
 
       <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
-        <section className="premium-card p-4 md:p-5 flex flex-wrap items-center gap-2">
-          {connectedStudents.length === 0 && <p className="text-sm text-slate-400">연결된 학생이 없습니다.</p>}
-          {connectedStudents.map((student) => {
-            const account = studentAccounts[student.user_id];
-            const active = selectedStudentId === student.user_id;
-            return (
-              <button
-                key={student.user_id}
-                onClick={() => setSelectedStudentId(student.user_id)}
-                className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
-              >
-                {account?.name || '학생'}
-              </button>
-            );
-          })}
+        <section className="premium-card p-4 md:p-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {connectedStudents.length === 0 && <p className="text-sm text-slate-400">연결된 학생이 없습니다.</p>}
+            {connectedStudents.map((student) => {
+              const active = selectedStudentId === student.user_id;
+              return (
+                <button
+                  key={student.user_id}
+                  onClick={() => setSelectedStudentId(student.user_id)}
+                  className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                >
+                  {getStudentDisplayName(student.user_id)}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedStudentId && (
+            <div className="flex flex-wrap items-center gap-2">
+              {!editingDisplayName ? (
+                <>
+                  <span className="text-sm font-black text-slate-900">{getStudentDisplayName(selectedStudentId)}</span>
+                  <button onClick={() => setEditingDisplayName(true)} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700">편집</button>
+                </>
+              ) : (
+                <>
+                  <input
+                    value={displayNameInput}
+                    onChange={(event) => setDisplayNameInput(event.target.value)}
+                    className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    placeholder="부모 화면용 학생 표시명"
+                  />
+                  <button onClick={saveParentDisplayName} className="px-3 py-2 rounded-xl bg-brand-900 text-white text-xs font-black">저장</button>
+                </>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <article className="premium-card p-6 lg:col-span-3">
-            <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
-            <div className="flex items-end justify-around gap-4 h-44">
+          <article className="premium-card p-6 lg:col-span-1">
+            <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계/필터</h2>
+            <div className="flex items-end justify-around gap-4 h-40 mb-4">
               {[
                 { key: 'stable' as SessionRiskLevel, label: '안정', color: 'bg-emerald-500' },
                 { key: 'normal' as SessionRiskLevel, label: '보통', color: 'bg-amber-500' },
-                { key: 'caution' as SessionRiskLevel, label: '주의', color: riskStats.counts.caution > 0 ? 'bg-rose-500' : 'bg-slate-200' },
+                { key: 'caution' as SessionRiskLevel, label: '주의', color: 'bg-rose-500' },
               ].map((item) => {
                 const count = riskStats.counts[item.key];
-                if (item.key === 'caution' && count === 0) {
-                  return null;
-                }
-
                 const ratio = count / riskStats.maxCount;
                 return (
                   <div key={item.key} className="flex-1 max-w-[88px] text-center">
-                    <div className="h-28 flex items-end justify-center">
-                      <div
-                        className={`w-10 rounded-2xl ${item.color}`}
-                        style={{ height: `${Math.max(10, Math.round(ratio * 100))}%` }}
-                      />
+                    <div className="h-24 flex items-end justify-center">
+                      <div className={`w-10 rounded-2xl ${item.color}`} style={{ height: `${Math.max(10, Math.round(ratio * 100))}%` }} />
                     </div>
                     <p className="mt-2 text-xs font-black text-slate-700">{item.label}</p>
                     <p className="text-[11px] text-slate-400 font-bold">{count}건</p>
@@ -379,49 +436,16 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 );
               })}
             </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-2">
-            <h2 className="font-black text-lg mb-4">2) 활동 타임라인</h2>
-            <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
-              {filteredSessions.length === 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>
-                  <button
-                    onClick={() => setRiskFilter('all')}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700"
-                  >
-                    필터 초기화
-                  </button>
-                </div>
-              )}
-              {filteredSessions.map((session) => {
-                const level = session.risk_level || 'normal';
-                return (
-                  <button
-                    key={session.id}
-                    onClick={() => setSelectedSessionId(session.id)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || '요약 없음'}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">3) 심리 안정도 필터</h2>
             <div className="space-y-2">
-              {riskFilterOptions.map((option) => (
+              {([
+                { value: 'stable', label: '안정', activeClass: 'bg-emerald-50 border-emerald-400 text-emerald-800' },
+                { value: 'normal', label: '보통', activeClass: 'bg-amber-50 border-amber-400 text-amber-800' },
+                { value: 'caution', label: '주의', activeClass: 'bg-rose-50 border-rose-400 text-rose-800' },
+              ] as const).map((option) => (
                 <button
                   key={option.value}
                   onClick={() => setRiskFilter(option.value)}
-                  className={`w-full text-left px-4 py-3 rounded-2xl border text-sm font-bold ${riskFilter === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100 text-slate-600'}`}
+                  className={`w-full text-left px-4 py-3 rounded-2xl border text-sm font-bold ${riskFilter === option.value ? option.activeClass : 'bg-white border-slate-100 text-slate-600'}`}
                 >
                   {option.label}
                 </button>
@@ -429,8 +453,72 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </div>
           </article>
 
+          <article className="premium-card p-6 lg:col-span-2">
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h2 className="font-black text-lg">2) 활동 타임라인</h2>
+              <button onClick={() => setRiskFilter('all')} className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700">전체 대화 보기</button>
+            </div>
+            <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
+              {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
+              {filteredSessions.map((session) => {
+                const level = session.risk_level || 'normal';
+                return (
+                  <button
+                    key={session.id}
+                    onClick={() => onOpenSession(session.id)}
+                    className="w-full text-left p-4 rounded-2xl border transition-all border-slate-100 bg-white hover:border-brand-200"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-xs font-black text-slate-800">{formatSessionTitle(session.started_at)}</p>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-2">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
+                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || '요약이 아직 없습니다.'}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
+
+          <article className="premium-card p-6 lg:col-span-2">
+            <h2 className="font-black text-lg mb-4">3) AI 개별 지시사항 관리</h2>
+            <textarea
+              value={normalizedSettings.ai_style_prompt}
+              onChange={(event) => {
+                const value = event.target.value;
+                setConnectedStudents((prev) =>
+                  prev.map((student) =>
+                    student.user_id === selectedStudentId
+                      ? { ...student, settings: { ...student.settings, ...toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) } }
+                      : student
+                  )
+                );
+              }}
+              placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
+              className="w-full min-h-36 rounded-2xl border border-slate-200 p-4 text-sm"
+            />
+            <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
+            {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
+          </article>
+
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">4) 필수 안심 가드레일</h2>
+            <h2 className="font-black text-lg mb-4">4) 멘토 말투 성향</h2>
+            <div className="space-y-2">
+              {mentorToneOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => updateMentorTone(option.value)}
+                  className={`w-full text-left px-4 py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
+                >
+                  <p className="font-black text-sm">{option.label}</p>
+                  <p className="text-xs text-slate-500 mt-1">{option.description}</p>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="premium-card p-6 lg:col-span-3">
+            <h2 className="font-black text-lg mb-4">5) 필수 안심 가드레일</h2>
             <div className="space-y-3">
               {guardrailMeta.map((item) => {
                 const enabled = normalizedSettings.guardrails[item.key];
@@ -450,56 +538,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               })}
             </div>
           </article>
-
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">5) 멘토 말투 성향</h2>
-            <div className="space-y-2">
-              {mentorToneOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => updateMentorTone(option.value)}
-                  className={`w-full text-left px-4 py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
-                >
-                  <p className="font-black text-sm">{option.label}</p>
-                  <p className="text-xs text-slate-500 mt-1">{option.description}</p>
-                </button>
-              ))}
-            </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-3">
-            <h2 className="font-black text-lg mb-4">6) AI 개별 지시사항 관리</h2>
-            <textarea
-              value={normalizedSettings.ai_style_prompt}
-              onChange={(event) => {
-                const value = event.target.value;
-                setConnectedStudents((prev) =>
-                  prev.map((student) =>
-                    student.user_id === selectedStudentId
-                      ? { ...student, settings: toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) }
-                      : student
-                  )
-                );
-              }}
-              placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
-              className="w-full min-h-36 rounded-2xl border border-slate-200 p-4 text-sm"
-            />
-            <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
-            {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
-          </article>
-        </section>
-
-        <section className="premium-card p-6">
-          <h2 className="font-black text-lg mb-4">세션 원문 대화</h2>
-          <div className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pr-2">
-            {sessionMessages.length === 0 && <p className="text-sm text-slate-400">세션을 선택하면 원문 대화가 표시됩니다.</p>}
-            {sessionMessages.map((message) => (
-              <div key={message.id} className={`p-3 rounded-xl text-sm ${message.role === 'user' ? 'bg-brand-900 text-white ml-8' : 'bg-slate-100 text-slate-800 mr-8'}`}>
-                <p className="text-[10px] opacity-70 mb-1">{message.role} · {new Date(message.created_at).toLocaleTimeString('ko-KR')}</p>
-                <p>{message.content}</p>
-              </div>
-            ))}
-          </div>
         </section>
       </main>
     </div>
