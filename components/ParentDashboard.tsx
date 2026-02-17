@@ -502,7 +502,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                       onClick={() => setViewingSessionId(session.id)}
                       className="w-full text-left p-5 rounded-2xl border border-slate-100 bg-white hover:border-brand-300 hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden"
                     >
-                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${key === 'stable' ? 'bg-emerald-400' : level === 'normal' ? 'bg-amber-400' : 'bg-rose-400'}`}></div>
+                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${level === 'stable' ? 'bg-emerald-400' : level === 'normal' ? 'bg-amber-400' : 'bg-rose-400'}`}></div>
                       <div className="flex justify-between items-start mb-2 pl-2">
                         <div className="flex items-center gap-2">
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
