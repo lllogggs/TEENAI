@@ -41,8 +41,8 @@ export const getRateLimitConfig = () => ({
 });
 
 export const getSummaryConfig = () => ({
-  idleMinSec: parseNumber(process.env.SUMMARY_IDLE_MIN_SEC, 60),
-  everyN: parseNumber(process.env.SUMMARY_EVERY_N_MESSAGES, 6),
+  idleMinSec: parseNumber(process.env.SUMMARY_IDLE_MIN_SEC, 20),
+  everyN: parseNumber(process.env.SUMMARY_EVERY_N_MESSAGES, 2),
   maxHistory: parseNumber(process.env.SUMMARY_MAX_HISTORY_MESSAGES, 30),
 });
 

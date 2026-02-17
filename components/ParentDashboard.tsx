@@ -115,14 +115,12 @@ const toStudentSettings = (normalized: NormalizedSettings): StudentSettings => (
   ai_style_prompt: normalized.ai_style_prompt,
 });
 
-const formatSessionTitle = (startedAt: string) => {
+const formatSessionFallbackDate = (startedAt: string) => {
   const date = new Date(startedAt);
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
-  const hh = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
-  return `대화 ${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  return `대화 ${yyyy}-${mm}-${dd}`;
 };
 
 const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpenSession }) => {
@@ -159,9 +157,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
   }, [selectedStudentId, connectedStudents]);
 
   const filteredSessions = useMemo(() => sessions.filter((session) => {
+    if (selectedStudentId && session.student_id !== selectedStudentId) return false;
     if (riskFilter === 'all') return true;
     return (session.risk_level || 'normal') === riskFilter;
-  }), [sessions, riskFilter]);
+  }), [sessions, riskFilter, selectedStudentId]);
 
   const riskStats = useMemo(() => {
     const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0, warn: 0, high: 0 };
@@ -258,7 +257,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
 
       const { data } = await supabase
         .from('chat_sessions')
-        .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
+        .select('id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
         .in('student_id', studentIds)
         .order('started_at', { ascending: false })
         .limit(50);
@@ -282,25 +281,28 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
               'Content-Type': 'application/json',
               ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
             },
-            body: JSON.stringify({ sessionId: session.id }),
+            body: JSON.stringify({
+              sessionId: session.id,
+              force: !session.summary?.trim() && !!session.last_activity_at && (Date.now() - new Date(session.last_activity_at).getTime()) >= 3600_000,
+            }),
           });
 
           if (!response.ok) {
             const payload = await response.json().catch(() => ({}));
             console.error('session summary backfill failed:', { sessionId: session.id, status: response.status, payload });
-            nextStatus[session.id] = '요약 생성 실패';
+            nextStatus[session.id] = '요약 생성 중';
             return;
           }
 
           const payload = await response.json().catch(() => ({}));
           if (payload?.skipped) {
-            nextStatus[session.id] = '요약 대기 중';
+            nextStatus[session.id] = '요약 생성 중';
           }
         }));
 
         const { data: refreshed } = await supabase
           .from('chat_sessions')
-          .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
+          .select('id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
           .in('student_id', studentIds)
           .order('started_at', { ascending: false })
           .limit(50);
@@ -434,42 +436,45 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
             {connectedStudents.map((student) => {
               const active = selectedStudentId === student.user_id;
               return (
-                <button
+                <div
                   key={student.user_id}
-                  onClick={() => setSelectedStudentId(student.user_id)}
-                  className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
                 >
-                  {getStudentDisplayName(student.user_id)}
-                </button>
+                  <button onClick={() => setSelectedStudentId(student.user_id)} className="font-bold">{getStudentDisplayName(student.user_id)}</button>
+                  {active && (
+                    <button
+                      onClick={() => {
+                        setEditingDisplayName((prev) => !prev);
+                        setDisplayNameInput(getStudentDisplayName(student.user_id));
+                      }}
+                      className={`text-xs ${active ? 'text-white/80 hover:text-white' : 'text-slate-500'}`}
+                      aria-label="표시명 편집"
+                    >
+                      ✏️
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
 
-          {selectedStudentId && (
+          {selectedStudentId && editingDisplayName && (
             <div className="flex flex-wrap items-center gap-2">
-              {!editingDisplayName ? (
-                <>
-                  <span className="text-sm font-black text-slate-900">{getStudentDisplayName(selectedStudentId)}</span>
-                  <button onClick={() => setEditingDisplayName(true)} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700">편집</button>
-                </>
-              ) : (
-                <>
-                  <input
-                    value={displayNameInput}
-                    onChange={(event) => setDisplayNameInput(event.target.value)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
-                    placeholder="부모 화면용 학생 표시명"
-                  />
-                  <button onClick={saveParentDisplayName} className="px-3 py-2 rounded-xl bg-brand-900 text-white text-xs font-black">저장</button>
-                </>
-              )}
+              <input
+                value={displayNameInput}
+                onChange={(event) => setDisplayNameInput(event.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                placeholder="부모 화면용 학생 표시명"
+              />
+              <button onClick={saveParentDisplayName} className="px-3 py-2 rounded-xl bg-brand-900 text-white text-xs font-black">저장</button>
             </div>
           )}
+
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계/필터</h2>
+            <h2 className="font-black text-lg mb-4">심리 안정도 통계</h2>
             <div className="flex items-end justify-around gap-4 h-40 mb-4">
               {[
                 { key: 'stable' as SessionRiskLevel, label: '안정', color: 'bg-emerald-500' },
@@ -479,37 +484,22 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
                 const count = riskStats.counts[item.key];
                 const ratio = count / riskStats.maxCount;
                 return (
-                  <div key={item.key} className="flex-1 max-w-[88px] text-center">
+                  <button key={item.key} onClick={() => setRiskFilter((prev) => (prev === item.key ? 'all' : item.key))} className={`flex-1 max-w-[88px] text-center rounded-2xl py-1 ${riskFilter === item.key ? 'bg-slate-100' : ''}`}>
                     <div className="h-24 flex items-end justify-center">
-                      <div className={`w-10 rounded-2xl ${item.color}`} style={{ height: `${Math.max(10, Math.round(ratio * 100))}%` }} />
+                      <div className={`w-10 rounded-2xl ${item.color} ${riskFilter === item.key ? 'ring-2 ring-brand-700 ring-offset-2' : ''}`} style={{ height: `${Math.max(10, Math.round(ratio * 100))}%` }} />
                     </div>
                     <p className="mt-2 text-xs font-black text-slate-700">{item.label}</p>
                     <p className="text-[11px] text-slate-400 font-bold">{count}건</p>
-                  </div>
+                  </button>
                 );
               })}
-            </div>
-            <div className="space-y-2">
-              {([
-                { value: 'stable', label: '안정', activeClass: 'bg-emerald-50 border-emerald-400 text-emerald-800' },
-                { value: 'normal', label: '보통', activeClass: 'bg-amber-50 border-amber-400 text-amber-800' },
-                { value: 'caution', label: '주의', activeClass: 'bg-rose-50 border-rose-400 text-rose-800' },
-              ] as const).map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setRiskFilter(option.value)}
-                  className={`w-full text-left px-4 py-3 rounded-2xl border text-sm font-bold ${riskFilter === option.value ? option.activeClass : 'bg-white border-slate-100 text-slate-600'}`}
-                >
-                  {option.label}
-                </button>
-              ))}
             </div>
           </article>
 
           <article className="premium-card p-6 lg:col-span-2">
             <div className="flex items-center justify-between mb-4 gap-2">
               <h2 className="font-black text-lg">2) 활동 타임라인</h2>
-              <button onClick={() => setRiskFilter('all')} className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700">전체 대화 보기</button>
+
             </div>
             <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
@@ -522,12 +512,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
                     className="w-full text-left p-4 rounded-2xl border transition-all border-slate-100 bg-white hover:border-brand-200"
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs font-black text-slate-800">{formatSessionTitle(session.started_at)}</p>
+                      <p className="text-xs font-black text-slate-800">{session.title?.trim() || formatSessionFallbackDate(session.started_at)}</p>
                       <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
                     </div>
+                    
                     <p className="text-xs text-slate-500 mb-2">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || session.session_summary || '요약이 아직 없습니다.'}</p>
-                    {!session.summary && summaryStatus[session.id] && <p className="text-[11px] text-slate-400 mt-1">{summaryStatus[session.id]}</p>}
+                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || '요약 생성 중'}</p>
+                    {!session.summary && <p className="text-[11px] text-slate-400 mt-1">{summaryStatus[session.id] || '요약 생성 중'}</p>}
                   </button>
                 );
               })}
