@@ -41,7 +41,9 @@ Use `.env.example` as the source of truth.
 
 - `supabase/schema.sql`은 **reference-only** 파일입니다. 직접 SQL Editor에서 실행하지 마세요.
 - DB 스키마 변경은 반드시 `supabase/migrations/`에 SQL 파일을 추가하는 방식으로 관리합니다.
-- 초기 스키마도 migration으로 관리되며, 기준 파일은 `supabase/migrations/20260218190000_init_schema.sql`입니다.
+- 모든 신규 DB 변경은 14자리 timestamp prefix(`YYYYMMDDHHMMSS`) migration 파일로만 추가합니다.
+- CI 실패 시 Supabase SQL Editor에서 `select version, name from supabase_migrations.schema_migrations order by version desc;`로 적용 여부를 확인하세요.
+- 초기 스키마 파일(`000000...`)은 reference 용도로만 보관하고, 이미 migration 이력이 있는 프로젝트의 `supabase/migrations/`에는 두지 않습니다.
 - `main` 브랜치에 push되면 GitHub Actions(`.github/workflows/supabase-db-push.yml`)가 자동으로 `supabase db push`를 실행해 원격 DB에 반영합니다.
 - 적용 여부는 Supabase Dashboard에서 `supabase_migrations.schema_migrations` 테이블을 확인하세요.
 

@@ -4,120 +4,131 @@
 -- 2) Parents can read chat_sessions/messages of students linked by student_profiles.parent_user_id
 -- 3) Writes remain student-focused (message inserts by student only)
 
-begin;
+BEGIN;
 
--- =========================
--- 0) Ensure RLS enabled
--- =========================
-alter table public.student_profiles enable row level security;
-alter table public.chat_sessions enable row level security;
-alter table public.messages enable row level security;
+DO $$
+BEGIN
+  IF to_regclass('public.student_profiles') IS NULL
+     OR to_regclass('public.chat_sessions') IS NULL
+     OR to_regclass('public.messages') IS NULL THEN
+    RAISE NOTICE 'Skipping migration 20260217_parent_linked_sessions_messages_rls: required tables do not exist yet.';
+    RETURN;
+  END IF;
 
--- =========================
--- 1) Remove potentially conflicting policies
--- =========================
-drop policy if exists "students_select_own_sessions" on public.chat_sessions;
-drop policy if exists "parents_select_linked_sessions" on public.chat_sessions;
-drop policy if exists "chat_sessions_select_student_or_parent" on public.chat_sessions;
+  -- =========================
+  -- 0) Ensure RLS enabled
+  -- =========================
+  ALTER TABLE public.student_profiles ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
-drop policy if exists "students_select_own_messages" on public.messages;
-drop policy if exists "parents_select_linked_messages" on public.messages;
-drop policy if exists "messages_select_student_or_parent" on public.messages;
-drop policy if exists "students_insert_own_messages" on public.messages;
-drop policy if exists "messages_insert_student" on public.messages;
-drop policy if exists "students_update_own_messages" on public.messages;
+  -- =========================
+  -- 1) Remove potentially conflicting policies
+  -- =========================
+  DROP POLICY IF EXISTS "students_select_own_sessions" ON public.chat_sessions;
+  DROP POLICY IF EXISTS "parents_select_linked_sessions" ON public.chat_sessions;
+  DROP POLICY IF EXISTS "chat_sessions_select_student_or_parent" ON public.chat_sessions;
 
-drop policy if exists "students_select_own_profile" on public.student_profiles;
-drop policy if exists "parents_select_linked_student_profiles" on public.student_profiles;
-drop policy if exists "student_profiles_select_own_or_parent" on public.student_profiles;
+  DROP POLICY IF EXISTS "students_select_own_messages" ON public.messages;
+  DROP POLICY IF EXISTS "parents_select_linked_messages" ON public.messages;
+  DROP POLICY IF EXISTS "messages_select_student_or_parent" ON public.messages;
+  DROP POLICY IF EXISTS "students_insert_own_messages" ON public.messages;
+  DROP POLICY IF EXISTS "messages_insert_student" ON public.messages;
+  DROP POLICY IF EXISTS "students_update_own_messages" ON public.messages;
 
--- =========================
--- 2) student_profiles policies
--- =========================
-create policy "students_select_own_profile"
-on public.student_profiles
-for select
-to authenticated
-using (user_id = auth.uid());
+  DROP POLICY IF EXISTS "students_select_own_profile" ON public.student_profiles;
+  DROP POLICY IF EXISTS "parents_select_linked_student_profiles" ON public.student_profiles;
+  DROP POLICY IF EXISTS "student_profiles_select_own_or_parent" ON public.student_profiles;
 
-create policy "parents_select_linked_student_profiles"
-on public.student_profiles
-for select
-to authenticated
-using (parent_user_id = auth.uid());
+  -- =========================
+  -- 2) student_profiles policies
+  -- =========================
+  CREATE POLICY "students_select_own_profile"
+  ON public.student_profiles
+  FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
 
--- =========================
--- 3) chat_sessions policies
--- =========================
-create policy "students_select_own_sessions"
-on public.chat_sessions
-for select
-to authenticated
-using (student_id = auth.uid());
+  CREATE POLICY "parents_select_linked_student_profiles"
+  ON public.student_profiles
+  FOR SELECT
+  TO authenticated
+  USING (parent_user_id = auth.uid());
 
-create policy "parents_select_linked_sessions"
-on public.chat_sessions
-for select
-to authenticated
-using (
-  exists (
-    select 1
-    from public.student_profiles sp
-    where sp.user_id = public.chat_sessions.student_id
-      and sp.parent_user_id = auth.uid()
-  )
-);
+  -- =========================
+  -- 3) chat_sessions policies
+  -- =========================
+  CREATE POLICY "students_select_own_sessions"
+  ON public.chat_sessions
+  FOR SELECT
+  TO authenticated
+  USING (student_id = auth.uid());
 
--- =========================
--- 4) messages policies
--- =========================
-create policy "students_select_own_messages"
-on public.messages
-for select
-to authenticated
-using (
-  exists (
-    select 1
-    from public.chat_sessions cs
-    where cs.id = public.messages.session_id
-      and cs.student_id = auth.uid()
-  )
-);
+  CREATE POLICY "parents_select_linked_sessions"
+  ON public.chat_sessions
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.student_profiles sp
+      WHERE sp.user_id = public.chat_sessions.student_id
+        AND sp.parent_user_id = auth.uid()
+    )
+  );
 
-create policy "parents_select_linked_messages"
-on public.messages
-for select
-to authenticated
-using (
-  exists (
-    select 1
-    from public.chat_sessions cs
-    join public.student_profiles sp
-      on sp.user_id = cs.student_id
-    where cs.id = public.messages.session_id
-      and sp.parent_user_id = auth.uid()
-  )
-);
+  -- =========================
+  -- 4) messages policies
+  -- =========================
+  CREATE POLICY "students_select_own_messages"
+  ON public.messages
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.chat_sessions cs
+      WHERE cs.id = public.messages.session_id
+        AND cs.student_id = auth.uid()
+    )
+  );
 
-create policy "students_insert_own_messages"
-on public.messages
-for insert
-to authenticated
-with check (
-  exists (
-    select 1
-    from public.chat_sessions cs
-    where cs.id = public.messages.session_id
-      and cs.student_id = auth.uid()
-  )
-);
+  CREATE POLICY "parents_select_linked_messages"
+  ON public.messages
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.chat_sessions cs
+      JOIN public.student_profiles sp
+        ON sp.user_id = cs.student_id
+      WHERE cs.id = public.messages.session_id
+        AND sp.parent_user_id = auth.uid()
+    )
+  );
 
--- =========================
--- 5) Performance indexes for policy joins
--- =========================
-create index if not exists idx_student_profiles_parent_user_id on public.student_profiles(parent_user_id);
-create index if not exists idx_student_profiles_user_id on public.student_profiles(user_id);
-create index if not exists idx_chat_sessions_student_id on public.chat_sessions(student_id);
-create index if not exists idx_messages_session_id on public.messages(session_id);
+  CREATE POLICY "students_insert_own_messages"
+  ON public.messages
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.chat_sessions cs
+      WHERE cs.id = public.messages.session_id
+        AND cs.student_id = auth.uid()
+    )
+  );
 
-commit;
+  -- =========================
+  -- 5) Performance indexes for policy joins
+  -- =========================
+  CREATE INDEX IF NOT EXISTS idx_student_profiles_parent_user_id ON public.student_profiles(parent_user_id);
+  CREATE INDEX IF NOT EXISTS idx_student_profiles_user_id ON public.student_profiles(user_id);
+  CREATE INDEX IF NOT EXISTS idx_chat_sessions_student_id ON public.chat_sessions(student_id);
+  CREATE INDEX IF NOT EXISTS idx_messages_session_id ON public.messages(session_id);
+END;
+$$;
+
+COMMIT;
