@@ -8,16 +8,22 @@ interface ParentSessionDetailProps {
   onBack: () => void;
 }
 
+// [수정] warn, high 추가
 const riskChipColor: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
   caution: 'bg-rose-50 text-rose-700 border-rose-100',
+  warn: 'bg-rose-100 text-rose-800 border-rose-200',
+  high: 'bg-red-100 text-red-800 border-red-200',
 };
 
+// [수정] warn, high 추가
 const riskText: Record<SessionRiskLevel, string> = {
   stable: '안정',
   normal: '보통',
   caution: '주의',
+  warn: '경고',
+  high: '위험',
 };
 
 const formatSessionTitle = (startedAt: string) => {
