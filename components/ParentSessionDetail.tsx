@@ -33,13 +33,13 @@ const formatSessionTitle = (startedAt: string) => {
 const ParentSessionDetail: React.FC<ParentSessionDetailProps> = ({ user, sessionId, onBack }) => {
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [messageError, setMessageError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSession = async () => {
-      setSessionError(null);
-      setMessageError(null);
+      setLoading(true);
+      setErrorMsg(null);
 
       const { data, error: sessionFetchError } = await supabase
         .from('chat_sessions')
@@ -48,13 +48,13 @@ const ParentSessionDetail: React.FC<ParentSessionDetailProps> = ({ user, session
         .single();
 
       if (sessionFetchError) {
-        console.error('부모 세션 조회 실패:', { sessionId, error: sessionFetchError });
-        setSessionError('세션을 불러오지 못했습니다. (RLS/권한 설정 확인)');
+        console.error('ParentSessionDetail fetch error', sessionFetchError);
+        setErrorMsg('세션을 불러올 수 없습니다. (권한/RLS 또는 세션 없음)');
+        setLoading(false);
+        return;
       }
 
-      if (data) {
-        setSession(data as ChatSession);
-      }
+      setSession(data as ChatSession);
 
       const { data: messageData, error: messageFetchError } = await supabase
         .from('messages')
@@ -63,18 +63,35 @@ const ParentSessionDetail: React.FC<ParentSessionDetailProps> = ({ user, session
         .order('created_at', { ascending: true });
 
       if (messageFetchError) {
-        console.error('부모 메시지 조회 실패:', { sessionId, error: messageFetchError });
-        setMessageError('메시지를 불러오지 못했습니다. (RLS/권한 설정 확인)');
+        console.error('ParentSessionDetail fetch error', messageFetchError);
+        setErrorMsg('메시지를 불러올 수 없습니다. (RLS 정책 확인 필요)');
+        setLoading(false);
+        return;
       }
 
       setMessages((messageData || []) as MessageRow[]);
+      setLoading(false);
     };
 
     fetchSession();
   }, [sessionId]);
 
-  if (!session) {
+  if (loading) {
     return <div className="h-screen flex items-center justify-center font-black text-brand-900">세션을 불러오는 중...</div>;
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-2 px-6 text-center">
+        <p className="font-black text-rose-600">{errorMsg}</p>
+        <p className="text-sm text-slate-500">콘솔 로그 확인 후 RLS 정책/권한 상태를 점검해 주세요.</p>
+        <button onClick={onBack} className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700">대시보드로</button>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <div className="h-screen flex items-center justify-center font-black text-brand-900">세션 정보를 찾을 수 없습니다.</div>;
   }
 
   const level = session.risk_level || 'normal';
@@ -101,8 +118,6 @@ const ParentSessionDetail: React.FC<ParentSessionDetailProps> = ({ user, session
 
         <section className="premium-card p-6">
           <h3 className="font-black text-lg mb-4">메시지</h3>
-          {sessionError && <p className="mb-3 text-sm text-rose-500">{sessionError}</p>}
-          {messageError && <p className="mb-3 text-sm text-rose-500">{messageError}</p>}
           <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
             {messages.length === 0 && <p className="text-sm text-slate-400">메시지가 없습니다.</p>}
             {messages.map((message) => (
