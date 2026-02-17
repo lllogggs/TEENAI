@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 import { createAuthedSupabase, supabaseAdmin } from '../_lib/supabaseServer';
 
@@ -68,7 +68,10 @@ export async function POST(req: Request) {
         throw new Error('GEMINI_API_KEY is missing');
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      // [수정] 올바른 패키지와 모델 사용
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
       const prompt = [
         '다음 첫 질문을 바탕으로 상담 세션 제목을 만드세요.',
         '규칙:',
@@ -82,13 +85,13 @@ export async function POST(req: Request) {
         `첫 질문: ${normalizedMessage}`,
       ].join('\n');
 
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { temperature: 0.2 },
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2 },
       });
 
-      title = sanitizeTitle(result.text || '', normalizedMessage);
+      const response = await result.response;
+      title = sanitizeTitle(response.text() || '', normalizedMessage);
       titleSource = 'ai';
     } catch (error) {
       console.warn('session-title ai generation failed, fallback is used', { sessionId: normalizedSessionId, error });
