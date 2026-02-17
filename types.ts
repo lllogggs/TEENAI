@@ -70,11 +70,11 @@ export interface SafetyAlert {
 export interface ChatSession {
   id: string;
   student_id: string;
+  title: string;
   started_at: string;
   topic_tags: string[];
   output_types: string[];
   tone_level: ToneLevel;
-  session_summary?: string;
   student_intent?: string;
   ai_intervention?: string;
   risk_level?: SessionRiskLevel;
@@ -93,13 +93,4 @@ export interface AISettings {
   praiseIntensity: 'normal' | 'high';
   interestTopic: string;
   parentDirectives: string[];
-}
-
-export interface AnalysisResult {
-  topic_tags: string[];
-  output_types: string[];
-  tone_level: 'low' | 'medium' | 'high';
-  session_summary: string;
-  student_intent: string;
-  ai_intervention: string;
 }

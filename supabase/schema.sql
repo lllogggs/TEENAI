@@ -31,6 +31,7 @@ create table if not exists public.chat_sessions (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null references public.users(id) on delete cascade,
   tone_level text not null default 'low' check (tone_level in ('low', 'medium', 'high')),
+  title text not null default '새 대화',
   topic_tags text[] not null default '{}',
   output_types text[] not null default '{}',
   session_summary text,
@@ -252,3 +253,7 @@ update public.users
 set my_invite_code = public.generate_parent_invite_code()
 where role = 'parent'
   and (my_invite_code is null or my_invite_code = '');
+
+
+alter table public.chat_sessions
+  add column if not exists title text not null default '새 대화';

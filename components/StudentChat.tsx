@@ -207,6 +207,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       .insert({
         student_id: user.id,
         tone_level: 'low',
+        title: '새 대화',
       })
       .select('*')
       .single();
@@ -263,23 +264,40 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const maybeRefreshSummary = async (sessionId: string) => {
-    const { count } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('session_id', sessionId);
-
-    if (!count || count < 2 || count % 4 !== 0) return;
+  const generateTitleFromFirstMessage = async (sessionId: string, firstMessage: string) => {
+    const session = sessions.find((item) => item.id === sessionId);
+    if (!session || session.title !== '새 대화') return;
 
     try {
-      await fetch('/api/session-summary', {
+      const response = await fetch('/api/title', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ firstMessage }),
       });
-      await fetchSessions(sessionId);
+
+      if (!response.ok) {
+        throw new Error('title generation failed');
+      }
+
+      const payload = await response.json();
+      const nextTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '새 대화';
+      if (nextTitle === '새 대화') return;
+
+      const { error } = await supabase
+        .from('chat_sessions')
+        .update({ title: nextTitle })
+        .eq('id', sessionId)
+        .eq('student_id', user.id)
+        .eq('title', '새 대화');
+
+      if (error) {
+        console.error('chat_sessions title update error:', error);
+        return;
+      }
+
+      setSessions((prev) => prev.map((item) => (item.id === sessionId ? { ...item, title: nextTitle } : item)));
     } catch (error) {
-      console.error('session summary refresh error:', error);
+      console.error('title generation error:', error);
     }
   };
 
@@ -289,6 +307,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setErrorNotice('');
     const userText = input.trim();
     const userMsg: ChatMessage = { role: 'user', text: userText, timestamp: Date.now() };
+    const hadMessages = messages.length > 0;
     const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
 
     setInput('');
@@ -302,6 +321,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     await persistMessage(sessionId, 'user', userText);
+
+    if (!hadMessages) {
+      await generateTitleFromFirstMessage(sessionId, userText);
+    }
 
     const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
     if (isDanger) {
@@ -338,7 +361,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       setMessages((prev) => [...prev, aiMsg]);
       await persistMessage(sessionId, 'model', aiText);
-      await maybeRefreshSummary(sessionId);
     } catch (err) {
       console.error('chat response error:', err);
       setErrorNotice('AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
@@ -395,7 +417,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
                     <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
                   </div>
-                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.session_summary || '새 대화가 시작되었어요.'}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
                 </button>
               );
             })}
@@ -406,7 +428,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex flex-col bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
             <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
-            <p className="text-xs text-slate-500 truncate">{activeSession?.session_summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
+            <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-36">

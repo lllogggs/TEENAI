@@ -370,7 +370,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                       <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
                       <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.session_summary || '요약 없음'}</p>
+                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.title || '새 대화'}</p>
                   </button>
                 );
               })}
@@ -438,7 +438,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         </section>
 
         <section className="premium-card p-6">
-          <h2 className="font-black text-lg mb-4">세션 원문 대화</h2>
+          <h2 className="font-black text-lg mb-1">세션 원문 대화</h2>
+          <p className="text-xs text-slate-500 mb-4">{sessions.find((session) => session.id === selectedSessionId)?.title || '대화를 선택해 주세요.'}</p>
           <div className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pr-2">
             {sessionMessages.length === 0 && <p className="text-sm text-slate-400">세션을 선택하면 원문 대화가 표시됩니다.</p>}
             {sessionMessages.map((message) => (
