@@ -356,30 +356,35 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     const nextUserCount = nextHistory.length + 1;
-    if (!activeSession?.title && nextUserCount === 1) {
-      try {
-        const { data: authData } = await supabase.auth.getSession();
-        const accessToken = authData.session?.access_token;
-        const titleResponse = await fetch('/api/session-title', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-          body: JSON.stringify({ sessionId, firstUserMessage: userText }),
-        });
+    
+    // [수정] 세션 타이틀 생성 로직을 비동기 IIFE(즉시 실행 함수)로 감싸서,
+    // AI 답변 생성과 병렬로 진행되도록 변경 (Fire-and-forget)
+    if ((!activeSession?.title || activeSession.title === '새 대화') && nextUserCount === 1) {
+      (async () => {
+        try {
+          const { data: authData } = await supabase.auth.getSession();
+          const accessToken = authData.session?.access_token;
+          const titleResponse = await fetch('/api/session-title', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({ sessionId, firstUserMessage: userText }),
+          });
 
-        if (titleResponse.ok) {
-          const titlePayload = await titleResponse.json().catch(() => ({}));
-          if (typeof titlePayload?.title === 'string' && titlePayload.title.trim()) {
-            setSessions((prev) => prev.map((session) => (
-              session.id === sessionId ? { ...session, title: titlePayload.title.trim() } : session
-            )));
+          if (titleResponse.ok) {
+            const titlePayload = await titleResponse.json().catch(() => ({}));
+            if (typeof titlePayload?.title === 'string' && titlePayload.title.trim()) {
+              setSessions((prev) => prev.map((session) => (
+                session.id === sessionId ? { ...session, title: titlePayload.title.trim() } : session
+              )));
+            }
           }
+        } catch (titleError) {
+          console.warn('session title generation request failed:', { sessionId, titleError });
         }
-      } catch (titleError) {
-        console.warn('session title generation request failed:', { sessionId, titleError });
-      }
+      })();
     }
 
     const isDanger = hasDangerKeyword(userText);
