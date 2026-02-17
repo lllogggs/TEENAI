@@ -1,0 +1,7 @@
+[db]
+# local 개발을 안 써도 되지만, CLI가 config.toml을 기대하므로 최소 섹션을 둔다.
+# 필요 시 추후 확장.
+major_version = 15
+
+[db.migrations]
+enabled = true
