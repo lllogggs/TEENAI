@@ -154,6 +154,8 @@ const formatSessionTime = (iso: string) => {
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+const SESSION_SELECT = 'id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention';
+
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -175,12 +177,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const fetchSessions = async (forceSessionId?: string) => {
     const { data, error } = await supabase
       .from('chat_sessions')
-      .select('id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
+      .select(SESSION_SELECT)
       .eq('student_id', user.id)
       .order('started_at', { ascending: false });
 
     if (error) {
       console.error('chat_sessions fetch error:', error);
+      setErrorNotice('대화 목록을 불러오지 못했습니다. 관리자에게 최신 DB 마이그레이션 적용을 요청해 주세요.');
       return;
     }
 

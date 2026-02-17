@@ -115,40 +115,15 @@ const toStudentSettings = (normalized: NormalizedSettings): StudentSettings => (
   ai_style_prompt: normalized.ai_style_prompt,
 });
 
-const LEGACY_SESSION_SELECT = 'id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention';
-const ENHANCED_SESSION_SELECT = 'id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention';
-
-const isMissingTitleColumnError = (error: { code?: string; message?: string } | null) => {
-  if (!error) return false;
-  if (error.code === '42703') return true;
-  return typeof error.message === 'string' && error.message.includes('column') && error.message.includes('title');
-};
+const SESSION_SELECT = 'id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention';
 
 const fetchSessionsByStudentIds = async (studentIds: string[]) => {
-  const queryBase = () => supabase
+  return supabase
     .from('chat_sessions')
+    .select(SESSION_SELECT)
     .in('student_id', studentIds)
     .order('started_at', { ascending: false })
     .limit(50);
-
-  const enhanced = await queryBase().select(ENHANCED_SESSION_SELECT);
-  if (!isMissingTitleColumnError(enhanced.error)) {
-    return enhanced;
-  }
-
-  console.warn('chat_sessions.title column missing on connected Supabase DB. Falling back to legacy query. Apply latest migrations to enable title rendering.', enhanced.error);
-  const legacy = await queryBase().select(LEGACY_SESSION_SELECT);
-  return {
-    ...legacy,
-    data: (legacy.data || []).map((session) => ({
-      ...session,
-      title: null,
-      title_source: null,
-      title_updated_at: null,
-      last_activity_at: session.started_at,
-      closed_at: null,
-    })),
-  };
 };
 
 const formatSessionFallbackDate = (startedAt: string) => {
