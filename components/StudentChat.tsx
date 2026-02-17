@@ -164,6 +164,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
+  const summaryCooldownRef = useRef<Record<string, number>>({});
 
   const activeSession = useMemo(() => sessions.find((session) => session.id === currentSessionId) || null, [sessions, currentSessionId]);
 
@@ -174,7 +175,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const fetchSessions = async (forceSessionId?: string) => {
     const { data, error } = await supabase
       .from('chat_sessions')
-      .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
+      .select('id, student_id, started_at, title, title_source, title_updated_at, last_activity_at, closed_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
       .eq('student_id', user.id)
       .order('started_at', { ascending: false });
 
@@ -289,8 +290,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const maybeRefreshSummary = async (sessionId: string, nextMessageCount: number) => {
-    if (nextMessageCount < 6 || nextMessageCount % 6 !== 0) return;
+  const maybeRefreshSummary = async (sessionId: string, nextMessageCount: number, force = false) => {
+    const now = Date.now();
+    const lastTriggeredAt = summaryCooldownRef.current[sessionId] || 0;
+    if (!force && now - lastTriggeredAt < 20_000) return;
+
+    if (!force && (nextMessageCount < 2 || nextMessageCount % 2 !== 0)) return;
 
     try {
       const { data: authData } = await supabase.auth.getSession();
@@ -301,7 +306,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           'Content-Type': 'application/json',
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, force }),
       });
 
       if (!response.ok) {
@@ -310,6 +315,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         return;
       }
 
+      summaryCooldownRef.current[sessionId] = now;
       await fetchSessions(sessionId);
     } catch (error) {
       console.warn('session summary refresh error:', { sessionId, nextMessageCount, error });
@@ -336,8 +342,46 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
     await persistMessage(sessionId, 'user', userText);
 
+    const { error: activityError } = await supabase
+      .from('chat_sessions')
+      .update({ last_activity_at: new Date().toISOString(), closed_at: null })
+      .eq('id', sessionId)
+      .eq('student_id', user.id);
+
+    if (activityError) {
+      console.error('chat_sessions activity update error:', activityError);
+    }
+
+    const nextUserCount = nextHistory.length + 1;
+    if (!activeSession?.title && nextUserCount === 1) {
+      try {
+        const { data: authData } = await supabase.auth.getSession();
+        const accessToken = authData.session?.access_token;
+        const titleResponse = await fetch('/api/session-title', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({ sessionId, firstUserMessage: userText }),
+        });
+
+        if (titleResponse.ok) {
+          const titlePayload = await titleResponse.json().catch(() => ({}));
+          if (typeof titlePayload?.title === 'string' && titlePayload.title.trim()) {
+            setSessions((prev) => prev.map((session) => (
+              session.id === sessionId ? { ...session, title: titlePayload.title.trim() } : session
+            )));
+          }
+        }
+      } catch (titleError) {
+        console.warn('session title generation request failed:', { sessionId, titleError });
+      }
+    }
+
     const isDanger = hasDangerKeyword(userText);
     if (isDanger) {
+      await maybeRefreshSummary(sessionId, nextUserCount, true);
       const { error } = await supabase.from('safety_alerts').insert({
         student_id: user.id,
         message: '위험 키워드가 포함된 대화가 감지되었습니다.',
@@ -437,7 +481,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
                     <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
                   </div>
-                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.summary || session.session_summary || '새 대화가 시작되었어요.'}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || session.summary || '새 대화가 시작되었어요.'}</p>
                 </button>
               );
             })}
@@ -448,7 +492,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex flex-col bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
             <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
-            <p className="text-xs text-slate-500 truncate">{activeSession?.summary || activeSession?.session_summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
+            <p className="text-xs text-slate-500 truncate">{activeSession?.title || activeSession?.summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-36">

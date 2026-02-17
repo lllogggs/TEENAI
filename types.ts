@@ -72,11 +72,15 @@ export interface ChatSession {
   id: string;
   student_id: string;
   started_at: string;
+  title?: string | null;
+  title_source?: string | null;
+  title_updated_at?: string | null;
+  last_activity_at?: string;
+  closed_at?: string | null;
   topic_tags: string[];
   output_types: string[];
   tone_level: ToneLevel;
   summary?: string;
-  session_summary?: string;
   student_intent?: string;
   ai_intervention?: string;
   risk_level?: SessionRiskLevel;

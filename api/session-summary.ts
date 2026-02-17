@@ -8,7 +8,7 @@ const normalizeSummary = (value: unknown) => {
   if (typeof value !== 'string') return '대화 요약을 생성하지 못했습니다.';
   const trimmed = value.trim();
   if (!trimmed) return '대화 요약을 생성하지 못했습니다.';
-  if (trimmed.length < 200) return `${trimmed} 학생의 현재 감정과 요청을 조금 더 구체적으로 지켜볼 필요가 있습니다.`.slice(0, 350);
+  if (trimmed.length < 120) return `${trimmed} 학생의 현재 감정과 요청을 조금 더 구체적으로 지켜볼 필요가 있습니다.`.slice(0, 350);
   if (trimmed.length > 350) return trimmed.slice(0, 350);
   return trimmed;
 };
@@ -32,7 +32,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { user, authedSupabase } = await requireUser(req);
+    const { user } = await requireUser(req);
     const { summary: summaryRateLimit } = getRateLimitConfig();
     const rateLimitResult = allow(getRateLimitKey(req, user.id), summaryRateLimit.windowSec, summaryRateLimit.max);
 
@@ -44,22 +44,43 @@ export default async function handler(req: any, res: any) {
 
     const body = parseBody(req);
     const sessionId = String((req.method === 'GET' ? req.query?.sessionId : body.sessionId) || '').trim();
+    const force = Boolean(req.method === 'GET' ? req.query?.force === 'true' : body.force);
 
-    if (!sessionId) {
-      throw new ApiError(400, 'sessionId is required.');
-    }
+    if (!sessionId) throw new ApiError(400, 'sessionId is required.');
 
-    const { data: sessionRow } = await authedSupabase
+    const adminSupabase = createServiceRoleClient();
+
+    const { data: me, error: meError } = await adminSupabase
+      .from('users')
+      .select('id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (meError || !me?.role) throw new ApiError(403, 'Failed to verify user role.');
+
+    const { data: sessionRow, error: sessionError } = await adminSupabase
       .from('chat_sessions')
-      .select('id, summary')
+      .select('id, student_id, summary, last_activity_at, closed_at')
       .eq('id', sessionId)
       .single();
 
-    if (!sessionRow) {
-      throw new ApiError(404, 'Session not found.');
+    if (sessionError || !sessionRow) throw new ApiError(404, 'Session not found.');
+
+    if (me.role === 'student' && sessionRow.student_id !== user.id) {
+      throw new ApiError(403, 'Forbidden');
     }
 
-    const adminSupabase = createServiceRoleClient();
+    if (me.role === 'parent') {
+      const { data: relation, error: relationError } = await adminSupabase
+        .from('student_profiles')
+        .select('user_id')
+        .eq('user_id', sessionRow.student_id)
+        .eq('parent_user_id', user.id)
+        .single();
+
+      if (relationError || !relation?.user_id) throw new ApiError(403, 'Forbidden');
+    }
+
     const summaryConfig = getSummaryConfig();
 
     const { data: latestMessages, error: messageError } = await adminSupabase
@@ -69,44 +90,46 @@ export default async function handler(req: any, res: any) {
       .order('created_at', { ascending: false })
       .limit(summaryConfig.maxHistory);
 
-    if (messageError) {
-      throw new ApiError(500, 'Failed to read messages.');
-    }
+    if (messageError) throw new ApiError(500, 'Failed to read messages.');
 
     const messages = [...(latestMessages || [])].reverse();
-    if (!messages.length) {
-      res.status(200).json({ ok: true, updated: false, skipped: true, reason: 'no_messages' });
-      return;
-    }
 
     const { count, error: countError } = await adminSupabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('session_id', sessionId);
 
-    if (countError) {
-      throw new ApiError(500, 'Failed to count messages.');
-    }
+    if (countError) throw new ApiError(500, 'Failed to count messages.');
 
     const messageCount = count || 0;
-    const idleMinSec = summaryConfig.idleMinSec;
-    const everyN = Math.max(1, summaryConfig.everyN);
-    const lastMessageAt = messages[messages.length - 1]?.created_at;
-    const idleMs = lastMessageAt ? Date.now() - new Date(lastMessageAt).getTime() : 0;
-    const shouldSummarize = idleMs >= idleMinSec * 1000 || (messageCount > 0 && messageCount % everyN === 0);
-
-    if (!shouldSummarize) {
-      res.status(200).json({ ok: true, updated: false, skipped: true, reason: 'trigger_not_met' });
+    if (messageCount < 1 || !messages.length) {
+      res.status(200).json({ ok: true, skipped: true, reason: 'no_messages' });
       return;
+    }
+
+    const idleRefAt = sessionRow.last_activity_at || messages[messages.length - 1]?.created_at;
+    const idleSec = idleRefAt ? Math.max(0, (Date.now() - new Date(idleRefAt).getTime()) / 1000) : 0;
+
+    if (!force) {
+      if (messageCount < 2) {
+        res.status(200).json({ ok: true, skipped: true, reason: 'insufficient_messages' });
+        return;
+      }
+
+      const shouldSkipByTrigger = idleSec < summaryConfig.idleMinSec && messageCount % Math.max(1, summaryConfig.everyN) !== 0;
+      if (shouldSkipByTrigger) {
+        res.status(200).json({ ok: true, skipped: true, reason: 'trigger_not_met' });
+        return;
+      }
     }
 
     const transcript = messages.map((item) => `${item.role}: ${item.content}`).join('\n');
     const ai = new GoogleGenAI({ apiKey: getGeminiKeyOrThrow() });
     const prompt = [
       '다음 청소년 상담 대화를 JSON으로 요약하세요.',
-      'summary는 반드시 한국어 2~3문장, 공백 포함 200~350자여야 합니다.',
+      'summary는 반드시 한국어 2~3문장, 공백 포함 120~350자여야 합니다.',
       '주제, 핵심 감정, 요청 사항, 멘토 개입 요지를 포함하고 민감정보는 제거하세요.',
-      "riskLevel은 normal|warn|high 중 하나로 답하세요.",
+      "riskLevel은 stable|normal|caution|warn|high 중 하나로 답하세요.",
       'topicTags는 1~5개 한국어 배열로 답하세요.',
       '',
       transcript,
@@ -119,13 +142,13 @@ export default async function handler(req: any, res: any) {
     });
 
     let summary = '대화 요약을 생성하지 못했습니다.';
-    let riskLevel = 'normal';
+    let riskLevel: 'stable' | 'normal' | 'caution' | 'warn' | 'high' = 'normal';
     let topicTags: string[] = [];
 
     try {
       const payload = JSON.parse(result.text || '{}');
       summary = normalizeSummary(payload.summary);
-      if (payload.riskLevel === 'warn' || payload.riskLevel === 'high' || payload.riskLevel === 'normal') {
+      if (['stable', 'normal', 'caution', 'warn', 'high'].includes(payload.riskLevel)) {
         riskLevel = payload.riskLevel;
       }
       if (Array.isArray(payload.topicTags)) {
@@ -135,20 +158,24 @@ export default async function handler(req: any, res: any) {
       summary = normalizeSummary(result.text || summary);
     }
 
-    const { error: updateError } = await adminSupabase
-      .from('chat_sessions')
-      .update({
-        summary,
-        risk_level: riskLevel,
-        topic_tags: topicTags,
-      })
-      .eq('id', sessionId);
+    const updatePayload: Record<string, unknown> = {
+      summary,
+      risk_level: riskLevel,
+      topic_tags: topicTags,
+    };
 
-    if (updateError) {
-      throw new ApiError(500, 'Failed to update summary.');
+    if (idleSec >= 3600) {
+      updatePayload.closed_at = new Date().toISOString();
     }
 
-    res.status(200).json({ ok: true, updated: true, skipped: false, summary, risk_level: riskLevel });
+    const { error: updateError } = await adminSupabase
+      .from('chat_sessions')
+      .update(updatePayload)
+      .eq('id', sessionId);
+
+    if (updateError) throw new ApiError(500, 'Failed to update summary.');
+
+    res.status(200).json({ ok: true, updated: true });
   } catch (error: any) {
     const status = typeof error?.status === 'number' ? error.status : 500;
     const message = error?.message || '요약 생성 중 오류가 발생했습니다.';

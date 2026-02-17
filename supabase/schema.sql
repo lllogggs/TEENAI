@@ -37,6 +37,11 @@ create table if not exists public.chat_sessions (
   summary text,
   student_intent text,
   ai_intervention text,
+  title text,
+  title_source text,
+  title_updated_at timestamptz,
+  last_activity_at timestamptz not null default now(),
+  closed_at timestamptz,
   started_at timestamptz not null default now()
 );
 
@@ -229,7 +234,14 @@ $$;
 
 alter table public.chat_sessions
   add column if not exists risk_level text not null default 'normal'
-  check (risk_level in ('stable', 'normal', 'caution'));
+  check (risk_level in ('stable', 'normal', 'caution', 'warn', 'high'));
+
+alter table public.chat_sessions
+  add column if not exists title text,
+  add column if not exists title_source text,
+  add column if not exists title_updated_at timestamptz,
+  add column if not exists last_activity_at timestamptz not null default now(),
+  add column if not exists closed_at timestamptz;
 
 create or replace function public.generate_parent_invite_code()
 returns text
