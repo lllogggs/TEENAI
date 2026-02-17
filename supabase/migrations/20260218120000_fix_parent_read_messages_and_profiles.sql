@@ -1,95 +1,106 @@
-begin;
+BEGIN;
 
-alter table public.student_profiles enable row level security;
-alter table public.chat_sessions enable row level security;
-alter table public.messages enable row level security;
+DO $$
+BEGIN
+  IF to_regclass('public.student_profiles') IS NULL
+     OR to_regclass('public.chat_sessions') IS NULL
+     OR to_regclass('public.messages') IS NULL THEN
+    RAISE NOTICE 'Skipping migration 20260218120000_fix_parent_read_messages_and_profiles: required tables do not exist yet.';
+    RETURN;
+  END IF;
 
--- student_profiles: 학생/부모 SELECT
-drop policy if exists "students_select_own_profile" on public.student_profiles;
-create policy "students_select_own_profile"
-on public.student_profiles for select to authenticated
-using (user_id = auth.uid());
+  ALTER TABLE public.student_profiles ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
-drop policy if exists "parents_select_linked_student_profiles" on public.student_profiles;
-create policy "parents_select_linked_student_profiles"
-on public.student_profiles for select to authenticated
-using (parent_user_id = auth.uid());
+  -- student_profiles: 학생/부모 SELECT
+  DROP POLICY IF EXISTS "students_select_own_profile" ON public.student_profiles;
+  CREATE POLICY "students_select_own_profile"
+  ON public.student_profiles FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
 
--- student_profiles: 학생/부모 UPDATE (부모 대시보드 설정/표시명 저장에 필요)
-drop policy if exists "students_update_own_profile" on public.student_profiles;
-create policy "students_update_own_profile"
-on public.student_profiles for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+  DROP POLICY IF EXISTS "parents_select_linked_student_profiles" ON public.student_profiles;
+  CREATE POLICY "parents_select_linked_student_profiles"
+  ON public.student_profiles FOR SELECT TO authenticated
+  USING (parent_user_id = auth.uid());
 
-drop policy if exists "parents_update_linked_student_profiles" on public.student_profiles;
-create policy "parents_update_linked_student_profiles"
-on public.student_profiles for update to authenticated
-using (parent_user_id = auth.uid())
-with check (parent_user_id = auth.uid());
+  -- student_profiles: 학생/부모 UPDATE (부모 대시보드 설정/표시명 저장에 필요)
+  DROP POLICY IF EXISTS "students_update_own_profile" ON public.student_profiles;
+  CREATE POLICY "students_update_own_profile"
+  ON public.student_profiles FOR UPDATE TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
--- chat_sessions: 학생/부모 SELECT
-drop policy if exists "students_select_own_sessions" on public.chat_sessions;
-create policy "students_select_own_sessions"
-on public.chat_sessions for select to authenticated
-using (student_id = auth.uid());
+  DROP POLICY IF EXISTS "parents_update_linked_student_profiles" ON public.student_profiles;
+  CREATE POLICY "parents_update_linked_student_profiles"
+  ON public.student_profiles FOR UPDATE TO authenticated
+  USING (parent_user_id = auth.uid())
+  WITH CHECK (parent_user_id = auth.uid());
 
-drop policy if exists "parents_select_linked_sessions" on public.chat_sessions;
-create policy "parents_select_linked_sessions"
-on public.chat_sessions for select to authenticated
-using (
-  exists (
-    select 1
-    from public.student_profiles sp
-    where sp.user_id = public.chat_sessions.student_id
-      and sp.parent_user_id = auth.uid()
-  )
-);
+  -- chat_sessions: 학생/부모 SELECT
+  DROP POLICY IF EXISTS "students_select_own_sessions" ON public.chat_sessions;
+  CREATE POLICY "students_select_own_sessions"
+  ON public.chat_sessions FOR SELECT TO authenticated
+  USING (student_id = auth.uid());
 
--- messages: 학생/부모 SELECT (핵심)
-drop policy if exists "students_select_own_messages" on public.messages;
-create policy "students_select_own_messages"
-on public.messages for select to authenticated
-using (
-  exists (
-    select 1
-    from public.chat_sessions cs
-    where cs.id = public.messages.session_id
-      and cs.student_id = auth.uid()
-  )
-);
+  DROP POLICY IF EXISTS "parents_select_linked_sessions" ON public.chat_sessions;
+  CREATE POLICY "parents_select_linked_sessions"
+  ON public.chat_sessions FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.student_profiles sp
+      WHERE sp.user_id = public.chat_sessions.student_id
+        AND sp.parent_user_id = auth.uid()
+    )
+  );
 
-drop policy if exists "parents_select_linked_messages" on public.messages;
-create policy "parents_select_linked_messages"
-on public.messages for select to authenticated
-using (
-  exists (
-    select 1
-    from public.chat_sessions cs
-    join public.student_profiles sp
-      on sp.user_id = cs.student_id
-    where cs.id = public.messages.session_id
-      and sp.parent_user_id = auth.uid()
-  )
-);
+  -- messages: 학생/부모 SELECT (핵심)
+  DROP POLICY IF EXISTS "students_select_own_messages" ON public.messages;
+  CREATE POLICY "students_select_own_messages"
+  ON public.messages FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.chat_sessions cs
+      WHERE cs.id = public.messages.session_id
+        AND cs.student_id = auth.uid()
+    )
+  );
 
--- messages: 학생 INSERT (필요 시)
-drop policy if exists "students_insert_own_messages" on public.messages;
-create policy "students_insert_own_messages"
-on public.messages for insert to authenticated
-with check (
-  exists (
-    select 1
-    from public.chat_sessions cs
-    where cs.id = public.messages.session_id
-      and cs.student_id = auth.uid()
-  )
-);
+  DROP POLICY IF EXISTS "parents_select_linked_messages" ON public.messages;
+  CREATE POLICY "parents_select_linked_messages"
+  ON public.messages FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.chat_sessions cs
+      JOIN public.student_profiles sp
+        ON sp.user_id = cs.student_id
+      WHERE cs.id = public.messages.session_id
+        AND sp.parent_user_id = auth.uid()
+    )
+  );
 
--- 성능 인덱스
-create index if not exists idx_student_profiles_parent_user_id on public.student_profiles(parent_user_id);
-create index if not exists idx_student_profiles_user_id on public.student_profiles(user_id);
-create index if not exists idx_chat_sessions_student_id on public.chat_sessions(student_id);
-create index if not exists idx_messages_session_id on public.messages(session_id);
+  -- messages: 학생 INSERT (필요 시)
+  DROP POLICY IF EXISTS "students_insert_own_messages" ON public.messages;
+  CREATE POLICY "students_insert_own_messages"
+  ON public.messages FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.chat_sessions cs
+      WHERE cs.id = public.messages.session_id
+        AND cs.student_id = auth.uid()
+    )
+  );
 
-commit;
+  -- 성능 인덱스
+  CREATE INDEX IF NOT EXISTS idx_student_profiles_parent_user_id ON public.student_profiles(parent_user_id);
+  CREATE INDEX IF NOT EXISTS idx_student_profiles_user_id ON public.student_profiles(user_id);
+  CREATE INDEX IF NOT EXISTS idx_chat_sessions_student_id ON public.chat_sessions(student_id);
+  CREATE INDEX IF NOT EXISTS idx_messages_session_id ON public.messages(session_id);
+END;
+$$;
+
+COMMIT;

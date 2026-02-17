@@ -27,4 +27,4 @@ jobs:
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Apply migrations (db push)
-        run: supabase db push
+        run: yes | supabase db push -p "$SUPABASE_DB_PASSWORD"
