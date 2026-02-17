@@ -92,8 +92,8 @@ export default async function handler(req: any, res: any) {
     const idleMinSec = summaryConfig.idleMinSec;
     const everyN = Math.max(1, summaryConfig.everyN);
     const lastMessageAt = messages[messages.length - 1]?.created_at;
-    const idleSec = lastMessageAt ? (Date.now() - new Date(lastMessageAt).getTime()) / 1000 : 0;
-    const shouldSummarize = idleSec >= idleMinSec || (messageCount > 0 && messageCount % everyN === 0);
+    const idleMs = lastMessageAt ? Date.now() - new Date(lastMessageAt).getTime() : 0;
+    const shouldSummarize = idleMs >= idleMinSec * 1000 || (messageCount > 0 && messageCount % everyN === 0);
 
     if (!shouldSummarize) {
       res.status(200).json({ ok: true, updated: false, skipped: true, reason: 'trigger_not_met' });
