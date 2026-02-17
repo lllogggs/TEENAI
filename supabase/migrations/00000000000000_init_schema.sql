@@ -36,6 +36,12 @@ create table if not exists public.chat_sessions (
   summary text,
   student_intent text,
   ai_intervention text,
+  title text,
+  title_source text,
+  title_updated_at timestamptz,
+  last_message_at timestamptz,
+  last_activity_at timestamptz not null default now(),
+  closed_at timestamptz,
   started_at timestamptz not null default now()
 );
 
@@ -229,6 +235,34 @@ $$;
 alter table public.chat_sessions
   add column if not exists risk_level text not null default 'normal'
   check (risk_level in ('stable', 'normal', 'caution'));
+
+
+create index if not exists idx_chat_sessions_last_activity_at
+  on public.chat_sessions(last_activity_at desc);
+
+create index if not exists idx_chat_sessions_closed_at
+  on public.chat_sessions(closed_at desc);
+
+create or replace function public.fn_touch_session_activity()
+returns trigger
+language plpgsql
+as $$
+begin
+  update public.chat_sessions
+  set
+    last_message_at = NEW.created_at,
+    last_activity_at = NEW.created_at
+  where id = NEW.session_id;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists trg_touch_session_activity on public.messages;
+create trigger trg_touch_session_activity
+after insert on public.messages
+for each row
+execute function public.fn_touch_session_activity();
 
 create or replace function public.generate_parent_invite_code()
 returns text
