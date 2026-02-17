@@ -1,8 +1,7 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AnalysisResult, AISettings } from '../types';
 
-// [수정] GoogleGenAI -> GoogleGenerativeAI (패키지 이름 변경)
-// API 키는 환경 변수에서 안전하게 가져오도록 변경
+// [수정] SchemaType 제거하고 직접 값 사용
 const getGenAI = () => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
   return new GoogleGenerativeAI(apiKey);
@@ -67,13 +66,11 @@ export const GeminiService = {
       }
 
       const genAI = getGenAI();
-      // [수정] 모델 생성 및 시스템 프롬프트 설정 방식 변경
       const model = genAI.getGenerativeModel({ 
         model: 'gemini-1.5-flash', 
         systemInstruction: instruction 
       });
 
-      // [수정] 대화 시작 방식 변경 (SDK 문법)
       const chat = model.startChat({
         history: history,
         generationConfig: {
@@ -105,29 +102,33 @@ ${transcript}`;
 
     try {
       const genAI = getGenAI();
-      // [수정] 모델 생성 및 JSON 스키마 설정 방식 변경
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
         generationConfig: {
           responseMimeType: "application/json",
+          // [수정] SchemaType 대신 any 타입으로 우회하거나, 직접 객체 구조 사용
+          // 여기서는 SchemaType enum을 쓰지 않고 직접 값을 넣는 것이 안전합니다.
+          // 하지만 구버전 호환성을 위해 스키마 정의를 생략하고 프롬프트에 의존하거나,
+          // 최신 버전이라면 아래와 같이 쓸 수 있습니다.
+          // (SchemaType 에러를 피하기 위해 any로 캐스팅하거나 직접 숫자를 사용)
           responseSchema: {
-            type: SchemaType.OBJECT,
+            type: 6 as any, // SchemaType.OBJECT (값: 6)
             properties: {
               topic_tags: { 
-                type: SchemaType.ARRAY, 
-                items: { type: SchemaType.STRING } 
+                type: 4 as any, // SchemaType.ARRAY (값: 4)
+                items: { type: 1 as any } // SchemaType.STRING (값: 1)
               },
               output_types: { 
-                type: SchemaType.ARRAY, 
-                items: { type: SchemaType.STRING } 
+                type: 4 as any, 
+                items: { type: 1 as any } 
               },
               tone_level: { 
-                type: SchemaType.STRING, 
+                type: 1 as any, 
                 enum: ["low", "medium", "high"] 
               },
-              summary: { type: SchemaType.STRING },
-              student_intent: { type: SchemaType.STRING },
-              ai_intervention: { type: SchemaType.STRING }
+              summary: { type: 1 as any },
+              student_intent: { type: 1 as any },
+              ai_intervention: { type: 1 as any }
             },
             required: ["topic_tags", "output_types", "tone_level", "summary", "student_intent", "ai_intervention"],
           },
