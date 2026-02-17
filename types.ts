@@ -9,7 +9,7 @@ export enum ToneLevel {
   HIGH = 'high'
 }
 
-export type SessionRiskLevel = 'stable' | 'normal' | 'caution';
+export type SessionRiskLevel = 'stable' | 'normal' | 'caution' | 'warn' | 'high';
 
 export interface User {
   id: string;
@@ -76,6 +76,7 @@ export interface ChatSession {
   output_types: string[];
   tone_level: ToneLevel;
   summary?: string;
+  session_summary?: string;
   student_intent?: string;
   ai_intervention?: string;
   risk_level?: SessionRiskLevel;

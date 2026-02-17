@@ -60,12 +60,16 @@ const riskChipColor: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
   caution: 'bg-rose-50 text-rose-700 border-rose-100',
+  warn: 'bg-rose-100 text-rose-800 border-rose-200',
+  high: 'bg-red-100 text-red-800 border-red-200',
 };
 
 const riskText: Record<SessionRiskLevel, string> = {
   stable: '안정',
   normal: '보통',
   caution: '주의',
+  warn: '경고',
+  high: '위험',
 };
 
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
@@ -132,6 +136,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
   const [inviteCode, setInviteCode] = useState('');
   const [editingDisplayName, setEditingDisplayName] = useState(false);
   const [displayNameInput, setDisplayNameInput] = useState('');
+  const [summaryStatus, setSummaryStatus] = useState<Record<string, string>>({});
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -159,13 +164,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
   }), [sessions, riskFilter]);
 
   const riskStats = useMemo(() => {
-    const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
+    const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0, warn: 0, high: 0 };
     sessions.forEach((session) => {
       const level = session.risk_level || 'normal';
       counts[level] += 1;
     });
 
-    const maxCount = Math.max(counts.stable, counts.normal, counts.caution, 1);
+    const maxCount = Math.max(counts.stable, counts.normal, counts.caution, counts.warn, counts.high, 1);
     return { counts, maxCount };
   }, [sessions]);
 
@@ -267,18 +272,29 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
       if (!missingSummarySessions.length) return;
 
       try {
+        const nextStatus: Record<string, string> = {};
         const { data: authData } = await supabase.auth.getSession();
         const accessToken = authData.session?.access_token;
         await Promise.all(missingSummarySessions.map(async (session) => {
-          const endpoint = `/api/session-summary?sessionId=${encodeURIComponent(session.id)}`;
-          const response = await fetch(endpoint, {
-            method: 'GET',
-            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+          const response = await fetch('/api/session-summary', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({ sessionId: session.id }),
           });
 
           if (!response.ok) {
             const payload = await response.json().catch(() => ({}));
             console.error('session summary backfill failed:', { sessionId: session.id, status: response.status, payload });
+            nextStatus[session.id] = '요약 생성 실패';
+            return;
+          }
+
+          const payload = await response.json().catch(() => ({}));
+          if (payload?.skipped) {
+            nextStatus[session.id] = '요약 대기 중';
           }
         }));
 
@@ -292,6 +308,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
         if (refreshed) {
           setSessions(refreshed as ChatSession[]);
         }
+        setSummaryStatus(nextStatus);
       } catch (error) {
         console.error('session summary backfill request failed:', error);
       }
@@ -509,7 +526,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
                       <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
                     </div>
                     <p className="text-xs text-slate-500 mb-2">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || '요약이 아직 없습니다.'}</p>
+                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.summary || session.session_summary || '요약이 아직 없습니다.'}</p>
+                    {!session.summary && summaryStatus[session.id] && <p className="text-[11px] text-slate-400 mt-1">{summaryStatus[session.id]}</p>}
                   </button>
                 );
               })}
