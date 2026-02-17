@@ -11,35 +11,36 @@
 1. Install dependencies:
    `npm install`
 2. Create `.env.local` and set:
-   - `GEMINI_API_KEY=...` (serverless `/api/chat`에서 사용)
+   - `GEMINI_API_KEY=...` (serverless `/api/chat`, `/api/title`에서만 사용)
    - `VITE_SUPABASE_URL=...`
    - `VITE_SUPABASE_ANON_KEY=...`
 3. Run app:
    `npm run dev`
 
-
 ## Supabase DB SQL (필수)
 
-Supabase SQL Editor에서 아래 파일 내용을 그대로 실행하세요.
+Supabase SQL Editor에서 아래 순서대로 실행하세요.
 
-- `supabase/schema.sql`
+1. `supabase/schema.sql`
+2. 제목 컬럼 마이그레이션 SQL
 
-이 SQL에는 다음이 포함되어 있습니다.
-- 테이블: `users`, `student_profiles`, `chat_sessions`, `safety_alerts`
-- 인덱스 / 제약조건(초대코드 6자리 포맷)
-- RLS 및 정책(학생 본인 + 연결된 학부모 접근)
+```sql
+alter table public.chat_sessions
+  add column if not exists title text not null default '새 대화';
+```
+
+또는 `supabase/migrations/20260217_add_chat_title.sql` 파일을 실행해도 됩니다.
 
 ## Vercel Environment Variables
 
-Vercel에 아래 환경 변수를 반드시 설정해야 실제 서비스가 동작합니다.
+Vercel에 아래 환경 변수를 반드시 설정해야 동작합니다.
 
 - `GEMINI_API_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
-## What was fixed
+## Notes
 
-- Vite 엔트리 누락(`index.html`의 `index.tsx` 미로딩)으로 빈 화면이 나오는 문제를 수정했습니다.
-- 인증/회원가입 플로우를 Supabase Auth + DB(users, student_profiles)로 통일했습니다.
-- 학부모 인증코드 6자리 랜덤 생성 및 DB 저장/학생 계정 연동을 보강했습니다.
-- Gemini 호출을 Vercel Serverless Function(`/api/chat`)으로 제공하도록 추가했습니다.
+- Gemini 호출은 클라이언트에서 직접 수행하지 않고, Vercel Serverless API(`/api/chat`, `/api/title`)를 통해서만 처리합니다.
+- 학생 채팅 세션은 첫 메시지 전송 시 자동으로 제목이 생성되어 `chat_sessions.title`에 저장됩니다.
+- 학부모 대시보드는 세션 제목 목록과 메시지 원문(`messages`)을 조회합니다.
