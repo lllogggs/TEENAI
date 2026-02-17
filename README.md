@@ -9,8 +9,8 @@
 Use `.env.example` as the source of truth.
 
 - **Client-safe only**
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
   - (`NEXT_PUBLIC_*` variants are also supported for compatibility)
 - **Server-only secrets (must never be exposed in client bundle)**
   - `GEMINI_API_KEY`
@@ -58,7 +58,7 @@ GitHub 저장소 `Settings > Secrets and variables > Actions`에 아래 3개를 
 ### API smoke test
 
 ```bash
-curl -X POST http://localhost:3000/api/chat \
+curl -X POST http://localhost:5173/api/chat \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"newMessage":"hi","history":[],"parentStylePrompt":""}'
@@ -69,8 +69,8 @@ curl -X POST http://localhost:3000/api/chat \
 Set these env vars in Vercel:
 
 - Public/client build:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
 - Server-only:
   - `GEMINI_API_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`

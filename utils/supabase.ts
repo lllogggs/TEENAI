@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { Database } from '../types';
 
-const envSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const envSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Vercel 환경변수 이름에 맞춰서 가져옵니다.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_VITE_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_VITE_SUPABASE_ANON_KEY!;
 
-const supabaseUrl = envSupabaseUrl || 'https://placeholder.supabase.co';
-const supabaseAnonKey = envSupabaseAnonKey || 'placeholder-anon-key';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 export const isSupabaseConfigured = () => {
-  return !!envSupabaseUrl && !!envSupabaseAnonKey;
+  return !!supabaseUrl && !!supabaseAnonKey;
 };

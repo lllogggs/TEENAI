@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAuthedSupabase, getSupabaseAdmin } from '../_lib/supabaseServer';
+import { createAuthedSupabase, supabaseAdmin } from '../_lib/supabaseServer';
 
 const generateCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
 export async function POST(req: Request) {
-  const supabaseAdmin = getSupabaseAdmin();
   try {
     const authHeader = req.headers.get('authorization');
     const authedClient = createAuthedSupabase(authHeader);

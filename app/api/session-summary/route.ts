@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
-import { createAuthedSupabase, getSupabaseAdmin } from '../_lib/supabaseServer';
+import { createAuthedSupabase, supabaseAdmin } from '../_lib/supabaseServer';
 
 const MESSAGE_FETCH_LIMIT = 20;
 
@@ -14,7 +14,6 @@ const normalizeSummary = (value: unknown) => {
 };
 
 const summarizeSession = async (sessionId: string) => {
-  const supabaseAdmin = getSupabaseAdmin();
   const { data: messages, error: messageError } = await supabaseAdmin
     .from('messages')
     .select('role, content, created_at')

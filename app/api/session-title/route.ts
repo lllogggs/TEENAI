@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
-import { createAuthedSupabase, getSupabaseAdmin } from '../_lib/supabaseServer';
+import { createAuthedSupabase, supabaseAdmin } from '../_lib/supabaseServer';
 
 const fallbackTitle = (value: string) => value.replace(/\s+/g, ' ').trim().slice(0, 24) || '새 대화';
 
@@ -31,7 +31,6 @@ const canAccessSession = async (authHeader: string | null, sessionId: string) =>
 };
 
 export async function POST(req: Request) {
-  const supabaseAdmin = getSupabaseAdmin();
   try {
     const { sessionId, firstUserMessage } = await req.json();
     const normalizedSessionId = String(sessionId || '').trim();
