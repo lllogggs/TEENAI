@@ -33,24 +33,39 @@ const formatSessionTitle = (startedAt: string) => {
 const ParentSessionDetail: React.FC<ParentSessionDetailProps> = ({ user, sessionId, onBack }) => {
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSession = async () => {
-      const { data } = await supabase
+      setSessionError(null);
+      setMessageError(null);
+
+      const { data, error: sessionFetchError } = await supabase
         .from('chat_sessions')
         .select('id, student_id, started_at, summary, risk_level, tone_level, topic_tags, output_types, student_intent, ai_intervention')
         .eq('id', sessionId)
         .single();
 
+      if (sessionFetchError) {
+        console.error('부모 세션 조회 실패:', { sessionId, error: sessionFetchError });
+        setSessionError('세션을 불러오지 못했습니다. (RLS/권한 설정 확인)');
+      }
+
       if (data) {
         setSession(data as ChatSession);
       }
 
-      const { data: messageData } = await supabase
+      const { data: messageData, error: messageFetchError } = await supabase
         .from('messages')
-        .select('*')
+        .select('id, role, content, created_at')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
+
+      if (messageFetchError) {
+        console.error('부모 메시지 조회 실패:', { sessionId, error: messageFetchError });
+        setMessageError('메시지를 불러오지 못했습니다. (RLS/권한 설정 확인)');
+      }
 
       setMessages((messageData || []) as MessageRow[]);
     };
@@ -86,6 +101,8 @@ const ParentSessionDetail: React.FC<ParentSessionDetailProps> = ({ user, session
 
         <section className="premium-card p-6">
           <h3 className="font-black text-lg mb-4">메시지</h3>
+          {sessionError && <p className="mb-3 text-sm text-rose-500">{sessionError}</p>}
+          {messageError && <p className="mb-3 text-sm text-rose-500">{messageError}</p>}
           <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
             {messages.length === 0 && <p className="text-sm text-slate-400">메시지가 없습니다.</p>}
             {messages.map((message) => (
