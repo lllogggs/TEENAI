@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextResponse } from 'next/server';
 import { createAuthedSupabase, supabaseAdmin } from '../_lib/supabaseServer';
+import { getGeminiApiKeyOrThrow } from '../_lib/env';
 
 const MESSAGE_FETCH_LIMIT = 20;
 
@@ -62,12 +63,7 @@ const summarizeSession = async (sessionId: string) => {
     return { skipped: true, reason: 'trigger-not-met', messageCount };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { error: 'GEMINI_API_KEY is missing.', status: 500 };
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKeyOrThrow() });
   const prompt = `아래 청소년 대화를 보고 JSON으로만 답하세요.\n필드:\n- summary: 반드시 한국어 2~3문장, 공백 포함 200~350자. '주제 + 감정/상태 + 요청사항'을 포함하고 민감정보는 제거\n- riskLevel: stable | normal | caution\n판정 기준: 자해/자살 암시, 폭력, 성적 착취, 극단 우울은 caution\n\n대화:\n${transcript}`;
 
   const result = await ai.models.generateContent({
