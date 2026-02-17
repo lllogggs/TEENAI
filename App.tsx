@@ -15,6 +15,7 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   useEffect(() => {
@@ -28,6 +29,44 @@ function App() {
     setCurrentPath(path);
   };
 
+  const ensureProfile = async (role?: UserRole, inviteCode?: string) => {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    if (!session?.access_token) throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.');
+
+    const response = await fetch('/api/ensure-profile', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        role: role === UserRole.PARENT ? 'parent' : 'student',
+        inviteCode: inviteCode?.trim() || undefined,
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.ok && payload?.profile) {
+      setUser(payload.profile as User);
+      return;
+    }
+
+    const fallback = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (fallback.data) {
+      setUser(fallback.data as User);
+      return;
+    }
+
+    throw new Error(payload?.error || '프로필 초기화 실패, 다시 시도해 주세요.');
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       if (!isSupabaseConfigured) {
@@ -35,53 +74,20 @@ function App() {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await ensureProfileLoaded(session.user.id, session.user.email || '');
-      } else {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+          await ensureProfile();
+        }
+      } catch (error) {
+        console.error('Session bootstrap failed:', error);
+      } finally {
         setLoading(false);
       }
     };
 
     checkSession();
   }, []);
-
-  const ensureProfileLoaded = async (userId: string, fallbackEmail: string) => {
-    try {
-      let profile: any = null;
-      let lastError: any = null;
-
-      for (let i = 0; i < 10; i += 1) {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (data) {
-          profile = data;
-          break;
-        }
-
-        lastError = error;
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-
-      if (profile) {
-        setUser(profile as User);
-        return;
-      }
-
-      console.error('users profile lookup error:', lastError);
-      if (fallbackEmail) {
-        alert('프로필 생성이 아직 완료되지 않았습니다. 잠시 후 다시 로그인해주세요.');
-      }
-    } catch (loadError) {
-      console.error('Profile load error:', loadError);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAuth = async (email: string, password: string, role: UserRole, code?: string, isSignup?: boolean) => {
     if (!isSupabaseConfigured) {
@@ -91,30 +97,9 @@ function App() {
 
     try {
       setAuthLoading(true);
+      setAuthError('');
 
       if (isSignup) {
-        let parentId: string | null = null;
-
-        if (role === UserRole.STUDENT) {
-          if (!code) {
-            throw new Error('초대 코드가 필요합니다.');
-          }
-
-          const normalizedCode = code.trim().toUpperCase();
-          const { data: parents } = await supabase
-            .from('users')
-            .select('id')
-            .eq('my_invite_code', normalizedCode)
-            .eq('role', UserRole.PARENT)
-            .limit(1);
-
-          if (!parents || parents.length === 0) {
-            throw new Error('유효하지 않은 초대 코드입니다.');
-          }
-
-          parentId = parents[0].id;
-        }
-
         const normalizedInviteCode = code?.trim().toUpperCase();
         const signupName = getSignupName(email);
         const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -124,20 +109,15 @@ function App() {
             data: {
               role,
               name: signupName,
-              ...(role === UserRole.STUDENT
-                ? {
-                    parent_user_id: parentId,
-                    invite_code: normalizedInviteCode,
-                  }
-                : {}),
             },
           },
         });
+
         if (authError) throw authError;
         if (!authData.user) throw new Error('가입 실패');
 
         if (authData.session?.user) {
-          await ensureProfileLoaded(authData.session.user.id, email);
+          await ensureProfile(role, role === UserRole.STUDENT ? normalizedInviteCode : undefined);
           return;
         }
 
@@ -147,13 +127,16 @@ function App() {
         if (error) throw error;
 
         if (data.user) {
-          await ensureProfileLoaded(data.user.id, data.user.email || email);
+          await ensureProfile(role);
         }
       }
     } catch (err: any) {
-      alert(err.message || '오류가 발생했습니다.');
+      const message = err.message || '오류가 발생했습니다.';
+      setAuthError(message);
+      alert(message);
     } finally {
       setAuthLoading(false);
+      setLoading(false);
     }
   };
 
@@ -180,7 +163,12 @@ function App() {
   }
 
   if (!user) {
-    return <Auth onLogin={handleAuth} loading={authLoading} />;
+    return (
+      <>
+        {authError && <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-semibold z-50">{authError}</div>}
+        <Auth onLogin={handleAuth} loading={authLoading} />
+      </>
+    );
   }
 
   if (user.role === UserRole.STUDENT) {
@@ -193,7 +181,7 @@ function App() {
       <ParentSessionDetail
         user={user}
         sessionId={sessionDetailMatch[1]}
-        onBack={() => movePath('/')}
+        onBack={() => movePath('/parent')}
       />
     );
   }

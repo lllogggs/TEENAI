@@ -4,42 +4,79 @@
 
 # TEENAI
 
-## Run Locally
+## Environment Variables
 
-**Prerequisites:** Node.js
+Use `.env.example` as the source of truth.
+
+- **Client-safe only**
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+  - (`NEXT_PUBLIC_*` variants are also supported for compatibility)
+- **Server-only secrets (must never be exposed in client bundle)**
+  - `GEMINI_API_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- **Optional tuning**
+  - Chat/Summary/Profile rate limits
+  - Summary trigger controls (`SUMMARY_IDLE_MIN_SEC`, `SUMMARY_EVERY_N_MESSAGES`, `SUMMARY_MAX_HISTORY_MESSAGES`)
+  - `ALLOWED_ORIGINS`
+
+> Server-only secrets must be set in Vercel project settings, **NOT** in client code.
+
+## Local Run
 
 1. Install dependencies:
-   `npm install`
-2. Create `.env.local` and set:
-   - `GEMINI_API_KEY=...` (serverless `/api/chat`에서 사용)
-   - `VITE_SUPABASE_URL=...`
-   - `VITE_SUPABASE_ANON_KEY=...`
-3. Run app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. Copy env template and set values:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Run dev server:
+   ```bash
+   npm run dev
+   ```
 
-
-## Supabase DB SQL (필수)
-
-Supabase SQL Editor에서 아래 파일 내용을 그대로 실행하세요.
-
+If you use Supabase locally/remotely, ensure your project schema and RLS policies are applied from:
 - `supabase/schema.sql`
 
-이 SQL에는 다음이 포함되어 있습니다.
-- 테이블: `users`, `student_profiles`, `chat_sessions`, `safety_alerts`
-- 인덱스 / 제약조건(초대코드 6자리 포맷)
-- RLS 및 정책(학생 본인 + 연결된 학부모 접근)
+### API smoke test
 
-## Vercel Environment Variables
+```bash
+curl -X POST http://localhost:5173/api/chat \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"newMessage":"hi","history":[],"parentStylePrompt":""}'
+```
 
-Vercel에 아래 환경 변수를 반드시 설정해야 실제 서비스가 동작합니다.
+## Vercel Deployment Settings
 
-- `GEMINI_API_KEY`
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+Set these env vars in Vercel:
 
-## What was fixed
+- Public/client build:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+- Server-only:
+  - `GEMINI_API_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
 
-- Vite 엔트리 누락(`index.html`의 `index.tsx` 미로딩)으로 빈 화면이 나오는 문제를 수정했습니다.
-- 인증/회원가입 플로우를 Supabase Auth + DB(users, student_profiles)로 통일했습니다.
-- 학부모 인증코드 6자리 랜덤 생성 및 DB 저장/학생 계정 연동을 보강했습니다.
-- Gemini 호출을 Vercel Serverless Function(`/api/chat`)으로 제공하도록 추가했습니다.
+For test deployments, set env values for **Preview** as well as **Production** (and Development when needed).
+
+## Security Checks
+
+Run these checks before release:
+
+```bash
+rg -n "GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|process\.env\.API_KEY" .
+```
+
+If `dist/` exists after a build:
+
+```bash
+rg -n "GEMINI_API_KEY|SUPABASE_SERVICE_ROLE_KEY" dist || true
+```
+
+Runtime checks:
+- `/api/chat` returns `401` without Bearer token.
+- `/api/chat` returns `429` when request rate exceeds threshold.
+- `/api/session-summary` updates `chat_sessions.summary` and `chat_sessions.risk_level` when trigger conditions are met.

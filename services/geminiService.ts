@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, AISettings } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: '' });
 
 export const GeminiService = {
   chat: async (history: { role: 'user' | 'model', parts: { text: string }[] }[], newMessage: string, settings?: AISettings) => {

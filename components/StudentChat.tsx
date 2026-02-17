@@ -38,12 +38,16 @@ const riskLabelMap: Record<SessionRiskLevel, string> = {
   stable: '안정',
   normal: '보통',
   caution: '주의',
+  warn: '경고',
+  high: '위험',
 };
 
 const riskColorMap: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
   caution: 'bg-rose-50 text-rose-700 border-rose-100',
+  warn: 'bg-rose-100 text-rose-800 border-rose-200',
+  high: 'bg-red-100 text-red-800 border-red-200',
 };
 
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
@@ -123,6 +127,28 @@ const buildSystemPromptFromSettings = (settings: NormalizedSettings) => {
   ].join('\n');
 };
 
+
+const normalizeForDangerCheck = (text: string) => ({
+  lower: text.toLowerCase(),
+  noSpace: text.toLowerCase().replace(/\s+/g, ''),
+  alnumOnly: text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''),
+});
+
+const hasDangerKeyword = (text: string) => {
+  const normalized = normalizeForDangerCheck(text);
+  return DANGER_KEYWORDS.some((keyword) => {
+    const lowerKeyword = keyword.toLowerCase();
+    const compactKeyword = lowerKeyword.replace(/\s+/g, '');
+    const escapedKeyword = lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const boundaryRegex = new RegExp(`(^|\\W)${escapedKeyword}(\\W|$)`, 'i');
+
+    return (
+      boundaryRegex.test(normalized.lower) ||
+      normalized.noSpace.includes(compactKeyword) ||
+      normalized.alnumOnly.includes(compactKeyword.replace(/[^\p{L}\p{N}]/gu, ''))
+    );
+  });
+};
 const formatSessionTime = (iso: string) => {
   const date = new Date(iso);
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -263,13 +289,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const maybeRefreshSummary = async (sessionId: string) => {
-    const { count } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('session_id', sessionId);
-
-    if (!count || count < 6) return;
+  const maybeRefreshSummary = async (sessionId: string, nextMessageCount: number) => {
+    if (nextMessageCount < 6 || nextMessageCount % 6 !== 0) return;
 
     try {
       const { data: authData } = await supabase.auth.getSession();
@@ -285,19 +306,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        console.error('session summary refresh failed:', { sessionId, status: response.status, payload, count });
-        if (process.env.NODE_ENV !== 'production') {
-          window.alert('요약 갱신에 실패했습니다. 개발자 콘솔을 확인해 주세요.');
-        }
+        console.warn('session summary refresh failed:', { sessionId, status: response.status, payload, nextMessageCount });
         return;
       }
 
       await fetchSessions(sessionId);
     } catch (error) {
-      console.error('session summary refresh error:', { sessionId, count, error });
-      if (process.env.NODE_ENV !== 'production') {
-        window.alert('요약 요청 중 오류가 발생했습니다. 개발자 콘솔을 확인해 주세요.');
-      }
+      console.warn('session summary refresh error:', { sessionId, nextMessageCount, error });
     }
   };
 
@@ -321,7 +336,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
     await persistMessage(sessionId, 'user', userText);
 
-    const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
+    const isDanger = hasDangerKeyword(userText);
     if (isDanger) {
       const { error } = await supabase.from('safety_alerts').insert({
         student_id: user.id,
@@ -336,10 +351,17 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       const settings = await loadStudentSettings();
       const parentStylePrompt = buildSystemPromptFromSettings(settings);
 
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData.session?.access_token;
+
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
+          sessionId,
           newMessage: userText,
           history: nextHistory,
           parentStylePrompt,
@@ -347,6 +369,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'AI 응답 생성 중 문제가 발생했습니다.');
       const aiText = data.text || '잠시 대화가 어려워요. 다시 시도해볼까요?';
       const aiMsg: ChatMessage = {
         role: 'model',
@@ -356,7 +379,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       setMessages((prev) => [...prev, aiMsg]);
       await persistMessage(sessionId, 'model', aiText);
-      await maybeRefreshSummary(sessionId);
+      const nextMessageCount = nextHistory.length + 2;
+      await maybeRefreshSummary(sessionId, nextMessageCount);
     } catch (err) {
       console.error('chat response error:', err);
       setErrorNotice('AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
@@ -413,7 +437,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
                     <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
                   </div>
-                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.summary || '새 대화가 시작되었어요.'}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.summary || session.session_summary || '새 대화가 시작되었어요.'}</p>
                 </button>
               );
             })}
@@ -424,7 +448,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex flex-col bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
             <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
-            <p className="text-xs text-slate-500 truncate">{activeSession?.summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
+            <p className="text-xs text-slate-500 truncate">{activeSession?.summary || activeSession?.session_summary || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-36">
