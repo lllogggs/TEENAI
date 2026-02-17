@@ -512,7 +512,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout, onOpe
                     className="w-full text-left p-4 rounded-2xl border transition-all border-slate-100 bg-white hover:border-brand-200"
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs font-black text-slate-800">{session.title?.trim() || formatSessionFallbackDate(session.started_at)}</p>
+                      <p className="text-xs font-black text-slate-800">{session.title?.trim() || session.summary?.trim() || formatSessionFallbackDate(session.started_at)}</p>
                       <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
                     </div>
                     
