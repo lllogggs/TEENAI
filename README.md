@@ -37,8 +37,21 @@ Use `.env.example` as the source of truth.
    npm run dev
    ```
 
-If you use Supabase locally/remotely, ensure your project schema and RLS policies are applied from:
-- `supabase/schema.sql`
+## Supabase DB SQL (필수)
+
+- `supabase/schema.sql`은 **reference-only** 파일입니다. 직접 SQL Editor에서 실행하지 마세요.
+- DB 스키마 변경은 반드시 `supabase/migrations/`에 SQL 파일을 추가하는 방식으로 관리합니다.
+- 초기 스키마도 migration으로 관리되며, 기준 파일은 `supabase/migrations/20260218190000_init_schema.sql`입니다.
+- `main` 브랜치에 push되면 GitHub Actions(`.github/workflows/supabase-db-push.yml`)가 자동으로 `supabase db push`를 실행해 원격 DB에 반영합니다.
+- 적용 여부는 Supabase Dashboard에서 `supabase_migrations.schema_migrations` 테이블을 확인하세요.
+
+### GitHub Secrets (Supabase DB Push CI)
+
+GitHub 저장소 `Settings > Secrets and variables > Actions`에 아래 3개를 설정해야 합니다.
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_DB_PASSWORD`
 
 ### API smoke test
 
