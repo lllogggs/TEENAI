@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 import { createAuthedSupabase, supabaseAdmin } from '../_lib/supabaseServer';
 
@@ -67,33 +67,49 @@ const summarizeSession = async (sessionId: string) => {
     return { error: 'GEMINI_API_KEY is missing.', status: 500 };
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const prompt = `아래 청소년 대화를 보고 JSON으로만 답하세요.\n필드:\n- summary: 반드시 한국어 2~3문장, 공백 포함 200~350자. '주제 + 감정/상태 + 요청사항'을 포함하고 민감정보는 제거\n- riskLevel: stable | normal | caution\n판정 기준: 자해/자살 암시, 폭력, 성적 착취, 극단 우울은 caution\n\n대화:\n${transcript}`;
+  try {
+    // [수정] 올바른 패키지 및 모델 초기화
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      },
+    });
 
-  const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-    },
-  });
+    const prompt = `아래 청소년 대화를 보고 JSON으로만 답하세요.
+필드:
+- summary: 반드시 한국어 2~3문장, 공백 포함 200~350자. '주제 + 감정/상태 + 요청사항'을 포함하고 민감정보는 제거
+- riskLevel: stable | normal | caution
+판정 기준: 자해/자살 암시, 폭력, 성적 착취, 극단 우울은 caution
 
-  const payload = JSON.parse(result.text || '{}');
-  const summary = normalizeSummary(payload.summary);
-  const riskLevel = payload.riskLevel === 'stable' || payload.riskLevel === 'caution' ? payload.riskLevel : 'normal';
+대화:
+${transcript}`;
 
-  const { error: updateError } = await supabaseAdmin
-    .from('chat_sessions')
-    .update({ summary, risk_level: riskLevel })
-    .eq('id', sessionId);
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-  if (updateError) {
-    console.error('session summary update failed:', { sessionId, messageCount, error: updateError });
-    return { error: 'Failed to update session summary', status: 500 };
+    const payload = JSON.parse(text || '{}');
+    const summary = normalizeSummary(payload.summary);
+    const riskLevel = payload.riskLevel === 'stable' || payload.riskLevel === 'caution' ? payload.riskLevel : 'normal';
+
+    const { error: updateError } = await supabaseAdmin
+      .from('chat_sessions')
+      .update({ summary, risk_level: riskLevel })
+      .eq('id', sessionId);
+
+    if (updateError) {
+      console.error('session summary update failed:', { sessionId, messageCount, error: updateError });
+      return { error: 'Failed to update session summary', status: 500 };
+    }
+
+    return { summary, riskLevel, messageCount, skipped: false };
+  } catch (error) {
+    console.error('AI Summary generation failed:', error);
+    return { error: 'AI generation failed', status: 500 };
   }
-
-  return { summary, riskLevel, messageCount, skipped: false };
 };
 
 export async function POST(req: Request) {
@@ -126,7 +142,7 @@ export async function POST(req: Request) {
 
     const result = await summarizeSession(sessionId);
     if ('error' in result) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json({ error: result.error }, { status: result.status as number });
     }
     return NextResponse.json(result);
   } catch (error) {
@@ -161,7 +177,7 @@ export async function GET(req: Request) {
 
   const result = await summarizeSession(sessionId);
   if ('error' in result) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ error: result.error }, { status: result.status as number });
   }
   return NextResponse.json(result);
 }
