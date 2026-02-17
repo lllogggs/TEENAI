@@ -11,10 +11,13 @@ on:
     paths:
       - "supabase/migrations/**"
       - "supabase/config.toml"
+  # 수동 실행 버튼 추가
+  workflow_dispatch:
 
 jobs:
   db_push:
-    if: github.event_name == 'push'
+    # push 이벤트이거나 수동 실행(workflow_dispatch)일 때 실행
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
