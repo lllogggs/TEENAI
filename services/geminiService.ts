@@ -1,7 +1,12 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { AnalysisResult, AISettings } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: '' });
+// [수정] GoogleGenAI -> GoogleGenerativeAI (패키지 이름 변경)
+// API 키는 환경 변수에서 안전하게 가져오도록 변경
+const getGenAI = () => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+  return new GoogleGenerativeAI(apiKey);
+};
 
 export const GeminiService = {
   chat: async (history: { role: 'user' | 'model', parts: { text: string }[] }[], newMessage: string, settings?: AISettings) => {
@@ -61,17 +66,25 @@ export const GeminiService = {
         }
       }
 
-      const chat = ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: { 
-          systemInstruction: instruction,
-          temperature: 0.7
-        },
-        history: history,
+      const genAI = getGenAI();
+      // [수정] 모델 생성 및 시스템 프롬프트 설정 방식 변경
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-1.5-flash', 
+        systemInstruction: instruction 
       });
 
-      const result = await chat.sendMessage({ message: newMessage });
-      return result.text;
+      // [수정] 대화 시작 방식 변경 (SDK 문법)
+      const chat = model.startChat({
+        history: history,
+        generationConfig: {
+          temperature: 0.7
+        }
+      });
+
+      const result = await chat.sendMessage(newMessage);
+      const response = await result.response;
+      return response.text();
+      
     } catch (error) {
       console.error("Gemini Chat Error:", error);
       return "죄송합니다, 잠시 대화 연결에 문제가 생겼어요. 다시 한번 말씀해 주시겠어요?";
@@ -91,27 +104,44 @@ export const GeminiService = {
 ${transcript}`;
 
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
+      const genAI = getGenAI();
+      // [수정] 모델 생성 및 JSON 스키마 설정 방식 변경
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+        generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              topic_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-              output_types: { type: Type.ARRAY, items: { type: Type.STRING } },
-              tone_level: { type: Type.STRING, enum: ["low", "medium", "high"] },
-              summary: { type: Type.STRING },
-              student_intent: { type: Type.STRING },
-              ai_intervention: { type: Type.STRING }
+              topic_tags: { 
+                type: SchemaType.ARRAY, 
+                items: { type: SchemaType.STRING } 
+              },
+              output_types: { 
+                type: SchemaType.ARRAY, 
+                items: { type: SchemaType.STRING } 
+              },
+              tone_level: { 
+                type: SchemaType.STRING, 
+                enum: ["low", "medium", "high"] 
+              },
+              summary: { type: SchemaType.STRING },
+              student_intent: { type: SchemaType.STRING },
+              ai_intervention: { type: SchemaType.STRING }
             },
             required: ["topic_tags", "output_types", "tone_level", "summary", "student_intent", "ai_intervention"],
           },
         },
       });
-      return JSON.parse(response.text) as AnalysisResult;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      return JSON.parse(text) as AnalysisResult;
+      
     } catch (e) {
+      console.error("Analysis Error:", e);
       return { 
         topic_tags: ['미분류'], 
         output_types: ['일반'], 
