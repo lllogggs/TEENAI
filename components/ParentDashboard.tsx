@@ -55,6 +55,13 @@ const mentorToneOptions: { value: MentorTone; label: string; description: string
   { value: 'friendly', label: '친근한', description: '가볍고 편안한 대화' },
 ];
 
+const riskFilterOptions: { value: SessionRiskLevel | 'all'; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'stable', label: '안정' },
+  { value: 'normal', label: '보통' },
+  { value: 'caution', label: '주의' },
+];
+
 const riskChipColor: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
@@ -63,15 +70,9 @@ const riskChipColor: Record<SessionRiskLevel, string> = {
 
 const riskText: Record<SessionRiskLevel, string> = {
   stable: '안정',
-  normal: '주의',
-  caution: '위험',
+  normal: '보통',
+  caution: '주의',
 };
-
-const riskBarMeta: { level: SessionRiskLevel; label: string; barClass: string }[] = [
-  { level: 'stable', label: '안정', barClass: 'bg-emerald-500' },
-  { level: 'normal', label: '주의', barClass: 'bg-amber-400' },
-  { level: 'caution', label: '위험', barClass: 'bg-rose-500' },
-];
 
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
   const guardrails = (settings?.guardrails as Record<string, unknown> | undefined) || {};
@@ -121,13 +122,12 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [studentAccounts, setStudentAccounts] = useState<Record<string, StudentAccount>>({});
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [sessionMessages, setSessionMessages] = useState<MessageRow[]>([]);
   const [riskFilter, setRiskFilter] = useState<SessionRiskLevel | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
   const [inviteCode, setInviteCode] = useState('');
-  const [detailSession, setDetailSession] = useState<ChatSession | null>(null);
-  const [detailMessages, setDetailMessages] = useState<MessageRow[]>([]);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -135,17 +135,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   );
 
   const normalizedSettings = useMemo(() => normalizeSettings(selectedStudent?.settings), [selectedStudent]);
-
-  const riskCounts = useMemo(() => {
-    const initial: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
-    sessions.forEach((session) => {
-      const level = (session.risk_level || 'normal') as SessionRiskLevel;
-      initial[level] += 1;
-    });
-    return initial;
-  }, [sessions]);
-
-  const maxRiskCount = Math.max(...Object.values(riskCounts), 1);
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => (riskFilter === 'all' ? true : (session.risk_level || 'normal') === riskFilter));
@@ -229,6 +218,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     const fetchSessions = async () => {
       if (!selectedStudentId) {
         setSessions([]);
+        setSelectedSessionId('');
         return;
       }
 
@@ -238,12 +228,32 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         .eq('student_id', selectedStudentId)
         .order('started_at', { ascending: false });
 
-      setSessions((data || []) as ChatSession[]);
-      setRiskFilter('all');
+      const fetched = (data || []) as ChatSession[];
+      setSessions(fetched);
+      setSelectedSessionId((prev) => prev || fetched[0]?.id || '');
     };
 
     fetchSessions();
   }, [selectedStudentId]);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!selectedSessionId) {
+        setSessionMessages([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('session_id', selectedSessionId)
+        .order('created_at', { ascending: true });
+
+      setSessionMessages((data || []) as MessageRow[]);
+    };
+
+    fetchMessages();
+  }, [selectedSessionId]);
 
   const updateStudentSettings = async (nextSettings: NormalizedSettings) => {
     if (!selectedStudentId) return;
@@ -291,21 +301,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     await navigator.clipboard.writeText(inviteCode);
   };
 
-  const openSessionDetail = async (session: ChatSession) => {
-    setDetailSession(session);
-    setDetailMessages([]);
-    setDetailLoading(true);
-
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('session_id', session.id)
-      .order('created_at', { ascending: true });
-
-    setDetailMessages((data || []) as MessageRow[]);
-    setDetailLoading(false);
-  };
-
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
   return (
@@ -345,55 +340,37 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
-            <div className="flex items-end justify-between gap-3 h-44 px-2">
-              {riskBarMeta.map((item) => {
-                const count = riskCounts[item.level];
-                const height = `${Math.max((count / maxRiskCount) * 100, count ? 24 : 10)}%`;
-                const active = riskFilter === item.level;
-                return (
-                  <button
-                    key={item.level}
-                    onClick={() => setRiskFilter(item.level)}
-                    className={`flex-1 h-full flex flex-col justify-end items-center rounded-2xl border p-2 transition-all ${active ? 'border-brand-400 bg-brand-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
-                  >
-                    <div className="text-sm font-black text-slate-700 mb-2">{count}</div>
-                    <div style={{ height }} className={`w-full rounded-xl ${item.barClass}`} />
-                    <div className="mt-2 text-xs font-bold text-slate-600">{item.label}</div>
-                  </button>
-                );
-              })}
+            <h2 className="font-black text-lg mb-4">1) 심리 안정도</h2>
+            <div className="space-y-2">
+              {riskFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setRiskFilter(option.value)}
+                  className={`w-full text-left px-4 py-3 rounded-2xl border text-sm font-bold ${riskFilter === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100 text-slate-600'}`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </article>
 
           <article className="premium-card p-6 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4 gap-3">
-              <div>
-                <h2 className="font-black text-lg">2) 대화 목록</h2>
-                <p className="text-xs text-slate-500 mt-1">막대를 누르면 상태별로 제목만 필터링됩니다.</p>
-              </div>
-              <button
-                onClick={() => setRiskFilter('all')}
-                className="px-3 py-2 rounded-xl text-xs font-black border border-slate-200 bg-white hover:border-brand-300"
-              >
-                모든 대화 보기
-              </button>
-            </div>
+            <h2 className="font-black text-lg mb-4">2) 활동 타임라인</h2>
             <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
               {filteredSessions.map((session) => {
-                const level = (session.risk_level || 'normal') as SessionRiskLevel;
+                const level = session.risk_level || 'normal';
                 return (
                   <button
                     key={session.id}
-                    onClick={() => openSessionDetail(session)}
-                    className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-white hover:border-brand-200 transition-all"
+                    onClick={() => setSelectedSessionId(session.id)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
                       <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-1">{session.title || '새 대화'}</p>
+                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.title || '새 대화'}</p>
                   </button>
                 );
               })}
@@ -459,31 +436,21 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
           </article>
         </section>
-      </main>
 
-      {detailSession && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl max-h-[85vh] rounded-3xl bg-white border border-slate-100 shadow-2xl flex flex-col">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-black text-slate-900">{detailSession.title || '새 대화'}</p>
-                <p className="text-xs text-slate-500 mt-1">{new Date(detailSession.started_at).toLocaleString('ko-KR')}</p>
+        <section className="premium-card p-6">
+          <h2 className="font-black text-lg mb-1">세션 원문 대화</h2>
+          <p className="text-xs text-slate-500 mb-4">{sessions.find((session) => session.id === selectedSessionId)?.title || '대화를 선택해 주세요.'}</p>
+          <div className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pr-2">
+            {sessionMessages.length === 0 && <p className="text-sm text-slate-400">세션을 선택하면 원문 대화가 표시됩니다.</p>}
+            {sessionMessages.map((message) => (
+              <div key={message.id} className={`p-3 rounded-xl text-sm ${message.role === 'user' ? 'bg-brand-900 text-white ml-8' : 'bg-slate-100 text-slate-800 mr-8'}`}>
+                <p className="text-[10px] opacity-70 mb-1">{message.role} · {new Date(message.created_at).toLocaleTimeString('ko-KR')}</p>
+                <p>{message.content}</p>
               </div>
-              <button onClick={() => setDetailSession(null)} className="text-xs font-black text-slate-500 hover:text-slate-900">닫기</button>
-            </div>
-            <div className="p-5 overflow-y-auto custom-scrollbar space-y-3">
-              {detailLoading && <p className="text-sm text-slate-500">원문을 불러오는 중입니다...</p>}
-              {!detailLoading && detailMessages.length === 0 && <p className="text-sm text-slate-400">대화 내역이 없습니다.</p>}
-              {!detailLoading && detailMessages.map((message) => (
-                <div key={message.id} className={`p-3 rounded-xl text-sm whitespace-pre-wrap ${message.role === 'user' ? 'bg-brand-900 text-white ml-8' : 'bg-slate-100 text-slate-800 mr-8'}`}>
-                  <p className="text-[10px] opacity-70 mb-1">{message.role} · {new Date(message.created_at).toLocaleTimeString('ko-KR')}</p>
-                  <p>{message.content}</p>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
-        </div>
-      )}
+        </section>
+      </main>
     </div>
   );
 };
