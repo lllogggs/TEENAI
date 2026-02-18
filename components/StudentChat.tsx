@@ -36,14 +36,20 @@ const DEFAULT_SETTINGS: NormalizedSettings = {
 
 const riskLabelMap: Record<SessionRiskLevel, string> = {
   stable: '안정',
-  normal: '보통',
-  caution: '주의',
+  normal: '주의',
+  caution: '위험',
 };
 
 const riskColorMap: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
   caution: 'bg-rose-50 text-rose-700 border-rose-100',
+};
+
+const normalizeRiskLevel = (value: unknown): SessionRiskLevel => {
+  if (value === 'stable') return 'stable';
+  if (value === 'caution' || value === 'warn' || value === 'high') return 'caution';
+  return 'normal';
 };
 
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
@@ -264,40 +270,56 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const generateTitleFromFirstMessage = async (sessionId: string, firstMessage: string) => {
+  const updateSessionMetaWithAI = async (sessionId: string, firstMessage: string, transcript: { role: 'user' | 'model'; content: string }[]) => {
     const session = sessions.find((item) => item.id === sessionId);
-    if (!session || session.title !== '새 대화') return;
+    if (!session) return;
 
     try {
-      const response = await fetch('/api/title', {
+      const response = await fetch('/api/session-meta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstMessage }),
+        body: JSON.stringify({
+          firstMessage,
+          transcript,
+          title: session.title || '새 대화',
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('title generation failed');
+        throw new Error('session-meta generation failed');
       }
 
       const payload = await response.json();
       const nextTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '새 대화';
-      if (nextTitle === '새 대화') return;
+      const nextRiskLevel = normalizeRiskLevel(payload.risk_level);
 
       const { error } = await supabase
         .from('chat_sessions')
-        .update({ title: nextTitle })
+        .update({
+          title: session.title === '새 대화' ? nextTitle : session.title,
+          risk_level: nextRiskLevel,
+        })
         .eq('id', sessionId)
-        .eq('student_id', user.id)
-        .eq('title', '새 대화');
+        .eq('student_id', user.id);
 
       if (error) {
-        console.error('chat_sessions title update error:', error);
+        console.error('chat_sessions session-meta update error:', error);
         return;
       }
 
-      setSessions((prev) => prev.map((item) => (item.id === sessionId ? { ...item, title: nextTitle } : item)));
+      setSessions((prev) =>
+        prev.map((item) =>
+          item.id === sessionId
+            ? {
+                ...item,
+                title: item.title === '새 대화' ? nextTitle : item.title,
+                risk_level: nextRiskLevel,
+              }
+            : item,
+        ),
+      );
     } catch (error) {
-      console.error('title generation error:', error);
+      console.error('session-meta generation error:', error);
     }
   };
 
@@ -307,7 +329,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setErrorNotice('');
     const userText = input.trim();
     const userMsg: ChatMessage = { role: 'user', text: userText, timestamp: Date.now() };
-    const hadMessages = messages.length > 0;
     const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
 
     setInput('');
@@ -321,10 +342,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     await persistMessage(sessionId, 'user', userText);
-
-    if (!hadMessages) {
-      await generateTitleFromFirstMessage(sessionId, userText);
-    }
+    await updateSessionMetaWithAI(sessionId, userText, [...nextHistory, { role: 'user', content: userText }]);
 
     const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
     if (isDanger) {
@@ -361,6 +379,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       setMessages((prev) => [...prev, aiMsg]);
       await persistMessage(sessionId, 'model', aiText);
+
     } catch (err) {
       console.error('chat response error:', err);
       setErrorNotice('AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
@@ -406,7 +425,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             <button onClick={handleNewSession} className="w-full rounded-2xl border border-brand-100 bg-brand-50 py-3 text-sm font-black text-brand-900">+ 새 대화</button>
             {sessions.map((session) => {
               const isActive = session.id === currentSessionId;
-              const riskLevel = session.risk_level || 'normal';
+              const riskLevel = normalizeRiskLevel(session.risk_level);
               return (
                 <button
                   key={session.id}
