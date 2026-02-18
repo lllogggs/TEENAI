@@ -26,5 +26,5 @@ export const SAFETY_ALERT_MESSAGE = `[TEENAI 안전 알림]
 자녀분과 따뜻한 대화를 나눠보시길 권장드립니다.
 (자녀의 프라이버시를 위해 대화 원문은 제공되지 않습니다)`;
 
-export const MOCK_GEN_MODEL = 'gemini-2.5-flash-latest';
-export const MOCK_ANALYSIS_MODEL = 'gemini-2.5-flash-latest'; // Efficient for JSON tasks
+export const MOCK_GEN_MODEL = 'gemini-1.5-flash';
+export const MOCK_ANALYSIS_MODEL = 'gemini-1.5-flash'; // Efficient for JSON tasks
