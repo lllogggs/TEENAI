@@ -31,6 +31,9 @@ alter table public.chat_sessions
 
 또는 `supabase/migrations/20260217_add_chat_title.sql` 파일을 실행해도 됩니다.
 
+기존 DB가 오래된 스키마(`title` nullable, `risk_level`에 `warn/high` 포함)라면
+`supabase/migrations/20260218_fix_chat_sessions_title_and_risk_constraint.sql`도 추가로 실행하세요.
+
 ## Vercel Environment Variables
 
 Vercel에 아래 환경 변수를 반드시 설정해야 동작합니다.

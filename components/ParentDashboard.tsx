@@ -75,6 +75,12 @@ const riskBarTheme: Record<SessionRiskLevel, { fill: string; text: string; borde
   caution: { fill: 'bg-rose-500', text: 'text-rose-700', border: 'border-rose-200' },
 };
 
+const normalizeRiskLevel = (value: unknown): SessionRiskLevel => {
+  if (value === 'stable') return 'stable';
+  if (value === 'caution' || value === 'warn' || value === 'high') return 'caution';
+  return 'normal';
+};
+
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
   const guardrails = (settings?.guardrails as Record<string, unknown> | undefined) || {};
   const mentorTone = settings?.mentor_tone || settings?.mentor_style;
@@ -151,7 +157,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const riskCounts = useMemo(() => {
     const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
     sessions.forEach((session) => {
-      const level = session.risk_level || 'normal';
+      const level = normalizeRiskLevel(session.risk_level);
       counts[level] += 1;
     });
     return counts;
@@ -160,7 +166,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const maxRiskCount = Math.max(1, riskCounts.stable, riskCounts.normal, riskCounts.caution);
 
   const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => (riskFilter === 'all' ? true : (session.risk_level || 'normal') === riskFilter));
+    return sessions.filter((session) => (riskFilter === 'all' ? true : normalizeRiskLevel(session.risk_level) === riskFilter));
   }, [sessions, riskFilter]);
 
   useEffect(() => {
@@ -454,7 +460,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             <div className="space-y-3 h-[440px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
               {filteredSessions.map((session) => {
-                const level = session.risk_level || 'normal';
+                const level = normalizeRiskLevel(session.risk_level);
                 return (
                   <button
                     key={session.id}

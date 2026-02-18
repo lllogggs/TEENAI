@@ -46,6 +46,12 @@ const riskColorMap: Record<SessionRiskLevel, string> = {
   caution: 'bg-rose-50 text-rose-700 border-rose-100',
 };
 
+const normalizeRiskLevel = (value: unknown): SessionRiskLevel => {
+  if (value === 'stable') return 'stable';
+  if (value === 'caution' || value === 'warn' || value === 'high') return 'caution';
+  return 'normal';
+};
+
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
   const guardrails = (settings?.guardrails as Record<string, unknown> | undefined) || {};
   const mentorTone = settings?.mentor_tone || settings?.mentor_style;
@@ -285,7 +291,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       const payload = await response.json();
       const nextTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '새 대화';
-      const nextRiskLevel: SessionRiskLevel = payload.risk_level === 'stable' || payload.risk_level === 'caution' ? payload.risk_level : 'normal';
+      // 충돌 해결: 전역 normalizeRiskLevel 함수를 사용하여 일관성 있게 값을 변환합니다.
+      const nextRiskLevel = normalizeRiskLevel(payload.risk_level);
 
       const { error } = await supabase
         .from('chat_sessions')
@@ -419,7 +426,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             <button onClick={handleNewSession} className="w-full rounded-2xl border border-brand-100 bg-brand-50 py-3 text-sm font-black text-brand-900">+ 새 대화</button>
             {sessions.map((session) => {
               const isActive = session.id === currentSessionId;
-              const riskLevel = session.risk_level || 'normal';
+              const riskLevel = normalizeRiskLevel(session.risk_level);
               return (
                 <button
                   key={session.id}
