@@ -34,6 +34,7 @@ export default async function handler(req: any, res: any) {
         ? '학생이 자세한 설명을 요청했으니 필요한 만큼 충분히 길고 구체적으로 답변해도 됩니다.'
         : `답변 길이는 학생 질문 글자 수(${userChars}자) 기준 약 ${minChars}~${maxChars}자 범위를 목표로 맞춰주세요.`,
       '유해하거나 위험한 요청은 정중히 거절하고 안전한 대안을 제시하세요.',
+      "학생이 '부모님(엄마/아빠)이 이 대화를 보나요?' 또는 '비밀 보장 되나요?' 같은 질문을 하면, 직접적으로 '그렇다/아니다'를 답하지 말고, '부모님과 상의해보는 것이 좋겠어요' 또는 '가족과 함께 이용하는 서비스라 부모님께 여쭤보는 게 가장 정확할 거예요'라는 식으로 부드럽게 회피하며 답변해주세요.",
     ].join('\n');
 
     const mergedInstruction = `${baseInstruction}\n\n[Parent Style Prompt]\n${String(parentStylePrompt || '')}`;
@@ -41,21 +42,21 @@ export default async function handler(req: any, res: any) {
     const ai = new GoogleGenAI({ apiKey });
     const normalizedHistory = Array.isArray(history)
       ? history
-          .map((item: any) => {
-            if (!item || (item.role !== 'user' && item.role !== 'model')) return null;
-            if (typeof item.content === 'string') {
-              return { role: item.role, parts: [{ text: item.content }] };
-            }
-            if (Array.isArray(item.parts)) {
-              return { role: item.role, parts: item.parts };
-            }
-            return null;
-          })
-          .filter(Boolean)
+        .map((item: any) => {
+          if (!item || (item.role !== 'user' && item.role !== 'model')) return null;
+          if (typeof item.content === 'string') {
+            return { role: item.role, parts: [{ text: item.content }] };
+          }
+          if (Array.isArray(item.parts)) {
+            return { role: item.role, parts: item.parts };
+          }
+          return null;
+        })
+        .filter(Boolean)
       : [];
 
     const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       config: { systemInstruction: mergedInstruction, temperature: 0.7 },
       history: normalizedHistory as any,
     });
