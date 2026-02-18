@@ -254,6 +254,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       const fetched = (data || []) as ChatSession[];
       setSessions(fetched);
       setSelectedSessionId((prev) => (prev && fetched.some((session) => session.id === prev) ? prev : fetched[0]?.id || ''));
+      void backfillSessionTitles(fetched);
     };
 
     fetchSessions();
@@ -341,6 +342,61 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     await navigator.clipboard.writeText(inviteCode);
   };
 
+  const backfillSessionTitles = async (sessionList: ChatSession[]) => {
+    if (!selectedStudentId) return;
+
+    const untitledSessions = sessionList.filter(
+      (session) => !session.title || session.title.trim() === '' || session.title === '새 대화'
+    );
+
+    if (!untitledSessions.length) return;
+
+    const titleMap: Record<string, string> = {};
+
+    for (const session of untitledSessions.slice(0, 12)) {
+      try {
+        const { data: firstMessageRows } = await supabase
+          .from('messages')
+          .select('content')
+          .eq('session_id', session.id)
+          .eq('role', 'user')
+          .order('created_at', { ascending: true })
+          .limit(1);
+
+        const firstMessage = firstMessageRows?.[0]?.content?.trim();
+        if (!firstMessage) continue;
+
+        const response = await fetch('/api/title', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firstMessage }),
+        });
+
+        if (!response.ok) continue;
+
+        const payload = await response.json();
+        const generatedTitle = typeof payload.title === 'string' ? payload.title.trim() : '';
+        if (!generatedTitle || generatedTitle === '새 대화') continue;
+
+        const { error } = await supabase
+          .from('chat_sessions')
+          .update({ title: generatedTitle })
+          .eq('id', session.id)
+          .eq('student_id', selectedStudentId);
+
+        if (!error) {
+          titleMap[session.id] = generatedTitle;
+        }
+      } catch (error) {
+        console.error('session title backfill error:', error);
+      }
+    }
+
+    if (Object.keys(titleMap).length) {
+      setSessions((prev) => prev.map((session) => (titleMap[session.id] ? { ...session, title: titleMap[session.id] } : session)));
+    }
+  };
+
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
   return (
@@ -361,106 +417,97 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       </nav>
 
       <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
-        <section className="premium-card p-4 md:p-5 flex flex-wrap items-center gap-2">
-          {connectedStudents.length === 0 && <p className="text-sm text-slate-400">연결된 학생이 없습니다.</p>}
-          {connectedStudents.map((student) => {
-            const account = studentAccounts[student.user_id];
-            const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
-            const active = selectedStudentId === student.user_id;
-            return (
+        <section className="premium-card p-4 md:p-5 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {connectedStudents.length === 0 && <p className="text-sm text-slate-400">연결된 학생이 없습니다.</p>}
+            {connectedStudents.map((student) => {
+              const account = studentAccounts[student.user_id];
+              const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
+              const active = selectedStudentId === student.user_id;
+              return (
+                <button
+                  key={student.user_id}
+                  onClick={() => setSelectedStudentId(student.user_id)}
+                  className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                >
+                  {studentName}
+                </button>
+              );
+            })}
+            {!!selectedStudentId && !isNameEditing && (
               <button
-                key={student.user_id}
-                onClick={() => setSelectedStudentId(student.user_id)}
-                className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                onClick={() => setIsNameEditing(true)}
+                className="text-sm font-black text-brand-900 border border-brand-100 bg-brand-50 rounded-xl px-3 py-2"
+                aria-label="학생 이름 편집"
               >
-                {studentName}
+                ✏️
               </button>
-            );
-          })}
+            )}
+          </div>
+          {isNameEditing && (
+            <div className="rounded-2xl border border-brand-100 bg-brand-50/40 p-3 md:p-4 max-w-md">
+              <p className="text-xs font-bold text-slate-600 mb-2">선택한 학생 이름 수정</p>
+              <div className="space-y-2">
+                <input
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  placeholder="학생 이름"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800"
+                />
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSaveStudentName} className="px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-black">저장</button>
+                  <button
+                    onClick={() => {
+                      setIsNameEditing(false);
+                      setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-slate-500 bg-white"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <article className="premium-card p-6 lg:col-span-1">
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="font-black text-lg">1) 학생 정보</h2>
-              {!isNameEditing && (
-                <button
-                  onClick={() => setIsNameEditing(true)}
-                  className="text-sm font-black text-brand-900 border border-brand-100 bg-brand-50 rounded-xl px-3 py-1.5"
-                  aria-label="학생 이름 편집"
-                >
-                  ✏️
-                </button>
-              )}
-            </div>
+            <h2 className="font-black text-lg mb-4">1) 심리안정도 통계</h2>
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
-              <p className="text-xs text-slate-500 mb-1">학생 이름</p>
-              {isNameEditing ? (
-                <div className="space-y-2">
-                  <input
-                    value={nameDraft}
-                    onChange={(event) => setNameDraft(event.target.value)}
-                    placeholder="학생 이름"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleSaveStudentName} className="px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-black">저장</button>
+              <div className="h-56 flex items-end justify-around gap-3">
+                {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
+                  const count = riskCounts[level];
+                  const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
+                  const active = riskFilter === level;
+                  const theme = riskBarTheme[level];
+                  return (
                     <button
-                      onClick={() => {
-                        setIsNameEditing(false);
-                        setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-slate-500"
+                      key={level}
+                      onClick={() => setRiskFilter(level)}
+                      className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
                     >
-                      취소
+                      <p className="text-xs font-black text-slate-500">{count}개</p>
+                      <div className="w-10 h-40 rounded-xl bg-slate-100 flex items-end overflow-hidden">
+                        <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
+                      </div>
+                      <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
                     </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-base font-black text-slate-900">{displayStudentName}</p>
-              )}
-            </div>
-            {selectedStudentAccount?.email && <p className="text-xs text-slate-500 mt-3">계정: {selectedStudentAccount.email}</p>}
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-2">
-            <h2 className="font-black text-lg mb-4">2) 심리 안정도 통계</h2>
-            <div className="space-y-3">
-              {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
-                const count = riskCounts[level];
-                const widthPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 14 : 0);
-                const active = riskFilter === level;
-                const theme = riskBarTheme[level];
-                return (
-                  <button
-                    key={level}
-                    onClick={() => setRiskFilter(level)}
-                    className={`w-full rounded-2xl border p-3 text-left bg-white transition-all ${active ? `${theme.border} ring-2 ring-brand-100` : 'border-slate-100 hover:border-slate-200'}`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <p className={`text-sm font-black ${theme.text}`}>{riskText[level]}</p>
-                      <p className="text-xs font-bold text-slate-500">{count}개 세션</p>
-                    </div>
-                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
-                      <div className={`${theme.fill} h-full rounded-full transition-all`} style={{ width: `${widthPercent}%` }} />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-2">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h2 className="font-black text-lg">3) 대화 목록</h2>
+                  );
+                })}
+              </div>
               <button
                 onClick={() => setRiskFilter('all')}
-                className="text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
+                className="mt-4 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
               >
-                모든 대화 보기
+                전체 보기
               </button>
             </div>
-            <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
+          </article>
+
+          <article className="premium-card p-6 lg:col-span-2">
+            <h2 className="font-black text-lg mb-4">2) 대화목록</h2>
+            <div className="space-y-3 h-[440px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
               {filteredSessions.map((session) => {
                 const level = session.risk_level || 'normal';
@@ -484,9 +531,46 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </div>
           </article>
 
+          <article className="premium-card p-6 lg:col-span-2">
+            <h2 className="font-black text-lg mb-4">3) AI 개별 지시사항 관리</h2>
+            <textarea
+              value={normalizedSettings.ai_style_prompt}
+              onChange={(event) => {
+                const value = event.target.value;
+                setConnectedStudents((prev) =>
+                  prev.map((student) =>
+                    student.user_id === selectedStudentId
+                      ? { ...student, settings: toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) }
+                      : student
+                  )
+                );
+              }}
+              placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
+              className="w-full min-h-48 rounded-2xl border border-slate-200 p-4 text-sm"
+            />
+            <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
+            {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
+          </article>
+
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">4) 필수 안심 가드레일</h2>
-            <div className="space-y-3">
+            <h2 className="font-black text-lg mb-4">4) 멘토 말투 성향</h2>
+            <div className="space-y-2">
+              {mentorToneOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => updateMentorTone(option.value)}
+                  className={`w-full text-left px-4 py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
+                >
+                  <p className="font-black text-sm">{option.label}</p>
+                  <p className="text-xs text-slate-500 mt-1">{option.description}</p>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="premium-card p-6 lg:col-span-3">
+            <h2 className="font-black text-lg mb-4">5) 필수 안심 가드레일</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               {guardrailMeta.map((item) => {
                 const enabled = normalizedSettings.guardrails[item.key];
                 return (
@@ -504,43 +588,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 );
               })}
             </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">5) 멘토 말투 성향</h2>
-            <div className="space-y-2">
-              {mentorToneOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => updateMentorTone(option.value)}
-                  className={`w-full text-left px-4 py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
-                >
-                  <p className="font-black text-sm">{option.label}</p>
-                  <p className="text-xs text-slate-500 mt-1">{option.description}</p>
-                </button>
-              ))}
-            </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-3">
-            <h2 className="font-black text-lg mb-4">6) AI 개별 지시사항 관리</h2>
-            <textarea
-              value={normalizedSettings.ai_style_prompt}
-              onChange={(event) => {
-                const value = event.target.value;
-                setConnectedStudents((prev) =>
-                  prev.map((student) =>
-                    student.user_id === selectedStudentId
-                      ? { ...student, settings: toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) }
-                      : student
-                  )
-                );
-              }}
-              placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
-              className="w-full min-h-36 rounded-2xl border border-slate-200 p-4 text-sm"
-            />
-            <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
-            {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
           </article>
         </section>
       </main>
