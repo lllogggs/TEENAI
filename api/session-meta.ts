@@ -46,9 +46,9 @@ export default async function handler(req: any, res: any) {
   const firstMessage = String(req.body?.firstMessage || '').trim();
   const transcript = Array.isArray(req.body?.transcript)
     ? req.body.transcript
-        .filter((item: any) => item && (item.role === 'user' || item.role === 'model') && typeof item.content === 'string')
-        .slice(-16)
-        .map((item: any) => ({ role: item.role, content: item.content.trim().slice(0, 400) }))
+      .filter((item: any) => item && (item.role === 'user' || item.role === 'model') && typeof item.content === 'string')
+      .slice(-16)
+      .map((item: any) => ({ role: item.role, content: item.content.trim().slice(0, 400) }))
     : [];
 
   if (!firstMessage && transcript.length === 0) {
@@ -84,7 +84,7 @@ export default async function handler(req: any, res: any) {
     ].join('\n');
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // 참고: 요청하신 코드 원본에 맞춰 모델명은 그대로 두었습니다.
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
