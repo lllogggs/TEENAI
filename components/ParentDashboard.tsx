@@ -378,21 +378,25 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 <button
                   key={student.user_id}
                   onClick={() => setSelectedStudentId(student.user_id)}
-                  className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                  className={`group relative px-4 py-2.5 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
                 >
                   {studentName}
+                  {active && !isNameEditing && (
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsNameEditing(true);
+                      }}
+                      className="opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                      role="button"
+                      aria-label="학생 이름 편집"
+                    >
+                      ✏️
+                    </span>
+                  )}
                 </button>
               );
             })}
-            {!!selectedStudentId && !isNameEditing && (
-              <button
-                onClick={() => setIsNameEditing(true)}
-                className="text-sm font-black text-brand-900 border border-brand-100 bg-brand-50 rounded-xl px-3 py-2"
-                aria-label="학생 이름 편집"
-              >
-                ✏️
-              </button>
-            )}
           </div>
           {isNameEditing && (
             <div className="rounded-2xl border border-brand-100 bg-brand-50/40 p-3 md:p-4 max-w-md">
@@ -425,7 +429,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           <article className="premium-card p-6 lg:col-span-1">
             <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
-              <div className="h-56 flex items-end justify-around gap-3">
+              <div className="h-40 flex items-end justify-around gap-3">
                 {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
                   const count = riskCounts[level];
                   const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
@@ -457,7 +461,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
           <article className="premium-card p-6 lg:col-span-2">
             <h2 className="font-black text-lg mb-4">2) 대화 목록</h2>
-            <div className="space-y-3 h-[440px] overflow-y-auto custom-scrollbar pr-2">
+            <div className="space-y-3 h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
               {filteredSessions.map((session) => {
                 const level = normalizeRiskLevel(session.risk_level);
