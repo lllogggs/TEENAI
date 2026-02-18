@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { User, ChatMessage, ChatSession, SessionRiskLevel, StudentSettings } from '../types';
 import { supabase } from '../utils/supabase';
+import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
 
 interface StudentChatProps {
@@ -44,12 +45,6 @@ const riskColorMap: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
   caution: 'bg-rose-50 text-rose-700 border-rose-100',
-};
-
-const normalizeRiskLevel = (value: unknown): SessionRiskLevel => {
-  if (value === 'stable') return 'stable';
-  if (value === 'caution' || value === 'warn' || value === 'high') return 'caution';
-  return 'normal';
 };
 
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
@@ -312,10 +307,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         prev.map((item) =>
           item.id === sessionId
             ? {
-                ...item,
-                title: item.title === '새 대화' ? nextTitle : item.title,
-                risk_level: nextRiskLevel,
-              }
+              ...item,
+              title: item.title === '새 대화' ? nextTitle : item.title,
+              risk_level: nextRiskLevel,
+            }
             : item,
         ),
       );
@@ -462,11 +457,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                 <div
-                  className={`max-w-[82%] md:max-w-[75%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${
-                    m.role === 'user'
+                  className={`max-w-[82%] md:max-w-[75%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
                       ? 'bg-brand-900 text-white rounded-tr-none'
                       : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
-                  }`}
+                    }`}
                 >
                   {m.text}
                 </div>
