@@ -428,35 +428,33 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <article className="premium-card p-6 lg:col-span-1">
             <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
-            <div className="rounded-2xl border border-slate-100 bg-white p-4">
-              <div className="h-40 flex items-end justify-around gap-3">
-                {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
-                  const count = riskCounts[level];
-                  const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
-                  const active = riskFilter === level;
-                  const theme = riskBarTheme[level];
-                  return (
-                    <button
-                      key={level}
-                      onClick={() => setRiskFilter(level)}
-                      className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
-                    >
-                      <p className="text-xs font-black text-slate-500">{count}개</p>
-                      <div className="w-10 h-40 rounded-xl bg-slate-100 flex items-end overflow-hidden">
-                        <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
-                      </div>
-                      <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => setRiskFilter('all')}
-                className="mt-4 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
-              >
-                전체 보기
-              </button>
+            <div className="h-40 flex items-end justify-around gap-3">
+              {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
+                const count = riskCounts[level];
+                const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
+                const active = riskFilter === level;
+                const theme = riskBarTheme[level];
+                return (
+                  <button
+                    key={level}
+                    onClick={() => setRiskFilter(level)}
+                    className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
+                  >
+                    <p className="text-xs font-black text-slate-500">{count}개</p>
+                    <div className="w-10 h-40 rounded-xl bg-slate-100 flex items-end overflow-hidden">
+                      <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
+                    </div>
+                    <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
+                  </button>
+                );
+              })}
             </div>
+            <button
+              onClick={() => setRiskFilter('all')}
+              className="mt-4 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
+            >
+              전체 보기
+            </button>
           </article>
 
           <article className="premium-card p-6 lg:col-span-2">
