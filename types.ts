@@ -95,6 +95,7 @@ export interface ChatSession {
   student_intent?: string;
   ai_intervention?: string;
   risk_level?: SessionRiskLevel;
+  is_deleted_by_student?: boolean;
 }
 
 

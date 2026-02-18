@@ -137,6 +137,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState('');
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Desktop sidebar toggle
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
 
@@ -161,6 +162,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       .from('chat_sessions')
       .select('*')
       .eq('student_id', user.id)
+      .eq('is_deleted_by_student', false) // Soft delete filter
       .order('started_at', { ascending: false });
 
     if (error) {
@@ -410,6 +412,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     <div className="flex h-screen bg-[#F8FAFC] flex-col overflow-hidden">
       <header className="px-5 md:px-10 py-5 md:py-7 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-3 md:gap-5">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+            {isSidebarOpen ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            )}
+          </button>
           <div className="w-11 h-11 md:w-14 md:h-14 bg-brand-900 rounded-[1.25rem] flex items-center justify-center text-xl md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
           <div>
             <h1 className="text-base md:text-lg font-black text-brand-900 tracking-tight">TEENAI 멘토</h1>
@@ -425,13 +434,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden lg:grid lg:grid-cols-[320px_1fr]">
-        <aside className={`${showMobileChat ? 'hidden' : 'block'} lg:block border-r border-slate-100 bg-white/70 backdrop-blur-sm`}>
-          <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3">
+      <div className="flex-1 overflow-hidden flex flex-row">
+        {/* Sidebar */}
+        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px] border-r' : 'lg:w-0 border-r-0'} lg:block border-slate-100 bg-white/70 backdrop-blur-sm transition-all duration-300 overflow-hidden`}>
+          <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 w-[320px]">
             <button onClick={handleNewSession} className="w-full rounded-2xl border border-brand-100 bg-brand-50 py-3 text-sm font-black text-brand-900">+ 새 대화</button>
             {sessions.map((session) => {
               const isActive = session.id === currentSessionId;
-              const riskLevel = normalizeRiskLevel(session.risk_level);
               return (
                 <div key={session.id} className="relative group">
                   <button
@@ -440,15 +449,20 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
+                      {/* Risk badge removed for student view */}
                     </div>
                     <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
                   </button>
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
-                      if (window.confirm('정말 이 대화를 삭제하시겠습니까?')) {
-                        const { error } = await supabase.from('chat_sessions').delete().eq('id', session.id);
+                      if (window.confirm('이 대화를 삭제하시겠습니까? (삭제된 대화는 복구할 수 없습니다)')) {
+                        // Soft Delete
+                        const { error } = await supabase
+                          .from('chat_sessions')
+                          .update({ is_deleted_by_student: true })
+                          .eq('id', session.id);
+
                         if (!error) {
                           setSessions((prev) => prev.filter((s) => s.id !== session.id));
                           if (currentSessionId === session.id) {
@@ -472,43 +486,48 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </aside>
 
-        <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex min-h-0 flex-col bg-slate-50/50`}>
+        {/* Chat Area */}
+        <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
             <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
             <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-56 lg:pb-44">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar relative">
             {errorNotice && <div className="text-sm text-red-600 font-bold">{errorNotice}</div>}
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full opacity-20">
+
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full opacity-20 absolute inset-0">
                 <div className="text-6xl mb-6">💬</div>
                 <p className="text-sm font-black text-brand-900">당신의 이야기를 들려주세요.</p>
               </div>
-            )}
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
-                <div
-                  className={`max-w-[82%] md:max-w-[75%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
-                    ? 'bg-brand-900 text-white rounded-tr-none'
-                    : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
-                    }`}
-                >
-                  {m.text}
-                </div>
+            ) : (
+              <div className="pb-40">
+                {messages.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
+                    <div
+                      className={`max-w-[82%] md:max-w-[75%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
+                        ? 'bg-brand-900 text-white rounded-tr-none'
+                        : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
+                        }`}
+                    >
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="flex items-center gap-2 px-4">
+                    <div className="flex gap-1">
+                      <div className="w-1.5 h-1.5 bg-brand-200 rounded-full animate-bounce"></div>
+                      <div className="w-1.5 h-1.5 bg-brand-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                      <div className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-black">답변 생성 중...</span>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-            ))}
-            {loading && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-brand-200 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-brand-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                  <div className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                </div>
-                <span className="text-[11px] text-slate-400 font-black">답변 생성 중...</span>
-              </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-5 md:pb-8 lg:pb-10 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
@@ -518,7 +537,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="멘토에게 고민을 털어놓아 보세요..."
+                  placeholder="궁금한걸 말해주세요..."
                   className="flex-1 bg-transparent border-none py-3 md:py-4 text-base focus:outline-none font-bold text-slate-700 placeholder-slate-400"
                 />
                 <button

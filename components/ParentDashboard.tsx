@@ -157,8 +157,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const riskCounts = useMemo(() => {
     const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
     sessions.forEach((session) => {
-      const level = normalizeRiskLevel(session.risk_level);
-      counts[level] += 1;
+      // Only count non-deleted sessions for risk stats
+      if (!session.is_deleted_by_student) {
+        const level = normalizeRiskLevel(session.risk_level);
+        counts[level] += 1;
+      }
     });
     return counts;
   }, [sessions]);
@@ -166,7 +169,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const maxRiskCount = Math.max(1, riskCounts.stable, riskCounts.normal, riskCounts.caution);
 
   const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => (riskFilter === 'all' ? true : normalizeRiskLevel(session.risk_level) === riskFilter));
+    return sessions.filter((session) => {
+      if (riskFilter === 'all') return true;
+      return normalizeRiskLevel(session.risk_level) === riskFilter;
+    });
   }, [sessions, riskFilter]);
 
   useEffect(() => {
@@ -270,25 +276,44 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   }, [user.id]);
 
   useEffect(() => {
-    const fetchSessions = async () => {
-      if (!selectedStudentId) {
-        setSessions([]);
-        setSelectedSessionId('');
-        return;
-      }
+    // Fetch sessions for selected student
+    if (!selectedStudentId) {
+      setSessions([]);
+      setSelectedSessionId('');
+      return;
+    }
 
-      const { data } = await supabase
+    const fetchSessions = async () => {
+      const { data, error } = await supabase
         .from('chat_sessions')
         .select('*')
         .eq('student_id', selectedStudentId)
         .order('started_at', { ascending: false });
 
-      const fetched = (data || []) as ChatSession[];
-      setSessions(fetched);
-      setSelectedSessionId((prev) => (prev && fetched.some((session) => session.id === prev) ? prev : fetched[0]?.id || ''));
+      if (error) {
+        console.error('Fetch sessions error:', error);
+      } else {
+        setSessions((data as ChatSession[]) || []);
+        setSelectedSessionId((prev) => (prev && (data || []).some((session) => session.id === prev) ? prev : (data || [])[0]?.id || ''));
+      }
     };
 
-    fetchSessions();
+    fetchSessions(); // Initial fetch
+
+    const channel = supabase
+      .channel('public:chat_sessions')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_sessions', filter: `student_id=eq.${selectedStudentId}` },
+        () => {
+          fetchSessions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedStudentId]);
 
   useEffect(() => {
@@ -316,6 +341,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     setIsNameEditing(false);
     setNameDraft('');
   }, [selectedStudentId]);
+
+  // Duplicate logic removed.
+  // The riskCounts and filteredSessions are already defined above.
+  // See lines 157+ for the source of truth.
 
   useEffect(() => {
     setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
@@ -494,22 +523,56 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             <div className="space-y-3 h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
               {filteredSessions.map((session) => {
-                const level = normalizeRiskLevel(session.risk_level);
+                const risk = normalizeRiskLevel(session.risk_level);
                 return (
-                  <button
+                  <div
                     key={session.id}
                     onClick={() => {
                       setSelectedSessionId(session.id);
                       setOpenedSessionId(session.id);
                     }}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer group relative ${selectedSessionId === session.id
+                      ? 'bg-brand-50 border-brand-500 ring-1 ring-brand-500'
+                      : 'bg-white border-slate-100 hover:border-brand-200 hover:shadow-md'
+                      } ${session.is_deleted_by_student ? 'opacity-75 bg-slate-50' : ''}`}
                   >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs text-slate-500">{new Date(session.started_at).toLocaleString('ko-KR')}</p>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskChipColor[level]}`}>{riskText[level]}</span>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${risk === 'stable' ? 'bg-emerald-100 text-emerald-700' :
+                        risk === 'normal' ? 'bg-amber-100 text-amber-700' :
+                          'bg-rose-100 text-rose-700'
+                        }`}>
+                        {risk.toUpperCase()}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">{new Date(session.started_at).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900 line-clamp-2">{session.title || '새 대화'}</p>
-                  </button>
+                    <h4 className="font-bold text-slate-800 text-sm mb-1 line-clamp-1 flex items-center gap-2">
+                      {session.title || '새 대화'}
+                      {session.is_deleted_by_student && (
+                        <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">학생이 삭제함</span>
+                      )}
+                    </h4>
+                    <p className="text-xs text-slate-400 font-medium line-clamp-1">
+                      {session.student_intent || '분석 중...'}
+                    </p>
+
+                    {/* Permanent Delete Button (Only for sessions deleted by student) */}
+                    {session.is_deleted_by_student && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm("이 대화 기록을 영구적으로 삭제하시겠습니까? 복구할 수 없습니다.")) {
+                            const { error } = await supabase.from('chat_sessions').delete().eq('id', session.id);
+                            if (error) alert("삭제 실패: " + error.message);
+                            // Session list will auto-update via realtime subscription
+                          }
+                        }}
+                        className="absolute right-4 bottom-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-lg"
+                        title="영구 삭제"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>

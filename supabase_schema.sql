@@ -48,3 +48,7 @@ CREATE POLICY "Enable full access for service role" ON "public"."admin_codes"
 AS PERMISSIVE FOR ALL
 TO service_role
 USING (true);
+
+-- 6. Add is_deleted_by_student to chat_sessions table (for Soft Delete)
+ALTER TABLE public.chat_sessions 
+ADD COLUMN IF NOT EXISTS is_deleted_by_student BOOLEAN DEFAULT FALSE;
