@@ -29,6 +29,7 @@ interface NormalizedSettings {
   };
   mentor_tone: MentorTone;
   ai_style_prompt: string;
+  parent_student_name: string;
 }
 
 const DEFAULT_SETTINGS: NormalizedSettings = {
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: NormalizedSettings = {
   },
   mentor_tone: 'kind',
   ai_style_prompt: '',
+  parent_student_name: '',
 };
 
 const guardrailMeta: { key: keyof NormalizedSettings['guardrails']; label: string; description: string }[] = [
@@ -55,13 +57,6 @@ const mentorToneOptions: { value: MentorTone; label: string; description: string
   { value: 'friendly', label: '친근한', description: '가볍고 편안한 대화' },
 ];
 
-const riskFilterOptions: { value: SessionRiskLevel | 'all'; label: string }[] = [
-  { value: 'all', label: '전체' },
-  { value: 'stable', label: '안정' },
-  { value: 'normal', label: '보통' },
-  { value: 'caution', label: '주의' },
-];
-
 const riskChipColor: Record<SessionRiskLevel, string> = {
   stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   normal: 'bg-amber-50 text-amber-700 border-amber-100',
@@ -70,8 +65,14 @@ const riskChipColor: Record<SessionRiskLevel, string> = {
 
 const riskText: Record<SessionRiskLevel, string> = {
   stable: '안정',
-  normal: '보통',
-  caution: '주의',
+  normal: '주의',
+  caution: '위험',
+};
+
+const riskBarTheme: Record<SessionRiskLevel, { fill: string; text: string; border: string }> = {
+  stable: { fill: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200' },
+  normal: { fill: 'bg-amber-400', text: 'text-amber-700', border: 'border-amber-200' },
+  caution: { fill: 'bg-rose-500', text: 'text-rose-700', border: 'border-rose-200' },
 };
 
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
@@ -107,6 +108,7 @@ const normalizeSettings = (settings?: StudentSettings | null): NormalizedSetting
     },
     mentor_tone: mentorTone === 'kind' || mentorTone === 'rational' || mentorTone === 'friendly' ? mentorTone : DEFAULT_SETTINGS.mentor_tone,
     ai_style_prompt: typeof settings?.ai_style_prompt === 'string' ? settings.ai_style_prompt : '',
+    parent_student_name: typeof settings?.parent_student_name === 'string' ? settings.parent_student_name : '',
   };
 };
 
@@ -115,6 +117,7 @@ const toStudentSettings = (normalized: NormalizedSettings): StudentSettings => (
   mentor_tone: normalized.mentor_tone,
   mentor_style: normalized.mentor_tone,
   ai_style_prompt: normalized.ai_style_prompt,
+  parent_student_name: normalized.parent_student_name,
 });
 
 const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => {
@@ -124,10 +127,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [sessionMessages, setSessionMessages] = useState<MessageRow[]>([]);
+  const [openedSessionId, setOpenedSessionId] = useState('');
   const [riskFilter, setRiskFilter] = useState<SessionRiskLevel | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [isNameEditing, setIsNameEditing] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -135,6 +141,23 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   );
 
   const normalizedSettings = useMemo(() => normalizeSettings(selectedStudent?.settings), [selectedStudent]);
+  const selectedStudentAccount = studentAccounts[selectedStudentId];
+
+  const displayStudentName = useMemo(() => {
+    const customName = normalizedSettings.parent_student_name.trim();
+    return customName || selectedStudentAccount?.name || '학생';
+  }, [normalizedSettings.parent_student_name, selectedStudentAccount?.name]);
+
+  const riskCounts = useMemo(() => {
+    const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
+    sessions.forEach((session) => {
+      const level = session.risk_level || 'normal';
+      counts[level] += 1;
+    });
+    return counts;
+  }, [sessions]);
+
+  const maxRiskCount = Math.max(1, riskCounts.stable, riskCounts.normal, riskCounts.caution);
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => (riskFilter === 'all' ? true : (session.risk_level || 'normal') === riskFilter));
@@ -230,7 +253,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
       const fetched = (data || []) as ChatSession[];
       setSessions(fetched);
-      setSelectedSessionId((prev) => prev || fetched[0]?.id || '');
+      setSelectedSessionId((prev) => (prev && fetched.some((session) => session.id === prev) ? prev : fetched[0]?.id || ''));
     };
 
     fetchSessions();
@@ -238,7 +261,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!selectedSessionId) {
+      if (!openedSessionId) {
         setSessionMessages([]);
         return;
       }
@@ -246,14 +269,25 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       const { data } = await supabase
         .from('messages')
         .select('*')
-        .eq('session_id', selectedSessionId)
+        .eq('session_id', openedSessionId)
         .order('created_at', { ascending: true });
 
       setSessionMessages((data || []) as MessageRow[]);
     };
 
     fetchMessages();
-  }, [selectedSessionId]);
+  }, [openedSessionId]);
+
+  useEffect(() => {
+    setRiskFilter('all');
+    setOpenedSessionId('');
+    setIsNameEditing(false);
+    setNameDraft('');
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
+  }, [normalizedSettings.parent_student_name, selectedStudentAccount?.name]);
 
   const updateStudentSettings = async (nextSettings: NormalizedSettings) => {
     if (!selectedStudentId) return;
@@ -296,6 +330,12 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     await updateStudentSettings({ ...normalizedSettings, ai_style_prompt: prompt });
   };
 
+  const handleSaveStudentName = async () => {
+    const trimmed = nameDraft.trim();
+    await updateStudentSettings({ ...normalizedSettings, parent_student_name: trimmed });
+    setIsNameEditing(false);
+  };
+
   const copyInviteCode = async () => {
     if (!inviteCode) return;
     await navigator.clipboard.writeText(inviteCode);
@@ -325,6 +365,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           {connectedStudents.length === 0 && <p className="text-sm text-slate-400">연결된 학생이 없습니다.</p>}
           {connectedStudents.map((student) => {
             const account = studentAccounts[student.user_id];
+            const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
             const active = selectedStudentId === student.user_id;
             return (
               <button
@@ -332,7 +373,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 onClick={() => setSelectedStudentId(student.user_id)}
                 className={`px-4 py-2.5 rounded-full text-sm font-bold border transition-all ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
               >
-                {account?.name || '학생'}
+                {studentName}
               </button>
             );
           })}
@@ -340,22 +381,85 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">1) 심리 안정도</h2>
-            <div className="space-y-2">
-              {riskFilterOptions.map((option) => (
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <h2 className="font-black text-lg">1) 학생 정보</h2>
+              {!isNameEditing && (
                 <button
-                  key={option.value}
-                  onClick={() => setRiskFilter(option.value)}
-                  className={`w-full text-left px-4 py-3 rounded-2xl border text-sm font-bold ${riskFilter === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100 text-slate-600'}`}
+                  onClick={() => setIsNameEditing(true)}
+                  className="text-sm font-black text-brand-900 border border-brand-100 bg-brand-50 rounded-xl px-3 py-1.5"
+                  aria-label="학생 이름 편집"
                 >
-                  {option.label}
+                  ✏️
                 </button>
-              ))}
+              )}
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-xs text-slate-500 mb-1">학생 이름</p>
+              {isNameEditing ? (
+                <div className="space-y-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    placeholder="학생 이름"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button onClick={handleSaveStudentName} className="px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-black">저장</button>
+                    <button
+                      onClick={() => {
+                        setIsNameEditing(false);
+                        setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-slate-500"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-base font-black text-slate-900">{displayStudentName}</p>
+              )}
+            </div>
+            {selectedStudentAccount?.email && <p className="text-xs text-slate-500 mt-3">계정: {selectedStudentAccount.email}</p>}
+          </article>
+
+          <article className="premium-card p-6 lg:col-span-2">
+            <h2 className="font-black text-lg mb-4">2) 심리 안정도 통계</h2>
+            <div className="space-y-3">
+              {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
+                const count = riskCounts[level];
+                const widthPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 14 : 0);
+                const active = riskFilter === level;
+                const theme = riskBarTheme[level];
+                return (
+                  <button
+                    key={level}
+                    onClick={() => setRiskFilter(level)}
+                    className={`w-full rounded-2xl border p-3 text-left bg-white transition-all ${active ? `${theme.border} ring-2 ring-brand-100` : 'border-slate-100 hover:border-slate-200'}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className={`text-sm font-black ${theme.text}`}>{riskText[level]}</p>
+                      <p className="text-xs font-bold text-slate-500">{count}개 세션</p>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={`${theme.fill} h-full rounded-full transition-all`} style={{ width: `${widthPercent}%` }} />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </article>
 
           <article className="premium-card p-6 lg:col-span-2">
-            <h2 className="font-black text-lg mb-4">2) 활동 타임라인</h2>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="font-black text-lg">3) 대화 목록</h2>
+              <button
+                onClick={() => setRiskFilter('all')}
+                className="text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
+              >
+                모든 대화 보기
+              </button>
+            </div>
             <div className="space-y-3 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
               {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
               {filteredSessions.map((session) => {
@@ -363,7 +467,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 return (
                   <button
                     key={session.id}
-                    onClick={() => setSelectedSessionId(session.id)}
+                    onClick={() => {
+                      setSelectedSessionId(session.id);
+                      setOpenedSessionId(session.id);
+                    }}
                     className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedSessionId === session.id ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -378,7 +485,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           </article>
 
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">3) 필수 안심 가드레일</h2>
+            <h2 className="font-black text-lg mb-4">4) 필수 안심 가드레일</h2>
             <div className="space-y-3">
               {guardrailMeta.map((item) => {
                 const enabled = normalizedSettings.guardrails[item.key];
@@ -400,7 +507,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           </article>
 
           <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">4) 멘토 말투 성향</h2>
+            <h2 className="font-black text-lg mb-4">5) 멘토 말투 성향</h2>
             <div className="space-y-2">
               {mentorToneOptions.map((option) => (
                 <button
@@ -415,8 +522,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </div>
           </article>
 
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">5) AI 개별 지시사항 관리</h2>
+          <article className="premium-card p-6 lg:col-span-3">
+            <h2 className="font-black text-lg mb-4">6) AI 개별 지시사항 관리</h2>
             <textarea
               value={normalizedSettings.ai_style_prompt}
               onChange={(event) => {
@@ -436,21 +543,30 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
           </article>
         </section>
-
-        <section className="premium-card p-6">
-          <h2 className="font-black text-lg mb-1">세션 원문 대화</h2>
-          <p className="text-xs text-slate-500 mb-4">{sessions.find((session) => session.id === selectedSessionId)?.title || '대화를 선택해 주세요.'}</p>
-          <div className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pr-2">
-            {sessionMessages.length === 0 && <p className="text-sm text-slate-400">세션을 선택하면 원문 대화가 표시됩니다.</p>}
-            {sessionMessages.map((message) => (
-              <div key={message.id} className={`p-3 rounded-xl text-sm ${message.role === 'user' ? 'bg-brand-900 text-white ml-8' : 'bg-slate-100 text-slate-800 mr-8'}`}>
-                <p className="text-[10px] opacity-70 mb-1">{message.role} · {new Date(message.created_at).toLocaleTimeString('ko-KR')}</p>
-                <p>{message.content}</p>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
+
+      {openedSessionId && (
+        <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-[1px] px-4 py-6 md:p-10">
+          <div className="max-w-4xl mx-auto h-full bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden">
+            <div className="px-5 md:px-7 py-4 border-b border-slate-100 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-black text-base md:text-lg text-slate-900">{sessions.find((session) => session.id === openedSessionId)?.title || '대화 전문'}</h3>
+                <p className="text-xs text-slate-500 mt-1">세션 원문 전체 메시지</p>
+              </div>
+              <button onClick={() => setOpenedSessionId('')} className="text-sm font-black text-slate-500 hover:text-slate-900">닫기</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-3 custom-scrollbar bg-slate-50/40">
+              {sessionMessages.length === 0 && <p className="text-sm text-slate-400">메시지가 없습니다.</p>}
+              {sessionMessages.map((message) => (
+                <div key={message.id} className={`max-w-[88%] p-3 rounded-2xl text-sm ${message.role === 'user' ? 'bg-brand-900 text-white ml-auto' : 'bg-white border border-slate-100 text-slate-800 mr-auto'}`}>
+                  <p className="text-[10px] opacity-70 mb-1">{message.role === 'user' ? '학생' : 'AI'} · {new Date(message.created_at).toLocaleTimeString('ko-KR')}</p>
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
