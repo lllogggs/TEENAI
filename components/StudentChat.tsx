@@ -140,6 +140,16 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
 
+  useEffect(() => {
+    if (user.subscription_expires_at) {
+      const expires = new Date(user.subscription_expires_at);
+      if (expires < new Date()) {
+        alert('서비스 이용 기간이 만료되었습니다. 관리자에게 문의하세요.');
+        onLogout();
+      }
+    }
+  }, [user, onLogout]);
+
   const activeSession = useMemo(() => sessions.find((session) => session.id === currentSessionId) || null, [sessions, currentSessionId]);
 
   useEffect(() => {
@@ -423,17 +433,39 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               const isActive = session.id === currentSessionId;
               const riskLevel = normalizeRiskLevel(session.risk_level);
               return (
-                <button
-                  key={session.id}
-                  onClick={() => openSession(session.id)}
-                  className={`w-full text-left rounded-2xl border p-3 transition-all ${isActive ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
-                  </div>
-                  <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
-                </button>
+                <div key={session.id} className="relative group">
+                  <button
+                    onClick={() => openSession(session.id)}
+                    className={`w-full text-left rounded-2xl border p-3 transition-all pr-8 ${isActive ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${riskColorMap[riskLevel]}`}>{riskLabelMap[riskLevel]}</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm('정말 이 대화를 삭제하시겠습니까?')) {
+                        const { error } = await supabase.from('chat_sessions').delete().eq('id', session.id);
+                        if (!error) {
+                          setSessions((prev) => prev.filter((s) => s.id !== session.id));
+                          if (currentSessionId === session.id) {
+                            setCurrentSessionId(null);
+                            setMessages([]);
+                          }
+                        } else {
+                          alert('삭제 실패: ' + error.message);
+                        }
+                      }
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="대화 삭제"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                  </button>
+                </div>
               );
             })}
             {sessions.length === 0 && <p className="text-sm text-slate-400 px-1">첫 대화를 시작해 보세요.</p>}
@@ -458,8 +490,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                 <div
                   className={`max-w-[82%] md:max-w-[75%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
-                      ? 'bg-brand-900 text-white rounded-tr-none'
-                      : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
+                    ? 'bg-brand-900 text-white rounded-tr-none'
+                    : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
                     }`}
                 >
                   {m.text}

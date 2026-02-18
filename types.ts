@@ -18,6 +18,22 @@ export interface User {
   name: string;
   avatar_url?: string;
   my_invite_code?: string;
+  subscription_expires_at?: string;
+}
+
+export interface AdminCode {
+  code: string;
+  is_used: boolean;
+  memo?: string;
+}
+
+export interface SystemLog {
+  id: string;
+  level: 'error' | 'warn' | 'info';
+  message: string;
+  context?: any;
+  user_id?: string;
+  created_at: string;
 }
 
 export interface StudentSettings {

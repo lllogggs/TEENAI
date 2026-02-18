@@ -170,7 +170,33 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   }, [sessions, riskFilter]);
 
   useEffect(() => {
+    if (user.subscription_expires_at) {
+      const expires = new Date(user.subscription_expires_at);
+      if (expires < new Date()) {
+        alert('서비스 이용 기간이 만료되었습니다. 관리자에게 문의하세요.');
+        onLogout();
+      }
+    }
+  }, [user, onLogout]);
+
+  useEffect(() => {
     const fetchInviteCode = async () => {
+      // Check student count limit first
+      const { count, error: countError } = await supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_user_id', user.id);
+
+      if (countError) {
+        console.error('Failed to count students:', countError);
+        return;
+      }
+
+      if ((count || 0) >= 3) {
+        setInviteCode('LIMIT_REACHED');
+        return;
+      }
+
       const { data: userRow } = await supabase
         .from('users')
         .select('my_invite_code, role')
@@ -357,9 +383,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
           {!!inviteCode && (
             <div className="flex items-center gap-2 rounded-2xl border border-brand-100 bg-brand-50 px-3 py-2">
-              <span className="text-[11px] md:text-xs font-black text-brand-900 whitespace-nowrap">학생 인증코드:</span>
-              <span className="text-sm md:text-base font-black tracking-[0.18em] text-brand-900">{inviteCode}</span>
-              <button onClick={copyInviteCode} className="text-[11px] md:text-xs font-black text-brand-700 hover:text-brand-900 bg-white px-2 py-1 rounded-lg border border-brand-100">복사</button>
+              {inviteCode === 'LIMIT_REACHED' ? (
+                <span className="text-xs font-bold text-red-500">학생 연결 3명 초과 (추가 불가)</span>
+              ) : (
+                <>
+                  <span className="text-[11px] md:text-xs font-black text-brand-900 whitespace-nowrap">학생 인증코드:</span>
+                  <span className="text-sm md:text-base font-black tracking-[0.18em] text-brand-900">{inviteCode}</span>
+                  <button onClick={copyInviteCode} className="text-[11px] md:text-xs font-black text-brand-700 hover:text-brand-900 bg-white px-2 py-1 rounded-lg border border-brand-100">복사</button>
+                </>
+              )}
             </div>
           )}
           <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>

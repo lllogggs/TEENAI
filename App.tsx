@@ -81,16 +81,15 @@ function App() {
 
       if (isSignup) {
         let parentId: string | null = null;
+        let registrationCode: string | null = null;
 
         if (role === UserRole.STUDENT) {
-          if (!code) {
-            throw new Error('초대 코드가 필요합니다.');
-          }
+          if (!code) throw new Error('초대 코드가 필요합니다.');
 
           const normalizedCode = code.trim().toUpperCase();
           const { data: parents } = await supabase
             .from('users')
-            .select('id')
+            .select('id, my_invite_code') // Fetch invite code to verify correct parent if needed, but ID is enough
             .eq('my_invite_code', normalizedCode)
             .eq('role', UserRole.PARENT)
             .limit(1);
@@ -99,11 +98,33 @@ function App() {
             throw new Error('유효하지 않은 초대 코드입니다.');
           }
 
+          // Check if parent has reached student limit (max 3)
+          const { count, error: countError } = await supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('parent_user_id', parents[0].id);
+
+          if (countError) throw countError;
+          if ((count || 0) >= 3) {
+            throw new Error('해당 부모님 계정의 학생 수가 최대(3명)에 도달했습니다.');
+          }
+
           parentId = parents[0].id;
+        } else if (role === UserRole.PARENT) {
+          // "code" argument is treated as Registration Code for Parents
+          if (!code) throw new Error('관리자 등록 코드가 필요합니다.');
+          registrationCode = code.trim();
+          // Validation is done in Auth.tsx, but good to re-verify or just proceed to mark used.
+          // We will mark it used AFTER successful signup.
         }
 
-        const normalizedInviteCode = code?.trim().toUpperCase();
+        const normalizedInviteCode = role === UserRole.STUDENT ? code?.trim().toUpperCase() : undefined;
         const signupName = getSignupName(email);
+
+        // Default 31 days trial
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 31);
+
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
@@ -111,17 +132,32 @@ function App() {
             data: {
               role,
               name: signupName,
+              subscription_expires_at: expiresAt.toISOString(), // Save to user metadata for easy access trigger
               ...(role === UserRole.STUDENT
                 ? {
-                    parent_user_id: parentId,
-                    invite_code: normalizedInviteCode,
-                  }
+                  parent_user_id: parentId,
+                  invite_code: normalizedInviteCode,
+                }
                 : {}),
             },
           },
         });
         if (authError) throw authError;
         if (!authData.user) throw new Error('가입 실패');
+
+        // If parent signup successful, mark registration code as used
+        if (role === UserRole.PARENT && registrationCode) {
+          const { error: codeError } = await supabase
+            .from('admin_codes')
+            .update({ is_used: true, used_at: new Date().toISOString() })
+            .eq('code', registrationCode);
+
+          if (codeError) {
+            console.error('Failed to mark registration code as used:', codeError);
+            // Non-fatal error for the user, but needs admin attention. 
+            // We might want to alert or log this system-wide.
+          }
+        }
 
         if (authData.session?.user) {
           await ensureProfileLoaded(authData.session.user.id, email);
