@@ -35,6 +35,7 @@ export interface StudentSettings {
   mentor_style?: 'kind' | 'rational' | 'friendly';
   parent_instructions?: string[];
   ai_style_prompt?: string;
+  parent_student_name?: string;
   [key: string]: unknown;
 }
 

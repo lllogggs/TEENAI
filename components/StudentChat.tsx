@@ -425,13 +425,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </aside>
 
-        <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex flex-col bg-slate-50/50`}>
+        <section className={`${showMobileChat ? 'block' : 'hidden'} lg:block flex min-h-0 flex-col bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
             <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
             <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-36">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar pb-56 lg:pb-44">
             {errorNotice && <div className="text-sm text-red-600 font-bold">{errorNotice}</div>}
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full opacity-20">
@@ -465,8 +465,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="fixed bottom-5 md:bottom-10 left-0 right-0 lg:left-[320px] px-5 md:px-10 pointer-events-none">
-            <div className="max-w-4xl mx-auto pointer-events-auto">
+          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-5 md:pb-8 lg:pb-10 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
+            <div className="max-w-4xl mx-auto">
               <div className="flex items-center gap-4 bg-white/90 backdrop-blur-2xl p-3 pl-6 md:pl-8 rounded-[3.5rem] border border-white shadow-2xl shadow-slate-300/50 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
                 <input
                   value={input}
