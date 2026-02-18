@@ -1,0 +1,52 @@
+name: Backfill Chat Metadata
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run only (no DB update)
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      limit:
+        description: Number of chat_sessions to scan (1~500)
+        required: true
+        default: '50'
+        type: string
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate required secrets
+        run: |
+          [ -n "$SUPABASE_URL" ] || (echo "Missing SUPABASE_URL secret" && exit 1)
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || (echo "Missing SUPABASE_SERVICE_ROLE_KEY secret" && exit 1)
+          [ -n "$GEMINI_API_KEY" ] || (echo "Missing GEMINI_API_KEY secret" && exit 1)
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Backfill (dry-run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: node scripts/backfill-chat-metadata.mjs --dry-run --limit=${{ github.event.inputs.limit }}
+
+      - name: Backfill (apply)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: node scripts/backfill-chat-metadata.mjs --limit=${{ github.event.inputs.limit }}
