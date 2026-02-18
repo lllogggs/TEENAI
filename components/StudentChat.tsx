@@ -291,6 +291,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       const payload = await response.json();
       const nextTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '새 대화';
+      // 충돌 해결: 전역 normalizeRiskLevel 함수를 사용하여 일관성 있게 값을 변환합니다.
       const nextRiskLevel = normalizeRiskLevel(payload.risk_level);
 
       const { error } = await supabase

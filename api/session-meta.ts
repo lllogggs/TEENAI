@@ -20,6 +20,7 @@ const extractJsonObject = (raw: string) => {
 
 const normalizeRiskLevel = (value: unknown): SessionRiskLevel => {
   if (value === 'stable' || value === 'normal' || value === 'caution') return value;
+  // 충돌 해결: AI가 'warn'이나 'high'를 반환할 경우 'caution'으로 매핑하여 안전하게 처리합니다.
   if (value === 'warn' || value === 'high') return 'caution';
   return 'normal';
 };
@@ -83,7 +84,7 @@ export default async function handler(req: any, res: any) {
     ].join('\n');
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash', // 참고: 요청하신 코드 원본에 맞춰 모델명은 그대로 두었습니다.
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
