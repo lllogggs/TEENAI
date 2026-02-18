@@ -1,0 +1,43 @@
+name: Backfill Chat Metadata
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "dry run only"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      limit:
+        description: "number of sessions to scan"
+        required: true
+        default: "50"
+        type: string
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run backfill
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            node scripts/backfill-chat-metadata.mjs --dry-run --limit=${{ github.event.inputs.limit }}
+          else
+            node scripts/backfill-chat-metadata.mjs --limit=${{ github.event.inputs.limit }}
+          fi
