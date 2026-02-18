@@ -36,8 +36,8 @@ const DEFAULT_SETTINGS: NormalizedSettings = {
 
 const riskLabelMap: Record<SessionRiskLevel, string> = {
   stable: '안정',
-  normal: '보통',
-  caution: '주의',
+  normal: '주의',
+  caution: '위험',
 };
 
 const riskColorMap: Record<SessionRiskLevel, string> = {
@@ -126,6 +126,22 @@ const buildSystemPromptFromSettings = (settings: NormalizedSettings) => {
 const formatSessionTime = (iso: string) => {
   const date = new Date(iso);
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const CAUTION_KEYWORDS = [
+  '불안', '우울', '힘들', '외로', '무서', '잠이 안', '짜증', '스트레스', '압박', '화가 나',
+];
+
+const classifyRiskLevel = (message: string): SessionRiskLevel => {
+  if (DANGER_KEYWORDS.some((keyword) => message.includes(keyword))) {
+    return 'caution';
+  }
+
+  if (CAUTION_KEYWORDS.some((keyword) => message.includes(keyword))) {
+    return 'normal';
+  }
+
+  return 'stable';
 };
 
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
@@ -264,6 +280,28 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
+  const updateSessionRisk = async (sessionId: string, level: SessionRiskLevel) => {
+    const session = sessions.find((item) => item.id === sessionId);
+    if (!session) return;
+
+    const currentRisk = session.risk_level || 'normal';
+    const riskPriority: Record<SessionRiskLevel, number> = { stable: 1, normal: 2, caution: 3 };
+    if (riskPriority[level] <= riskPriority[currentRisk]) return;
+
+    const { error } = await supabase
+      .from('chat_sessions')
+      .update({ risk_level: level })
+      .eq('id', sessionId)
+      .eq('student_id', user.id);
+
+    if (error) {
+      console.error('chat_sessions risk_level update error:', error);
+      return;
+    }
+
+    setSessions((prev) => prev.map((item) => (item.id === sessionId ? { ...item, risk_level: level } : item)));
+  };
+
   const generateTitleFromFirstMessage = async (sessionId: string, firstMessage: string) => {
     const session = sessions.find((item) => item.id === sessionId);
     if (!session || session.title !== '새 대화') return;
@@ -326,7 +364,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       await generateTitleFromFirstMessage(sessionId, userText);
     }
 
-    const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
+    const riskLevel = classifyRiskLevel(userText);
+    await updateSessionRisk(sessionId, riskLevel);
+
+    const isDanger = riskLevel === 'caution';
     if (isDanger) {
       const { error } = await supabase.from('safety_alerts').insert({
         student_id: user.id,
