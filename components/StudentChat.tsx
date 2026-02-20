@@ -761,7 +761,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             </div>
 
             <div className="max-w-4xl mx-auto flex items-center gap-2">
-              <div className="flex-1 flex flex-col md:flex-row items-center gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-5 md:pl-7 rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
+              <div className="flex-1 flex flex-row items-center gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-5 md:pl-7 rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
