@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
         return;
     }
 
-    const { text, voiceName = 'ko-KR-Neural2-A' } = req.body || {};
+    const { text } = req.body || {};
     if (!text) {
         res.status(400).json({ error: 'Text is required for TTS' });
         return;
@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
     try {
         const request = {
             input: { text },
-            voice: { languageCode: 'ko-KR', name: voiceName },
+            voice: { languageCode: 'ko-KR', name: 'ko-KR-Neural2-A' },
             audioConfig: { audioEncoding: 'MP3' as const },
         };
 

@@ -9,7 +9,6 @@ interface VoiceModeModalProps {
 
 const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onTextSubmit, onPlayAudio }) => {
     const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
-    const [selectedVoice, setSelectedVoice] = useState<'ko-KR-Neural2-A' | 'ko-KR-Neural2-C'>('ko-KR-Neural2-A');
 
     const speechRecognitionRef = useRef<any>(null);
     const currentTranscriptRef = useRef<string>('');
@@ -93,20 +92,12 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         ctx.lineTo(canvas.width, canvas.height / 2);
         ctx.stroke();
 
-        // Simple VAD Logic
+        // Simple VAD Logic using SpeechRecognition event timings
         if (status === 'listening' && speechRecognitionRef.current) {
-            const avg = sum / bufferLength;
-            const threshold = 3; // Sensitivity threshold
-
-            if (avg > threshold) {
-                isSpeakingRef.current = true;
-                silenceStartRef.current = Date.now();
-            } else {
-                // If user was speaking and now has been silent for 1.5 seconds
-                if (isSpeakingRef.current && Date.now() - silenceStartRef.current > 1500) {
-                    isSpeakingRef.current = false;
-                    handleStopAndSend();
-                }
+            // If user was speaking and hasn't produced a new recognized word in 2 seconds
+            if (isSpeakingRef.current && Date.now() - silenceStartRef.current > 2000) {
+                isSpeakingRef.current = false;
+                handleStopAndSend();
             }
         }
 
@@ -118,6 +109,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         setStatus('listening');
         silenceStartRef.current = Date.now();
         isSpeakingRef.current = false;
+        currentTranscriptRef.current = '';
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -209,13 +201,14 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         }
 
         setStatus('processing');
+        currentTranscriptRef.current = ''; // Clear for next loop
 
         try {
             const aiText = await onTextSubmit(text);
             if (!isModalOpenRef.current) return;
 
             setStatus('speaking');
-            await onPlayAudio(aiText, selectedVoice);
+            await onPlayAudio(aiText);
 
             if (isModalOpenRef.current) {
                 startListening();
@@ -252,16 +245,6 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
 
     return (
         <div className="fixed inset-0 z-[100] bg-brand-900/95 flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
-            <div className="absolute top-6 left-6">
-                <select
-                    value={selectedVoice}
-                    onChange={(e) => setSelectedVoice(e.target.value as any)}
-                    className="bg-white/10 text-white font-bold text-sm border border-white/20 rounded-xl px-3 py-2 outline-none hover:bg-white/20 transition-colors"
-                >
-                    <option value="ko-KR-Neural2-A" className="text-black">여성 목소리</option>
-                    <option value="ko-KR-Neural2-C" className="text-black">남성 목소리</option>
-                </select>
-            </div>
             <button onClick={onClose} className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
