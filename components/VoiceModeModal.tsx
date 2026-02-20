@@ -8,9 +8,7 @@ interface VoiceModeModalProps {
 }
 
 const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoiceSubmit, onPlayAudio }) => {
-    const [isRecording, setIsRecording] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
@@ -20,8 +18,17 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
     const analyserRef = useRef<AnalyserNode | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
 
+    // VAD (Voice Activity Detection) refs
+    const silenceStartRef = useRef<number>(Date.now());
+    const isSpeakingRef = useRef<boolean>(false);
+    const isModalOpenRef = useRef<boolean>(isOpen);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
     useEffect(() => {
-        if (!isOpen) {
+        isModalOpenRef.current = isOpen;
+        if (isOpen) {
+            startListening();
+        } else {
             stopAll();
         }
         return stopAll;
@@ -33,6 +40,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
         }
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
         }
         if (audioContextRef.current) {
             audioContextRef.current.close().catch(() => { });
@@ -40,7 +48,13 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
         }
         if (animationRef.current) {
             cancelAnimationFrame(animationRef.current);
+            animationRef.current = 0;
         }
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setStatus('idle');
     };
 
     const drawWaveform = () => {
@@ -55,15 +69,17 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.lineWidth = 4;
-        ctx.strokeStyle = '#4f46e5';
+        ctx.strokeStyle = status === 'listening' ? '#4f46e5' : '#94a3b8';
         ctx.beginPath();
 
         const sliceWidth = canvas.width / bufferLength;
         let x = 0;
+        let sum = 0;
 
         for (let i = 0; i < bufferLength; i++) {
             const v = dataArray[i] / 128.0;
             const y = (v * canvas.height) / 2;
+            sum += Math.abs(dataArray[i] - 128);
 
             if (i === 0) {
                 ctx.moveTo(x, y);
@@ -75,12 +91,38 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
         ctx.lineTo(canvas.width, canvas.height / 2);
         ctx.stroke();
 
+        // Simple VAD Logic
+        if (status === 'listening' && mediaRecorderRef.current?.state === 'recording') {
+            const avg = sum / bufferLength;
+            const threshold = 3; // Sensitivity threshold
+
+            if (avg > threshold) {
+                isSpeakingRef.current = true;
+                silenceStartRef.current = Date.now();
+            } else {
+                // If user was speaking and now has been silent for 1.5 seconds
+                if (isSpeakingRef.current && Date.now() - silenceStartRef.current > 1500) {
+                    isSpeakingRef.current = false;
+                    handleStopAndSend();
+                }
+            }
+        }
+
         animationRef.current = requestAnimationFrame(drawWaveform);
     };
 
-    const startRecording = async () => {
+    const startListening = async () => {
+        stopAll();
+        setStatus('listening');
+        silenceStartRef.current = Date.now();
+        isSpeakingRef.current = false;
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (!isModalOpenRef.current) {
+                stream.getTracks().forEach(t => t.stop());
+                return;
+            }
             streamRef.current = stream;
 
             const audioContext = new AudioContext();
@@ -103,50 +145,77 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
             };
 
             mediaRecorder.onstop = async () => {
-                setIsProcessing(true);
+                if (!isModalOpenRef.current || status !== 'listening') return; // Might be cancelled
+
+                setStatus('processing');
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+                // If the audio is too short (didn't actually speak anything, just noise), we could restart,
+                // but for now let's just send it.
+                if (audioBlob.size < 1000) {
+                    if (isModalOpenRef.current) startListening();
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 reader.onloadend = async () => {
                     const base64Audio = reader.result as string;
                     try {
                         const aiText = await onVoiceSubmit(base64Audio);
+                        if (!isModalOpenRef.current) return;
+
+                        setStatus('speaking');
                         await onPlayAudio(aiText);
+
+                        // Loop back to listening after AI finishes speaking
+                        if (isModalOpenRef.current) {
+                            startListening();
+                        }
                     } catch (e) {
                         console.error('Voice loop error:', e);
-                    } finally {
-                        setIsProcessing(false);
+                        if (isModalOpenRef.current) setStatus('idle');
                     }
                 };
             };
 
             mediaRecorder.start();
-            setIsRecording(true);
         } catch (err) {
             console.error('Failed to start recording', err);
+            setStatus('idle');
             alert('마이크 접근 권한이 필요합니다.');
         }
     };
 
-    const stopRecording = () => {
+    const handleStopAndSend = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stop(); // Triggers onstop which handles the rest
         }
-        setIsRecording(false);
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(t => t.stop());
-        }
-        if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-        }
-        // Clear canvas
-        if (canvasRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    };
+
+    const handleMainButtonClick = () => {
+        if (status === 'listening') {
+            // Manual send
+            isSpeakingRef.current = false;
+            handleStopAndSend();
+        } else if (status === 'speaking' || status === 'processing') {
+            // Interrupt
+            startListening();
+        } else if (status === 'idle') {
+            startListening();
         }
     };
 
     if (!isOpen) return null;
+
+    const getStatusText = () => {
+        switch (status) {
+            case 'listening': return isSpeakingRef.current ? "듣고 있어요..." : "자유롭게 말씀하세요 (자동 전송)";
+            case 'processing': return "생각 중...";
+            case 'speaking': return "말하는 중... (클릭 시 중단)";
+            case 'idle': return "클릭하여 대화 시작";
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[100] bg-brand-900/95 flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
@@ -155,27 +224,43 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
             </button>
 
             <div className="text-center mb-12">
-                <div className="w-24 h-24 bg-white/10 rounded-full mx-auto flex items-center justify-center text-5xl mb-6 shadow-2xl shadow-brand-500/20">🎧</div>
+                <div className="w-24 h-24 bg-white/10 rounded-full mx-auto flex items-center justify-center mb-6 shadow-2xl shadow-brand-500/20 text-white">
+                    {/* SVG for Voice Conversation */}
+                    <svg className={`w-12 h-12 ${status === 'listening' ? 'animate-pulse' : ''}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="11" fill="currentColor" fillOpacity="0.2" />
+                        <rect x="8.5" y="10" width="1.5" height="4" rx="0.75" fill="white" />
+                        <rect x="11.25" y="7" width="1.5" height="10" rx="0.75" fill="white" />
+                        <rect x="14" y="9" width="1.5" height="6" rx="0.75" fill="white" />
+                    </svg>
+                </div>
                 <h2 className="text-3xl font-black text-white mb-3">포틴에이아이 대화 모드</h2>
-                <p className="text-brand-200 font-bold">자연스럽게 말해보세요.</p>
+                <p className={`font-bold transition-colors ${status === 'processing' ? 'text-brand-300 animate-pulse' : 'text-brand-200'}`}>
+                    {getStatusText()}
+                </p>
             </div>
 
             <div className="w-full max-w-md h-32 bg-brand-900/50 rounded-3xl mb-12 relative overflow-hidden flex items-center justify-center border border-white/10">
                 <canvas ref={canvasRef} width={400} height={100} className="w-full h-full opacity-80" />
-                {!isRecording && !isProcessing && <p className="absolute text-brand-300 font-bold text-sm">마이크 버튼을 누른 채로 말하세요</p>}
-                {isProcessing && <p className="absolute text-brand-300 font-bold text-sm animate-pulse">생각 중...</p>}
             </div>
 
             <button
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-                onMouseLeave={stopRecording}
-                onTouchStart={startRecording}
-                onTouchEnd={stopRecording}
-                disabled={isProcessing}
-                className={`w-28 h-28 rounded-full flex items-center justify-center text-4xl shadow-2xl transition-all ${isRecording ? 'bg-rose-500 shadow-rose-500/50 scale-110' : 'bg-white text-brand-900 hover:scale-105'} disabled:bg-slate-400 disabled:scale-100 disabled:shadow-none`}
+                onClick={handleMainButtonClick}
+                className={`w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all 
+                ${status === 'listening' ? 'bg-rose-500 shadow-rose-500/50 hover:bg-rose-600' : ''}
+                ${status === 'processing' ? 'bg-slate-500 cursor-wait shadow-slate-500/50' : ''}
+                ${status === 'speaking' ? 'bg-brand-500 shadow-brand-500/50 hover:bg-brand-600 animate-pulse' : ''}
+                ${status === 'idle' ? 'bg-white text-brand-900 hover:scale-105' : 'text-white scale-105'}
+                `}
             >
-                🎙️
+                {status === 'listening' ? (
+                    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd"></path></svg>
+                ) : status === 'processing' ? (
+                    <svg className="w-10 h-10 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                ) : status === 'speaking' ? (
+                    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd"></path></svg>
+                ) : (
+                    <span className="text-4xl text-brand-900">🎙️</span>
+                )}
             </button>
         </div>
     );
