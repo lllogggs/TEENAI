@@ -3,15 +3,16 @@ import React, { useState, useRef, useEffect } from 'react';
 interface VoiceModeModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onTextSubmit: (text: string) => Promise<string>; // Returns AI text response
+    onAudioSubmit: (audioBase64: string) => Promise<string>; // Returns AI text response
     onPlayAudio: (text: string, voiceName?: string) => Promise<void>; // Sends text to TTS and plays
 }
 
-const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onTextSubmit, onPlayAudio }) => {
+const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudioSubmit, onPlayAudio }) => {
     const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
 
-    const speechRecognitionRef = useRef<any>(null);
-    const currentTranscriptRef = useRef<string>('');
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<BlobPart[]>([]);
+    const mimeTypeRef = useRef<string>('');
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationRef = useRef<number>(0);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -36,9 +37,9 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
     }, [isOpen]);
 
     const stopAll = () => {
-        if (speechRecognitionRef.current) {
-            speechRecognitionRef.current.stop();
-            speechRecognitionRef.current = null;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current = null;
         }
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(t => t.stop());
@@ -93,10 +94,10 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         ctx.lineTo(canvas.width, canvas.height / 2);
         ctx.stroke();
 
-        // VAD Logic using volume threshold + SpeechRecognition
-        if (status === 'listening' && speechRecognitionRef.current && !isProcessingRef.current) {
+        // VAD Logic using volume threshold (Wait until speaking starts)
+        if (status === 'listening' && !isProcessingRef.current) {
             const avg = sum / bufferLength;
-            const threshold = 15; // Raised threshold to filter out fan noise
+            const threshold = 15; // Raised threshold to filter out background noise
 
             if (avg > threshold) {
                 isSpeakingRef.current = true;
@@ -104,15 +105,10 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
             } else {
                 const timeSinceSilenceStart = Date.now() - silenceStartRef.current;
 
-                // 1. If user was speaking and now silent for 1.5 seconds -> Send
+                // If user was speaking and now silent for 1.5 seconds -> Send
                 if (isSpeakingRef.current && timeSinceSilenceStart > 1500) {
                     isSpeakingRef.current = false;
                     handleStopAndSend();
-                }
-                // 2. Mobile fallback: If no speech recognized and silent for 5 seconds -> Restart
-                else if (!isSpeakingRef.current && !currentTranscriptRef.current && timeSinceSilenceStart > 5000) {
-                    console.log("Restarting listener due to prolonged silence without transcription");
-                    startListening();
                 }
             }
         }
@@ -120,14 +116,31 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         animationRef.current = requestAnimationFrame(drawWaveform);
     };
 
+    const getSupportedMimeType = () => {
+        const types = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav'];
+        for (const t of types) {
+            if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) {
+                return t;
+            }
+        }
+        return '';
+    };
+
     const startListening = async () => {
         stopAll();
         setStatus('listening');
         silenceStartRef.current = Date.now();
         isSpeakingRef.current = false;
-        currentTranscriptRef.current = '';
+        audioChunksRef.current = [];
 
         try {
+            const mimeType = getSupportedMimeType();
+            if (!mimeType) {
+                alert('이 브라우저에서는 음성 녹음을 지원하지 않습니다. (Safari 최신 버전 또는 Chrome을 사용해 주세요.)');
+                onClose();
+                return;
+            }
+            mimeTypeRef.current = mimeType;
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -152,60 +165,39 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
 
             drawWaveform();
 
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                alert('실시간 음성 인식을 지원하지 않는 브라우저입니다.');
-                onClose();
-                return;
-            }
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = mediaRecorder;
 
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'ko-KR';
-            recognition.interimResults = true;
-            recognition.continuous = true;
-
-            speechRecognitionRef.current = recognition;
-
-            recognition.onresult = (event: any) => {
-                let fullTranscript = '';
-                for (let i = 0; i < event.results.length; ++i) {
-                    fullTranscript += event.results[i][0].transcript;
-                }
-                currentTranscriptRef.current = fullTranscript;
-
-                if (fullTranscript.trim()) {
-                    isSpeakingRef.current = true;
-                    silenceStartRef.current = Date.now(); // reset silence timeout
-                }
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
             };
 
-            recognition.onerror = (event: any) => {
-                console.error('Speech recognition error in conversation modal', event.error);
-                if (event.error !== 'no-speech') {
+            mediaRecorder.onstop = () => {
+                if (!isModalOpenRef.current) return;
+
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                audioChunksRef.current = []; // Clear for next time
+
+                // If user didn't speak long enough or blob is empty
+                if (audioBlob.size < 1000 && !isSpeakingRef.current) {
                     isProcessingRef.current = false;
+                    return;
                 }
+
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = () => {
+                    const base64data = reader.result as string;
+                    processAudioAndSend(base64data);
+                };
             };
 
-            recognition.onend = () => {
-                if (status === 'listening' && isModalOpenRef.current) {
-                    // Mobile browsers often forcefully end recognition on silence.
-                    // If we have recognized text, treat this 'onend' as the user finishing their sentence.
-                    if (currentTranscriptRef.current) {
-                        isSpeakingRef.current = false;
-                        handleStopAndSend();
-                    } else {
-                        // Otherwise, just reboot the listener to keep listening
-                        try { recognition.start(); } catch { }
-                    }
-                }
-            };
-
-            recognition.start();
+            mediaRecorder.start();
 
         } catch (err) {
             console.error('Failed to start recording', err);
             setStatus('idle');
-            alert('마이크 접근 권한이 필요합니다.');
+            alert('마이크 사용할 수 없는 환경이거나 권한이 거부되었습니다.');
         }
     };
 
@@ -213,35 +205,23 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         if (isProcessingRef.current) return;
         isProcessingRef.current = true;
 
-        if (!currentTranscriptRef.current.trim()) {
-            isSpeakingRef.current = false;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            try { mediaRecorderRef.current.stop(); } catch (e) { }
+        } else {
             isProcessingRef.current = false;
-            return;
         }
-        if (speechRecognitionRef.current) {
-            try { speechRecognitionRef.current.stop(); } catch (e) { }
-        }
-        processTranscriptAndSend();
     };
 
-    const processTranscriptAndSend = async () => {
+    const processAudioAndSend = async (audioBase64: string) => {
         if (!isModalOpenRef.current || status !== 'listening') {
             isProcessingRef.current = false;
             return;
         }
 
-        const text = currentTranscriptRef.current.trim();
-        if (!text) {
-            isProcessingRef.current = false;
-            if (isModalOpenRef.current) startListening();
-            return;
-        }
-
         setStatus('processing');
-        currentTranscriptRef.current = ''; // Clear for next loop
 
         try {
-            const aiText = await onTextSubmit(text);
+            const aiText = await onAudioSubmit(audioBase64);
             if (!isModalOpenRef.current) return;
 
             setStatus('speaking');

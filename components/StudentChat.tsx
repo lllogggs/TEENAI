@@ -148,7 +148,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [isMicRecording, setIsMicRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const speechRecognitionRef = useRef<any>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const mimeTypeRef = useRef<string>('');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -184,64 +185,61 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const startMicRecord = () => {
+  const getSupportedMimeType = () => {
+    const types = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav'];
+    for (const t of types) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) {
+        return t;
+      }
+    }
+    return '';
+  };
+
+  const startMicRecord = async () => {
     try {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert('이 브라우저에서는 실시간 음성 인식을 지원하지 않습니다. Chrome 브라우저를 사용해 주세요.');
+      const mimeType = getSupportedMimeType();
+      if (!mimeType) {
+        alert('이 브라우저에서는 음성 녹음을 지원하지 않습니다. (Safari 최신 버전 또는 Chrome을 사용해 주세요.)');
         return;
       }
+      mimeTypeRef.current = mimeType;
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'ko-KR';
-      recognition.interimResults = true;
-      // Note: Keep continuous false so it stops nicely, or true if we want keep recording until release.
-      // Since it's a "hold to talk" button, continuous=true is good to prevent it from cutting out mid-sentence.
-      recognition.continuous = true;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-      let currentPrefix = input ? input + (input.endsWith(' ') ? '' : ' ') : '';
-
-      recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-
-        if (finalTranscript) {
-          currentPrefix += finalTranscript + ' ';
-          setInput(currentPrefix + interimTranscript);
-        } else {
-          setInput(currentPrefix + interimTranscript);
-        }
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error', event.error);
-        if (event.error !== 'no-speech') {
-          stopMicRecord();
-        }
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        audioChunksRef.current = [];
+
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          handleSend(base64data);
+        };
+
+        // Stop all tracks to release mic
+        stream.getTracks().forEach(track => track.stop());
       };
 
-      speechRecognitionRef.current = recognition;
-      recognition.start();
+      mediaRecorder.start();
       setIsMicRecording(true);
     } catch (err) {
       console.error('Mic access error:', err);
-      alert('마이크 접근 권한이 필요합니다.');
+      alert('마이크 사용할 수 없는 환경이거나 권한이 거부되었습니다.');
       setIsMicRecording(false);
     }
   };
 
   const stopMicRecord = () => {
-    if (speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
-      speechRecognitionRef.current = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
     }
     setIsMicRecording(false);
   };
@@ -249,19 +247,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const toggleMicRecord = () => {
     if (isMicRecording) {
       stopMicRecord();
-      // Allow minor delay for final transcript to be set into state
-      setTimeout(() => {
-        const sendBtn = document.getElementById('chat-send-button');
-        if (sendBtn && !sendBtn.hasAttribute('disabled')) {
-          sendBtn.click();
-        }
-      }, 300);
     } else {
       startMicRecord();
     }
   };
 
-  const handleVoiceConversationSubmit = async (recognizedText: string): Promise<string> => {
+  const handleVoiceConversationSubmit = async (audioBase64: string): Promise<string> => {
     const sessionId = await ensureSession();
     if (!sessionId) return "세션 오류";
 
@@ -269,7 +260,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const settings = await loadStudentSettings();
     const parentStylePrompt = buildSystemPromptFromSettings(settings);
 
-    const userMsgToSave = `🎙️ ${recognizedText}`; // Mark it visually for the log
+    const userMsgToSave = `🎙️ (음성 메시지)`; // Mark it visually for the log
     setMessages((prev) => [...prev, { role: 'user', text: userMsgToSave, timestamp: Date.now() }]);
     await persistMessage(sessionId, 'user', userMsgToSave);
 
@@ -277,9 +268,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        newMessage: recognizedText,
+        newMessage: '(음성 메시지)',
         history: nextHistory,
         parentStylePrompt,
+        audioData: audioBase64,
       }),
     });
 
@@ -846,7 +838,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       <VoiceModeModal
         isOpen={isVoiceModeOpen}
         onClose={() => setIsVoiceModeOpen(false)}
-        onTextSubmit={handleVoiceConversationSubmit}
+        onAudioSubmit={handleVoiceConversationSubmit}
         onPlayAudio={handlePlayAudio}
       />
     </div>

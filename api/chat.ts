@@ -76,10 +76,13 @@ export default async function handler(req: any, res: any) {
     }
 
     if (audioData) {
+      const match = audioData.match(/^data:(audio\/\w+);base64,/);
+      const mimeType = match ? match[1] : 'audio/webm';
+
       userParts.push({
         inlineData: {
           data: audioData.replace(/^data:audio\/\w+;base64,/, ''),
-          mimeType: 'audio/webm'
+          mimeType: mimeType
         }
       });
     }
