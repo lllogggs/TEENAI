@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { history, newMessage, parentStylePrompt } = req.body || {};
+    const { history, newMessage, parentStylePrompt, imageData, audioData } = req.body || {};
     const userMessage = String(newMessage || '');
     const userChars = Math.max(countChars(userMessage), 1);
     const minChars = Math.floor(userChars * 0.8);
@@ -27,7 +27,7 @@ export default async function handler(req: any, res: any) {
     const allowLong = shouldAllowLongAnswer(userMessage);
 
     const baseInstruction = [
-      "학생에게 답하는 기본 원칙: 당신은 청소년 전문 AI 멘토 '틴에이아이(TEENAI)'입니다.",
+      "학생에게 답하는 기본 원칙: 당신은 청소년 전문 AI 멘토 '포틴에이아이(ForTeenAI)'입니다.",
       '반드시 부드러운 존댓말(해요체)을 사용하고, 공감 -> 조언 -> 질문의 구조로 답변해주세요.',
       '답변은 줄글만 길게 쓰지 말고, 문단/불릿/번호를 섞어 읽기 쉽게 구성해주세요.',
       allowLong
@@ -35,7 +35,8 @@ export default async function handler(req: any, res: any) {
         : `답변 길이는 학생 질문 글자 수(${userChars}자) 기준 약 ${minChars}~${maxChars}자 범위를 목표로 맞춰주세요.`,
       '유해하거나 위험한 요청은 정중히 거절하고 안전한 대안을 제시하세요.',
       "학생이 '부모님(엄마/아빠)이 이 대화를 보나요?' 또는 '비밀 보장 되나요?' 같은 질문을 하면, 직접적으로 '그렇다/아니다'를 답하지 말고, '부모님과 상의해보는 것이 좋겠어요' 또는 '가족과 함께 이용하는 서비스라 부모님께 여쭤보는 게 가장 정확할 거예요'라는 식으로 부드럽게 회피하며 답변해주세요.",
-    ].join('\n');
+      (imageData || audioData) ? '이미지가 첨부된 경우, 이미지 속 글자, 수식, 표 등을 정확히 인식(OCR)하고 학생이 이해하기 쉽게 단계별로 친절하게 설명하세요.' : '',
+    ].filter(Boolean).join('\n');
 
     const mergedInstruction = `${baseInstruction}\n\n[Parent Style Prompt]\n${String(parentStylePrompt || '')}`;
 
@@ -56,12 +57,32 @@ export default async function handler(req: any, res: any) {
       : [];
 
     const chat = ai.chats.create({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       config: { systemInstruction: mergedInstruction, temperature: 0.7 },
       history: normalizedHistory as any,
     });
 
-    const result = await chat.sendMessage({ message: userMessage });
+    let userParts: any[] = [{ text: userMessage }];
+
+    if (imageData) {
+      userParts.push({
+        inlineData: {
+          data: imageData.replace(/^data:image\/\w+;base64,/, ''),
+          mimeType: 'image/jpeg'
+        }
+      });
+    }
+
+    if (audioData) {
+      userParts.push({
+        inlineData: {
+          data: audioData.replace(/^data:audio\/\w+;base64,/, ''),
+          mimeType: 'audio/webm'
+        }
+      });
+    }
+
+    const result = await chat.sendMessage({ message: userParts });
     res.status(200).json({ text: result.text || '' });
   } catch (error) {
     console.error('Gemini chat error:', error);

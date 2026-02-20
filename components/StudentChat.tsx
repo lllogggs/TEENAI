@@ -3,6 +3,7 @@ import { User, ChatMessage, ChatSession, SessionRiskLevel, StudentSettings } fro
 import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
+import VoiceModeModal from './VoiceModeModal';
 
 interface StudentChatProps {
   user: User;
@@ -140,6 +141,139 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Desktop sidebar toggle
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
+
+  // Multimodal states
+  const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
+  const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
+  const [isMicRecording, setIsMicRecording] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+        setImageThumbnail(base64);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const startMicRecord = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          // Send immediately when stopped
+          await handleSend(base64Audio);
+        };
+        // Stop stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsMicRecording(true);
+    } catch (err) {
+      console.error('Mic access error:', err);
+      alert('마이크 접근 권한이 필요합니다.');
+    }
+  };
+
+  const stopMicRecord = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsMicRecording(false);
+  };
+
+  const handleVoiceSubmit = async (audioBase64: string): Promise<string> => {
+    const sessionId = await ensureSession();
+    if (!sessionId) return "세션 오류";
+
+    const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
+    const settings = await loadStudentSettings();
+    const parentStylePrompt = buildSystemPromptFromSettings(settings);
+
+    const textMsg = "(음성 대화 모드)";
+    setMessages((prev) => [...prev, { role: 'user', text: textMsg, timestamp: Date.now() }]);
+    await persistMessage(sessionId, 'user', textMsg);
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        newMessage: textMsg,
+        history: nextHistory,
+        parentStylePrompt,
+        audioData: audioBase64
+      }),
+    });
+
+    const data = await response.json();
+    const aiText = data.text || '응답을 생성할 수 없습니다.';
+
+    setMessages((prev) => [...prev, { role: 'model', text: aiText, timestamp: Date.now() }]);
+    await persistMessage(sessionId, 'model', aiText);
+
+    return aiText;
+  };
+
+  const handlePlayAudio = async (text: string) => {
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await response.json();
+      if (data.audioContent) {
+        const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
+        await audio.play();
+        return new Promise<void>((resolve) => {
+          audio.onended = () => resolve();
+        });
+      }
+    } catch (err) {
+      console.error('Play audio error:', err);
+    }
+  };
 
   useEffect(() => {
     if (user.subscription_expires_at) {
@@ -331,15 +465,19 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  const handleSend = async (inlineAudioBase64?: string) => {
+    if (!input.trim() && !imageThumbnail && !inlineAudioBase64) return;
+    if (loading) return;
 
     setErrorNotice('');
-    const userText = input.trim();
+    const userText = input.trim() || (inlineAudioBase64 ? '(음성 메시지)' : '(이미지 전송)');
     const userMsg: ChatMessage = { role: 'user', text: userText, timestamp: Date.now() };
     const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
 
+    const currentImage = imageThumbnail;
+
     setInput('');
+    setImageThumbnail(null);
     setLoading(true);
     setMessages((prev) => [...prev, userMsg]);
 
@@ -350,9 +488,22 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
 
     await persistMessage(sessionId, 'user', userText);
-    await updateSessionMetaWithAI(sessionId, userText, [...nextHistory, { role: 'user', content: userText }]);
 
+    // [최우선] API 호출 비용 최적화 로직
     const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
+    const nextTotalLength = nextHistory.length + 1; // including new user message
+
+    // 조건: 첫 3턴(메세지 6개) 이하이거나, 이후로는 메시지 10개 (5턴) 단위이거나, 위험 문구가 포함된 경우
+    const shouldUpdateMeta =
+      nextTotalLength <= 6 ||
+      (nextTotalLength - 6) % 10 === 0 ||
+      isDanger;
+
+    if (shouldUpdateMeta) {
+      // (불필요한 await 없이 비동기로 실행)
+      updateSessionMetaWithAI(sessionId, userText, [...nextHistory, { role: 'user', content: userText }]);
+    }
+
     if (isDanger) {
       const { error } = await supabase.from('safety_alerts').insert({
         student_id: user.id,
@@ -374,6 +525,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           newMessage: userText,
           history: nextHistory,
           parentStylePrompt,
+          imageData: currentImage || undefined,
+          audioData: inlineAudioBase64 || undefined
         }),
       });
 
@@ -421,7 +574,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </button>
           <div className="w-11 h-11 md:w-14 md:h-14 bg-brand-900 rounded-[1.25rem] flex items-center justify-center text-xl md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
           <div>
-            <h1 className="text-base md:text-lg font-black text-brand-900 tracking-tight">TEENAI 멘토</h1>
+            <h1 className="text-base md:text-lg font-black text-brand-900 tracking-tight">ForTeenAI 멘토</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">LIVE MENTORING</p>
@@ -429,6 +582,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setIsVoiceModeOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-brand-200 bg-brand-50 text-brand-900 font-bold text-xs uppercase tracking-tight hover:bg-brand-100 transition-colors mr-2">
+            <span className="text-sm">🎧</span> 실시간 대화 모드
+          </button>
           <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors">새 대화</button>
           <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-xs uppercase tracking-tighter transition-colors">Logout</button>
         </div>
@@ -531,27 +687,66 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
 
           <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-5 md:pb-8 lg:pb-10 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center gap-4 bg-white/90 backdrop-blur-2xl p-3 pl-6 md:pl-8 rounded-[3.5rem] border border-white shadow-2xl shadow-slate-300/50 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
+            {imageThumbnail && (
+              <div className="max-w-4xl mx-auto mb-2 relative inline-block">
+                <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
+                <button onClick={() => setImageThumbnail(null)} className="absolute -top-2 -right-2 bg-slate-800 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px]">&times;</button>
+              </div>
+            )}
+
+            <div className="max-w-4xl mx-auto flex items-center gap-2">
+              <div className="flex bg-white/90 backdrop-blur-2xl p-1 rounded-full border border-slate-200 shadow-sm items-center">
+                <button onClick={() => fileInputRef.current?.click()} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl hover:bg-slate-100 rounded-full transition-colors text-slate-600">
+                  <span className="sr-only">이미지 첨부</span>📷
+                </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                />
+                <button
+                  onMouseDown={startMicRecord}
+                  onMouseUp={stopMicRecord}
+                  onMouseLeave={stopMicRecord}
+                  onTouchStart={startMicRecord}
+                  onTouchEnd={stopMicRecord}
+                  className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl rounded-full transition-colors ${isMicRecording ? 'bg-rose-100 text-rose-600 animate-pulse' : 'hover:bg-slate-100 text-slate-600'}`}
+                >
+                  <span className="sr-only">음성 메시지</span>🎙️
+                </button>
+              </div>
+
+              <div className="flex-1 flex flex-col md:flex-row items-center gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-5 md:pl-7 rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="궁금한걸 말해주세요..."
-                  className="flex-1 bg-transparent border-none py-3 md:py-4 text-base focus:outline-none font-bold text-slate-700 placeholder-slate-400"
+                  placeholder={isMicRecording ? "녹음 중... 손을 떼면 전송됩니다" : "궁금한걸 말해주세요..."}
+                  disabled={isMicRecording}
+                  className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
+                  autoComplete="off"
                 />
                 <button
-                  onClick={handleSend}
-                  disabled={loading || !input.trim()}
-                  className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-brand-900 text-white hover:bg-black hover:-translate-y-1 active:scale-95 transition-all shadow-xl shadow-brand-900/20 disabled:bg-slate-300 disabled:shadow-none"
+                  onClick={() => handleSend()}
+                  disabled={loading || (!input.trim() && !imageThumbnail)}
+                  className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center bg-brand-900 text-white hover:bg-black hover:-translate-y-0.5 active:scale-95 transition-all shadow-lg shadow-brand-900/20 disabled:bg-slate-300 disabled:shadow-none"
                 >
-                  <svg className="w-6 h-6 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
+                  <svg className="w-5 h-5 md:w-6 md:h-6 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
                 </button>
               </div>
             </div>
           </div>
         </section>
       </div>
+
+      <VoiceModeModal
+        isOpen={isVoiceModeOpen}
+        onClose={() => setIsVoiceModeOpen(false)}
+        onVoiceSubmit={handleVoiceSubmit}
+        onPlayAudio={handlePlayAudio}
+      />
     </div>
   );
 };

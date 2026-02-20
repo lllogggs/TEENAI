@@ -407,7 +407,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   return (
     <div className="min-h-screen bg-[#F4F7FC]">
       <nav className="sticky top-0 z-40 px-5 md:px-10 py-5 md:py-6 flex justify-between items-center bg-white/90 backdrop-blur-xl border-b border-slate-100">
-        <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">TEENAI <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded ml-1 uppercase tracking-tighter">Parent</span></h1>
+        <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">ForTeenAI <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded ml-1 uppercase tracking-tighter">Parent</span></h1>
         <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
           <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
           {!!inviteCode && (

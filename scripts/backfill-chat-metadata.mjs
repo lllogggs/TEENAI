@@ -83,7 +83,7 @@ const buildMetadata = async ({ title, transcript }) => {
   const firstMessage = transcript.find((m) => m.role === 'user')?.content || '';
   const prompt = buildPrompt({ currentTitle: title, transcript, firstMessage });
   const result = await ai.models.generateContent({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: { responseMimeType: 'application/json', temperature: 0.2 },
   });

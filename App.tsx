@@ -72,7 +72,30 @@ function App() {
 
   const handleAuth = async (email: string, password: string, role: UserRole, code?: string, isSignup?: boolean) => {
     if (!isSupabaseConfigured) {
-      alert('Supabase가 연결되지 않았습니다. VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY를 설정해주세요.');
+      // Mock Auth logic
+      const { MockDb } = await import('./services/mockDb');
+      try {
+        setAuthLoading(true);
+        if (isSignup) {
+          if (role === UserRole.STUDENT) {
+            const u = await MockDb.registerStudent(email, code || '');
+            if (!u) throw new Error('유효하지 않은 초대 코드');
+            setUser(u);
+          } else {
+            const u = await MockDb.loginParent(email);
+            setUser(u);
+          }
+        } else {
+          const mockUsers = JSON.parse(localStorage.getItem('forteenai_users') || '[]');
+          const u = mockUsers.find((u: any) => u.email === email && u.role === role);
+          if (u) setUser(u);
+          else throw new Error('계정을 찾을 수 없습니다.');
+        }
+      } catch (err: any) {
+        alert(err.message || '로그인/가입 실패');
+      } finally {
+        setAuthLoading(false);
+      }
       return;
     }
 

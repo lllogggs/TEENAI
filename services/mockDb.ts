@@ -2,11 +2,11 @@
 import { User, UserRole, ChatSession, SafetyAlert, StudentProfile, ToneLevel, AISettings } from '../types';
 
 const STORAGE_KEYS = {
-  USERS: 'teenai_users',
-  PROFILES: 'teenai_profiles',
-  SESSIONS: 'teenai_sessions',
-  ALERTS: 'teenai_alerts',
-  PENDING_INVITES: 'teenai_pending_invites'
+  USERS: 'forteenai_users',
+  PROFILES: 'forteenai_profiles',
+  SESSIONS: 'forteenai_sessions',
+  ALERTS: 'forteenai_alerts',
+  PENDING_INVITES: 'forteenai_pending_invites'
 };
 
 const DEFAULT_SETTINGS: AISettings = {
@@ -33,19 +33,20 @@ const generateCode = () => Math.random().toString(36).substr(2, 6).toUpperCase()
 
 const seedTestData = () => {
   const users: User[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-  const testEmail = 'TEST@TEST.COM';
+  const testParentEmail = 'PARENT@TEST.COM';
+  const testStudentEmail = 'STUDENT@TEST.COM';
 
   // 1. 테스트 학부모 생성
-  let parent = users.find(u => u.email === testEmail && u.role === UserRole.PARENT);
+  let parent = users.find(u => u.email === testParentEmail && u.role === UserRole.PARENT);
   if (!parent) {
-    parent = { id: 'test_parent_id', email: testEmail, role: UserRole.PARENT, name: '테스트학부모' };
+    parent = { id: 'test_parent_id', email: testParentEmail, role: UserRole.PARENT, name: '테스트학부모' };
     users.push(parent);
   }
 
   // 2. 테스트 학생 생성
-  let student = users.find(u => u.email === testEmail && u.role === UserRole.STUDENT);
+  let student = users.find(u => u.email === testStudentEmail && u.role === UserRole.STUDENT);
   if (!student) {
-    student = { id: 'test_student_id', email: testEmail, role: UserRole.STUDENT, name: '테스트학생' };
+    student = { id: 'test_student_id', email: testStudentEmail, role: UserRole.STUDENT, name: '테스트학생' };
     users.push(student);
   }
   localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
@@ -145,7 +146,7 @@ export const MockDb = {
     const profiles: StudentProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
     // Changed userId to user_id to match StudentProfile interface
     let profile = profiles.find(p => p.user_id === user!.id);
-    
+
     if (!profile) {
       profile = { user_id: user.id, invite_code: inviteCode, parent_user_id: parentId, settings: DEFAULT_SETTINGS };
       profiles.push(profile);
@@ -199,7 +200,7 @@ export const MockDb = {
   getConnectedStudents: (parentUserId: string): (User & { profile: StudentProfile })[] => {
     const profiles: StudentProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
     const users: User[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-    
+
     // Changed parentUserId to parent_user_id to match StudentProfile interface
     const myStudents = profiles.filter(p => p.parent_user_id === parentUserId);
     return myStudents.map(p => {
