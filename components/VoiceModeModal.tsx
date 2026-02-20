@@ -92,12 +92,20 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         ctx.lineTo(canvas.width, canvas.height / 2);
         ctx.stroke();
 
-        // Simple VAD Logic using SpeechRecognition event timings
+        // Simple VAD Logic using SpeechRecognition event timings + Volume fallback for mobile
         if (status === 'listening' && speechRecognitionRef.current) {
-            // If user was speaking and hasn't produced a new recognized word in 2 seconds
-            if (isSpeakingRef.current && Date.now() - silenceStartRef.current > 2000) {
+            const timeSinceSilenceStart = Date.now() - silenceStartRef.current;
+
+            // 1. If user was speaking and hasn't produced a new recognized word in 2 seconds -> Send
+            if (isSpeakingRef.current && timeSinceSilenceStart > 2000) {
                 isSpeakingRef.current = false;
                 handleStopAndSend();
+            }
+            // 2. Mobile fallback: If no speech was recognized at all, but the mic has been open for 5 seconds,
+            // restart the listener to prevent the API from silently dying (common in mobile browsers)
+            else if (!isSpeakingRef.current && !currentTranscriptRef.current && timeSinceSilenceStart > 5000) {
+                console.log("Restarting listener due to prolonged silence without transcription");
+                startListening();
             }
         }
 
@@ -165,9 +173,16 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
             };
 
             recognition.onend = () => {
-                // Keep it alive if we are still supposed to be listening
                 if (status === 'listening' && isModalOpenRef.current) {
-                    try { recognition.start(); } catch { }
+                    // Mobile browsers often forcefully end recognition on silence.
+                    // If we have recognized text, treat this 'onend' as the user finishing their sentence.
+                    if (currentTranscriptRef.current) {
+                        isSpeakingRef.current = false;
+                        handleStopAndSend();
+                    } else {
+                        // Otherwise, just reboot the listener to keep listening
+                        try { recognition.start(); } catch { }
+                    }
                 }
             };
 
