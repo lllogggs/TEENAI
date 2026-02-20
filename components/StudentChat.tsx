@@ -147,6 +147,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const speechRecognitionRef = useRef<any>(null);
+  const isIntentionalStopRef = useRef<boolean>(true);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -220,23 +221,40 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
         if (event.error !== 'no-speech') {
+          isIntentionalStopRef.current = true;
           stopMicRecord();
         }
       };
 
+      recognition.onend = () => {
+        if (!isIntentionalStopRef.current && speechRecognitionRef.current) {
+          // Keep listening exactly like a toggle button
+          try {
+            speechRecognitionRef.current.start();
+          } catch (e) {
+            setIsMicRecording(false);
+          }
+        } else {
+          setIsMicRecording(false);
+        }
+      };
+
       speechRecognitionRef.current = recognition;
-      recognition.start();
+      isIntentionalStopRef.current = false;
       setIsMicRecording(true);
+      recognition.start();
     } catch (err) {
       console.error('Mic access error:', err);
       alert('마이크 접근 권한이 필요합니다.');
       setIsMicRecording(false);
+      isIntentionalStopRef.current = true;
     }
   };
 
   const stopMicRecord = () => {
+    isIntentionalStopRef.current = true;
     if (speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
+      try { speechRecognitionRef.current.stop(); } catch (e) { }
       speechRecognitionRef.current = null;
     }
     setIsMicRecording(false);
