@@ -717,14 +717,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
 
             {/* Visual Action Bar (Camera, Voice Modes) */}
-            <div className="max-w-4xl mx-auto flex items-center justify-between mb-2 md:mb-3 px-1 md:px-2">
-              <div className="flex gap-1.5 md:gap-2">
+            <div className="max-w-4xl mx-auto flex items-center justify-between mb-2 md:mb-3 px-1 md:px-2 gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex gap-1.5 md:gap-2 shrink-0">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-[10px] md:text-xs tracking-tight hover:bg-slate-100 transition-colors shadow-sm"
-                  title="이미지 첨부"
+                  className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-[11px] md:text-xs tracking-tight hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap"
                 >
-                  <span className="text-sm md:text-sm">📷</span> <span className="hidden md:inline">이미지 첨부</span>
+                  <span className="text-sm">📷</span> 이미지 첨부
                 </button>
                 <input
                   type="file"
@@ -735,30 +734,28 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 />
               </div>
 
-              <div className="flex gap-1.5 md:gap-2">
+              <div className="flex gap-1.5 md:gap-2 shrink-0">
                 <button
                   onMouseDown={startMicRecord}
                   onMouseUp={stopMicRecord}
                   onMouseLeave={stopMicRecord}
                   onTouchStart={startMicRecord}
                   onTouchEnd={stopMicRecord}
-                  className={`flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-[10px] md:text-xs tracking-tight ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
-                  title="음성 입력 모드"
+                  className={`flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-[11px] md:text-xs tracking-tight whitespace-nowrap ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
                 >
-                  <span className="text-sm md:text-sm">🎙️</span> <span className="hidden md:inline">음성 입력 모드</span>
+                  <span className="text-sm">🎙️</span> 음성 입력 모드
                 </button>
                 <button
                   onClick={() => setIsVoiceModeOpen(true)}
-                  className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand-900 font-bold text-[10px] md:text-xs tracking-tight hover:bg-brand-100 transition-colors shadow-sm"
-                  title="음성 대화 모드"
+                  className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand-900 font-bold text-[11px] md:text-xs tracking-tight hover:bg-brand-100 transition-colors shadow-sm whitespace-nowrap"
                 >
-                  <svg className="w-3.5 h-3.5 md:w-4 md:h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="11" fill="currentColor" />
                     <rect x="8.5" y="10" width="1.5" height="4" rx="0.75" fill="white" />
                     <rect x="11.25" y="7" width="1.5" height="10" rx="0.75" fill="white" />
                     <rect x="14" y="9" width="1.5" height="6" rx="0.75" fill="white" />
                   </svg>
-                  <span className="hidden md:inline">음성 대화 모드</span>
+                  음성 대화 모드
                 </button>
               </div>
             </div>
