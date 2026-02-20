@@ -140,21 +140,21 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
           <p className="text-slate-500 font-bold text-sm md:text-lg">청소년을 위한 가장 안전한 AI 성장의 공간</p>
         </div>
 
-        <div className="max-w-5xl w-[85vw] sm:w-[85%] md:w-full grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10">
-          <button onClick={() => setView('student-auth')} className="group flex flex-col p-6 md:p-14 bg-brand-900 rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-brand-900/30 hover:-translate-y-2 transition-all text-left border border-slate-800 relative overflow-hidden">
+        <div className="max-w-[320px] sm:max-w-sm md:max-w-5xl w-[95%] md:w-full grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10 mx-auto">
+          <button onClick={() => setView('student-auth')} className="group flex flex-col items-center p-8 md:p-14 bg-brand-900 rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-brand-900/30 hover:-translate-y-2 transition-all text-center border border-slate-800 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-white/5 rounded-full -mr-12 -mt-12 md:-mr-16 md:-mt-16 group-hover:bg-white/10 transition-colors"></div>
-            <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-2xl md:rounded-3xl flex items-center justify-center text-2xl md:text-4xl mb-4 md:mb-10 group-hover:scale-110 transition-transform">🎓</div>
-            <h2 className="text-2xl md:text-4xl font-black text-white mb-2 md:mb-5">학생 시작하기</h2>
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 rounded-2xl md:rounded-3xl flex items-center justify-center text-3xl md:text-5xl mb-5 md:mb-8 group-hover:scale-110 transition-transform">🎓</div>
+            <h2 className="text-2xl md:text-4xl font-black text-white mb-3 md:mb-5">학생 시작하기</h2>
             <p className="text-slate-400 font-medium text-sm md:text-lg leading-relaxed mb-6 md:mb-10 text-balance tracking-tight">부모님께 받은 코드를 준비하셨나요?<br />지금 멘토와 대화를 시작해보세요.</p>
-            <div className="mt-auto flex items-center gap-2 text-white font-black text-xs md:text-sm uppercase tracking-widest">Start Now <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
+            <div className="mt-auto flex justify-center items-center gap-2 text-white font-black text-xs md:text-sm uppercase tracking-widest">Start Now <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
           </button>
 
-          <button onClick={() => setView('parent-auth')} className="group flex flex-col p-6 md:p-14 bg-white rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-slate-200 hover:-translate-y-2 transition-all text-left border border-white relative overflow-hidden">
+          <button onClick={() => setView('parent-auth')} className="group flex flex-col items-center p-8 md:p-14 bg-white rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-slate-200 hover:-translate-y-2 transition-all text-center border border-white relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-indigo-50/50 rounded-full -mr-12 -mt-12 md:-mr-16 md:-mt-16 group-hover:bg-indigo-50 transition-colors"></div>
-            <div className="w-12 h-12 md:w-16 md:h-16 bg-indigo-50 rounded-2xl md:rounded-3xl flex items-center justify-center text-2xl md:text-4xl mb-4 md:mb-10 group-hover:scale-110 transition-transform">🛡️</div>
-            <h2 className="text-2xl md:text-4xl font-black text-slate-900 mb-2 md:mb-5">학부모 시작하기</h2>
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-indigo-50 rounded-2xl md:rounded-3xl flex items-center justify-center text-3xl md:text-5xl mb-5 md:mb-8 group-hover:scale-110 transition-transform">🛡️</div>
+            <h2 className="text-2xl md:text-4xl font-black text-slate-900 mb-3 md:mb-5">학부모 시작하기</h2>
             <p className="text-slate-400 font-medium text-sm md:text-lg leading-relaxed mb-6 md:mb-10 text-balance tracking-tight">자녀를 위해 안전 가이드를 설정하고<br />성장 리포트를 확인하세요.</p>
-            <div className="mt-auto flex items-center gap-2 text-indigo-600 font-black text-xs md:text-sm uppercase tracking-widest">Parent Portal <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
+            <div className="mt-auto flex justify-center items-center gap-2 text-indigo-600 font-black text-xs md:text-sm uppercase tracking-widest">Parent Portal <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
           </button>
         </div>
       </div>
