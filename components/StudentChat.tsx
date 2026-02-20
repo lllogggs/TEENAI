@@ -310,9 +310,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const firstId = forceSessionId || nextSessions[0]?.id || null;
     if (!currentSessionId && firstId) {
       setCurrentSessionId(firstId);
-      if (window.innerWidth < 1024) {
-        setShowMobileChat(false);
-      }
     }
   };
 
