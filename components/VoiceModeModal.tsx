@@ -9,6 +9,7 @@ interface VoiceModeModalProps {
 
 const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudioSubmit, onPlayAudio }) => {
     const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
+    const [debugText, setDebugText] = useState<string>('');
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<BlobPart[]>([]);
@@ -29,6 +30,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
     useEffect(() => {
         isModalOpenRef.current = isOpen;
         if (isOpen) {
+            setDebugText('');
             startListening();
         } else {
             stopAll();
@@ -97,7 +99,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
         // VAD Logic using volume threshold (Wait until speaking starts)
         if (status === 'listening' && !isProcessingRef.current) {
             const avg = sum / bufferLength;
-            const threshold = 15; // Raised threshold to filter out background noise
+            const threshold = 8; // Lowered threshold to reliably catch voice even if quiet
 
             if (avg > threshold) {
                 isSpeakingRef.current = true;
@@ -108,7 +110,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
                 // If user was speaking and now silent for 1.5 seconds -> Send
                 if (isSpeakingRef.current && timeSinceSilenceStart > 1500) {
                     isSpeakingRef.current = false;
-                    handleStopAndSend();
+                    handleStopAndSend(); // This safely transitions to processing
                 }
             }
         }
@@ -129,6 +131,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
     const startListening = async () => {
         stopAll();
         setStatus('listening');
+        setDebugText('');
         silenceStartRef.current = Date.now();
         isSpeakingRef.current = false;
         audioChunksRef.current = [];
@@ -181,8 +184,9 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
                 // If user didn't speak long enough or blob is empty
                 if (audioBlob.size < 50) {
                     console.warn(`Audio blob too small (${audioBlob.size} bytes), restarting...`);
+                    setDebugText(`[Debug] 녹음 데이터 0바이트 예외: 시작 버튼을 다시 눌러주세요.`);
+                    setStatus('idle');
                     isProcessingRef.current = false;
-                    startListening();
                     return;
                 }
 
@@ -194,10 +198,12 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
                 };
             };
 
-            mediaRecorder.start();
+            // timeslice 500ms ensures ondataavailable guarantees data flush on iOS safari
+            mediaRecorder.start(500);
 
         } catch (err) {
             console.error('Failed to start recording', err);
+            setDebugText((err as Error).message || '마이크 권한 오류');
             setStatus('idle');
             alert('마이크 사용할 수 없는 환경이거나 권한이 거부되었습니다.');
         }
@@ -235,6 +241,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
             }
         } catch (e) {
             console.error('Voice loop error:', e);
+            setDebugText('서버 응답 오류 (오디오 길이/타입 확인 필요)');
             if (isModalOpenRef.current) {
                 setStatus('idle');
                 isProcessingRef.current = false;
@@ -271,7 +278,14 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
 
-            <div className="text-center mb-12">
+            <div className="text-center mb-12 relative">
+                {debugText && (
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-full text-center">
+                        <span className="bg-red-500/90 text-white px-3 py-1 text-xs font-bold rounded-full">
+                            {debugText}
+                        </span>
+                    </div>
+                )}
                 <div className="w-24 h-24 bg-white/10 rounded-full mx-auto flex items-center justify-center mb-6 shadow-2xl shadow-brand-500/20 text-white">
                     {/* SVG for Voice Conversation */}
                     <svg className={`w-12 h-12 ${status === 'listening' ? 'animate-pulse' : ''}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
