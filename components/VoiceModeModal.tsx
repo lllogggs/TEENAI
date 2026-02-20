@@ -181,8 +181,8 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
 
             recognition.onerror = (event: any) => {
                 console.error('Speech recognition error in conversation modal', event.error);
-                if (event.error !== 'no-speech' && status === 'listening') {
-                    // fall back
+                if (event.error !== 'no-speech') {
+                    isProcessingRef.current = false;
                 }
             };
 
@@ -265,10 +265,9 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
             // Manual send
             isSpeakingRef.current = false;
             handleStopAndSend();
-        } else if (status === 'speaking' || status === 'processing') {
-            // Interrupt
-            startListening();
-        } else if (status === 'idle') {
+        } else {
+            // Interrupt anything (speaking/processing/idle) and force start listening again
+            isProcessingRef.current = false;
             startListening();
         }
     };

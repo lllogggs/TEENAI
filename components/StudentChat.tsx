@@ -199,16 +199,26 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       // Since it's a "hold to talk" button, continuous=true is good to prevent it from cutting out mid-sentence.
       recognition.continuous = true;
 
-      const currentInputLength = input.length;
-      const prefix = input ? input + (input.endsWith(' ') ? '' : ' ') : '';
+      let currentPrefix = input ? input + (input.endsWith(' ') ? '' : ' ') : '';
 
       recognition.onresult = (event: any) => {
-        let fullTranscript = '';
+        let interimTranscript = '';
+        let finalTranscript = '';
 
-        for (let i = 0; i < event.results.length; ++i) {
-          fullTranscript += event.results[i][0].transcript;
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
         }
-        setInput(prefix + fullTranscript);
+
+        if (finalTranscript) {
+          currentPrefix += finalTranscript + ' ';
+          setInput(currentPrefix + interimTranscript);
+        } else {
+          setInput(currentPrefix + interimTranscript);
+        }
       };
 
       recognition.onerror = (event: any) => {
