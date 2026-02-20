@@ -179,8 +179,10 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onAudi
                 audioChunksRef.current = []; // Clear for next time
 
                 // If user didn't speak long enough or blob is empty
-                if (audioBlob.size < 1000 && !isSpeakingRef.current) {
+                if (audioBlob.size < 50) {
+                    console.warn(`Audio blob too small (${audioBlob.size} bytes), restarting...`);
                     isProcessingRef.current = false;
+                    startListening();
                     return;
                 }
 
