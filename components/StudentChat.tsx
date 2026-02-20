@@ -3,7 +3,6 @@ import { User, ChatMessage, ChatSession, SessionRiskLevel, StudentSettings } fro
 import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
-import VoiceModeModal from './VoiceModeModal';
 
 interface StudentChatProps {
   user: User;
@@ -143,7 +142,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
 
   // Multimodal states
-  const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
   const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
   const [isMicRecording, setIsMicRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -252,57 +250,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const handleVoiceConversationSubmit = async (audioBase64: string): Promise<string> => {
-    const sessionId = await ensureSession();
-    if (!sessionId) return "세션 오류";
 
-    const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
-    const settings = await loadStudentSettings();
-    const parentStylePrompt = buildSystemPromptFromSettings(settings);
-
-    const userMsgToSave = `🎙️ (음성 메시지)`; // Mark it visually for the log
-    setMessages((prev) => [...prev, { role: 'user', text: userMsgToSave, timestamp: Date.now() }]);
-    await persistMessage(sessionId, 'user', userMsgToSave);
-
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        newMessage: '(음성 메시지)',
-        history: nextHistory,
-        parentStylePrompt,
-        audioData: audioBase64,
-      }),
-    });
-
-    const data = await response.json();
-    const aiText = data.text || '응답을 생성할 수 없습니다.';
-
-    setMessages((prev) => [...prev, { role: 'model', text: aiText, timestamp: Date.now() }]);
-    await persistMessage(sessionId, 'model', aiText);
-
-    return aiText;
-  };
-
-  const handlePlayAudio = async (text: string, voiceName?: string) => {
-    try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceName }),
-      });
-      const data = await response.json();
-      if (data.audioContent) {
-        const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-        await audio.play();
-        return new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-        });
-      }
-    } catch (err) {
-      console.error('Play audio error:', err);
-    }
-  };
 
   useEffect(() => {
     if (user.subscription_expires_at) {
@@ -726,8 +674,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
                       <span className="text-2xl md:text-3xl md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none">🎙️</span>
                       <div>
-                        <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">실시간 음성</h3>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">대화 모드를 켜서 자연스럽게 티키타카 해보세요.</p>
+                        <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">음성 입력</h3>
+                        <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">마이크 버튼을 눌러 편하게 말로 질문하세요.</p>
                       </div>
                     </div>
                   </div>
@@ -795,18 +743,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 >
                   <span className="text-sm">{isMicRecording ? '🛑' : '🎙️'}</span> {isMicRecording ? '정지' : '음성 입력'}
                 </button>
-                <button
-                  onClick={() => setIsVoiceModeOpen(true)}
-                  className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand-900 font-bold text-[11px] md:text-xs tracking-tight hover:bg-brand-100 transition-colors shadow-sm whitespace-nowrap"
-                >
-                  <svg className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="11" fill="currentColor" />
-                    <rect x="8.5" y="10" width="1.5" height="4" rx="0.75" fill="white" />
-                    <rect x="11.25" y="7" width="1.5" height="10" rx="0.75" fill="white" />
-                    <rect x="14" y="9" width="1.5" height="6" rx="0.75" fill="white" />
-                  </svg>
-                  음성 대화 모드
-                </button>
               </div>
             </div>
 
@@ -834,13 +770,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </section>
       </div>
-
-      <VoiceModeModal
-        isOpen={isVoiceModeOpen}
-        onClose={() => setIsVoiceModeOpen(false)}
-        onAudioSubmit={handleVoiceConversationSubmit}
-        onPlayAudio={handlePlayAudio}
-      />
     </div>
   );
 };
