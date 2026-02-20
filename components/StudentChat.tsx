@@ -203,17 +203,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       const prefix = input ? input + (input.endsWith(' ') ? '' : ' ') : '';
 
       recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
+        let fullTranscript = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
         }
-        setInput(prefix + finalTranscript + interimTranscript);
+        setInput(prefix + fullTranscript);
       };
 
       recognition.onerror = (event: any) => {
@@ -241,7 +236,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setIsMicRecording(false);
   };
 
-  const handleVoiceSubmit = async (audioBase64: string): Promise<string> => {
+  const handleVoiceConversationSubmit = async (recognizedText: string): Promise<string> => {
     const sessionId = await ensureSession();
     if (!sessionId) return "세션 오류";
 
@@ -249,18 +244,17 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const settings = await loadStudentSettings();
     const parentStylePrompt = buildSystemPromptFromSettings(settings);
 
-    const textMsg = "(음성 대화 모드)";
-    setMessages((prev) => [...prev, { role: 'user', text: textMsg, timestamp: Date.now() }]);
-    await persistMessage(sessionId, 'user', textMsg);
+    const userMsgToSave = `🎙️ ${recognizedText}`; // Mark it visually for the log
+    setMessages((prev) => [...prev, { role: 'user', text: userMsgToSave, timestamp: Date.now() }]);
+    await persistMessage(sessionId, 'user', userMsgToSave);
 
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        newMessage: textMsg,
+        newMessage: recognizedText,
         history: nextHistory,
         parentStylePrompt,
-        audioData: audioBase64
       }),
     });
 
@@ -798,7 +792,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       <VoiceModeModal
         isOpen={isVoiceModeOpen}
         onClose={() => setIsVoiceModeOpen(false)}
-        onVoiceSubmit={handleVoiceSubmit}
+        onTextSubmit={handleVoiceConversationSubmit}
         onPlayAudio={handlePlayAudio}
       />
     </div>
