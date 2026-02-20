@@ -236,6 +236,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setIsMicRecording(false);
   };
 
+  const toggleMicRecord = () => {
+    if (isMicRecording) {
+      stopMicRecord();
+    } else {
+      startMicRecord();
+    }
+  };
+
   const handleVoiceConversationSubmit = async (recognizedText: string): Promise<string> => {
     const sessionId = await ensureSession();
     if (!sessionId) return "세션 오류";
@@ -267,12 +275,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     return aiText;
   };
 
-  const handlePlayAudio = async (text: string) => {
+  const handlePlayAudio = async (text: string, voiceName?: string) => {
     try {
       const response = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voiceName }),
       });
       const data = await response.json();
       if (data.audioContent) {
@@ -767,14 +775,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
               <div className="flex gap-1.5 md:gap-2 shrink-0">
                 <button
-                  onMouseDown={startMicRecord}
-                  onMouseUp={stopMicRecord}
-                  onMouseLeave={stopMicRecord}
-                  onTouchStart={startMicRecord}
-                  onTouchEnd={stopMicRecord}
+                  onClick={toggleMicRecord}
                   className={`flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-[11px] md:text-xs tracking-tight whitespace-nowrap ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
                 >
-                  <span className="text-sm">🎙️</span> 음성 입력 모드
+                  <span className="text-sm">🎙️</span> {isMicRecording ? '초기화 시 1회 클릭' : '음성 입력 켜기'}
                 </button>
                 <button
                   onClick={() => setIsVoiceModeOpen(true)}

@@ -4,11 +4,12 @@ interface VoiceModeModalProps {
     isOpen: boolean;
     onClose: () => void;
     onTextSubmit: (text: string) => Promise<string>; // Returns AI text response
-    onPlayAudio: (text: string) => Promise<void>; // Sends text to TTS and plays
+    onPlayAudio: (text: string, voiceName?: string) => Promise<void>; // Sends text to TTS and plays
 }
 
 const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onTextSubmit, onPlayAudio }) => {
     const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
+    const [selectedVoice, setSelectedVoice] = useState<'ko-KR-Neural2-A' | 'ko-KR-Neural2-C'>('ko-KR-Neural2-A');
 
     const speechRecognitionRef = useRef<any>(null);
     const currentTranscriptRef = useRef<string>('');
@@ -188,6 +189,10 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
     };
 
     const handleStopAndSend = () => {
+        if (!currentTranscriptRef.current.trim()) {
+            isSpeakingRef.current = false;
+            return;
+        }
         if (speechRecognitionRef.current) {
             speechRecognitionRef.current.stop();
         }
@@ -210,7 +215,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
             if (!isModalOpenRef.current) return;
 
             setStatus('speaking');
-            await onPlayAudio(aiText);
+            await onPlayAudio(aiText, selectedVoice);
 
             if (isModalOpenRef.current) {
                 startListening();
@@ -247,6 +252,16 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
 
     return (
         <div className="fixed inset-0 z-[100] bg-brand-900/95 flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
+            <div className="absolute top-6 left-6">
+                <select
+                    value={selectedVoice}
+                    onChange={(e) => setSelectedVoice(e.target.value as any)}
+                    className="bg-white/10 text-white font-bold text-sm border border-white/20 rounded-xl px-3 py-2 outline-none hover:bg-white/20 transition-colors"
+                >
+                    <option value="ko-KR-Neural2-A" className="text-black">여성 목소리</option>
+                    <option value="ko-KR-Neural2-C" className="text-black">남성 목소리</option>
+                </select>
+            </div>
             <button onClick={onClose} className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
