@@ -141,6 +141,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
 
+  const latestInputRef = useRef(input);
+  useEffect(() => {
+    latestInputRef.current = input;
+  }, [input]);
+
   // Multimodal states
   const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
   const [isMicRecording, setIsMicRecording] = useState(false);
@@ -205,25 +210,25 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       recognition.interimResults = true;
       recognition.continuous = true;
 
-      let currentPrefix = input ? input + (input.endsWith(' ') ? '' : ' ') : '';
+      let sessionBaseText = latestInputRef.current ? latestInputRef.current + (latestInputRef.current.endsWith(' ') ? '' : ' ') : '';
 
       recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
+        let finalSegment = '';
+        let interimSegment = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            finalSegment += event.results[i][0].transcript;
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interimSegment += event.results[i][0].transcript;
           }
         }
 
-        if (finalTranscript) {
-          currentPrefix += finalTranscript + ' ';
-          setInput(currentPrefix + interimTranscript);
+        if (finalSegment) {
+          sessionBaseText += finalSegment + ' ';
+          setInput(sessionBaseText + interimSegment);
         } else {
-          setInput(currentPrefix + interimTranscript);
+          setInput(sessionBaseText + interimSegment);
         }
       };
 
@@ -236,13 +241,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       };
 
       recognition.onend = () => {
-        if (!isIntentionalStopRef.current && speechRecognitionRef.current) {
-          // Keep listening exactly like a toggle button
-          try {
-            speechRecognitionRef.current.start();
-          } catch (e) {
-            setIsMicRecording(false);
-          }
+        if (!isIntentionalStopRef.current) {
+          // Restart with a completely new instance to clear Safari's ghost history bugs (which causes word duplication)
+          setTimeout(() => {
+            if (!isIntentionalStopRef.current) startMicRecord();
+          }, 50);
         } else {
           setIsMicRecording(false);
         }
