@@ -619,8 +619,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                               e.stopPropagation();
                               if (confirm("이 대화 기록을 영구적으로 삭제하시겠습니까? 복구할 수 없습니다.")) {
                                 const { error } = await supabase.from('chat_sessions').delete().eq('id', session.id);
-                                if (error) alert("삭제 실패: " + error.message);
-                                // Session list will auto-update via realtime subscription
+                                if (error) {
+                                  alert("삭제 실패: " + error.message);
+                                } else {
+                                  setSessions((prev) => prev.filter((s) => s.id !== session.id));
+                                  if (openedSessionId === session.id) setOpenedSessionId('');
+                                  if (selectedSessionId === session.id) setSelectedSessionId(sessions.find(s => s.id !== session.id)?.id || '');
+                                }
                               }
                             }}
                             className="absolute right-4 bottom-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-lg"
