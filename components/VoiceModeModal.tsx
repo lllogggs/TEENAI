@@ -21,6 +21,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
     // VAD (Voice Activity Detection) refs
     const silenceStartRef = useRef<number>(Date.now());
     const isSpeakingRef = useRef<boolean>(false);
+    const isProcessingRef = useRef<boolean>(false);
     const isModalOpenRef = useRef<boolean>(isOpen);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -92,20 +93,27 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         ctx.lineTo(canvas.width, canvas.height / 2);
         ctx.stroke();
 
-        // Simple VAD Logic using SpeechRecognition event timings + Volume fallback for mobile
-        if (status === 'listening' && speechRecognitionRef.current) {
-            const timeSinceSilenceStart = Date.now() - silenceStartRef.current;
+        // VAD Logic using volume threshold + SpeechRecognition
+        if (status === 'listening' && speechRecognitionRef.current && !isProcessingRef.current) {
+            const avg = sum / bufferLength;
+            const threshold = 15; // Raised threshold to filter out fan noise
 
-            // 1. If user was speaking and hasn't produced a new recognized word in 2 seconds -> Send
-            if (isSpeakingRef.current && timeSinceSilenceStart > 2000) {
-                isSpeakingRef.current = false;
-                handleStopAndSend();
-            }
-            // 2. Mobile fallback: If no speech was recognized at all, but the mic has been open for 5 seconds,
-            // restart the listener to prevent the API from silently dying (common in mobile browsers)
-            else if (!isSpeakingRef.current && !currentTranscriptRef.current && timeSinceSilenceStart > 5000) {
-                console.log("Restarting listener due to prolonged silence without transcription");
-                startListening();
+            if (avg > threshold) {
+                isSpeakingRef.current = true;
+                silenceStartRef.current = Date.now();
+            } else {
+                const timeSinceSilenceStart = Date.now() - silenceStartRef.current;
+
+                // 1. If user was speaking and now silent for 1.5 seconds -> Send
+                if (isSpeakingRef.current && timeSinceSilenceStart > 1500) {
+                    isSpeakingRef.current = false;
+                    handleStopAndSend();
+                }
+                // 2. Mobile fallback: If no speech recognized and silent for 5 seconds -> Restart
+                else if (!isSpeakingRef.current && !currentTranscriptRef.current && timeSinceSilenceStart > 5000) {
+                    console.log("Restarting listener due to prolonged silence without transcription");
+                    startListening();
+                }
             }
         }
 
@@ -120,7 +128,13 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
         currentTranscriptRef.current = '';
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
             if (!isModalOpenRef.current) {
                 stream.getTracks().forEach(t => t.stop());
                 return;
@@ -196,21 +210,29 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
     };
 
     const handleStopAndSend = () => {
+        if (isProcessingRef.current) return;
+        isProcessingRef.current = true;
+
         if (!currentTranscriptRef.current.trim()) {
             isSpeakingRef.current = false;
+            isProcessingRef.current = false;
             return;
         }
         if (speechRecognitionRef.current) {
-            speechRecognitionRef.current.stop();
+            try { speechRecognitionRef.current.stop(); } catch (e) { }
         }
         processTranscriptAndSend();
     };
 
     const processTranscriptAndSend = async () => {
-        if (!isModalOpenRef.current || status !== 'listening') return;
+        if (!isModalOpenRef.current || status !== 'listening') {
+            isProcessingRef.current = false;
+            return;
+        }
 
         const text = currentTranscriptRef.current.trim();
         if (!text) {
+            isProcessingRef.current = false;
             if (isModalOpenRef.current) startListening();
             return;
         }
@@ -226,11 +248,15 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onText
             await onPlayAudio(aiText);
 
             if (isModalOpenRef.current) {
+                isProcessingRef.current = false;
                 startListening();
             }
         } catch (e) {
             console.error('Voice loop error:', e);
-            if (isModalOpenRef.current) setStatus('idle');
+            if (isModalOpenRef.current) {
+                setStatus('idle');
+                isProcessingRef.current = false;
+            }
         }
     };
 

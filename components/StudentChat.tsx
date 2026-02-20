@@ -239,6 +239,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const toggleMicRecord = () => {
     if (isMicRecording) {
       stopMicRecord();
+      // Allow minor delay for final transcript to be set into state
+      setTimeout(() => {
+        const sendBtn = document.getElementById('chat-send-button');
+        if (sendBtn && !sendBtn.hasAttribute('disabled')) {
+          sendBtn.click();
+        }
+      }, 300);
     } else {
       startMicRecord();
     }
@@ -778,7 +785,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   onClick={toggleMicRecord}
                   className={`flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-[11px] md:text-xs tracking-tight whitespace-nowrap ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
                 >
-                  <span className="text-sm">🎙️</span> {isMicRecording ? '초기화 시 1회 클릭' : '음성 입력 켜기'}
+                  <span className="text-sm">{isMicRecording ? '🛑' : '🎙️'}</span> {isMicRecording ? '녹음 완료 및 전송' : '음성 녹음 시작'}
                 </button>
                 <button
                   onClick={() => setIsVoiceModeOpen(true)}
@@ -807,6 +814,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   autoComplete="off"
                 />
                 <button
+                  id="chat-send-button"
                   onClick={() => handleSend()}
                   disabled={loading || (!input.trim() && !imageThumbnail) || isMicRecording}
                   className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center bg-brand-900 text-white hover:bg-black hover:-translate-y-0.5 active:scale-95 transition-all shadow-lg shadow-brand-900/20 disabled:bg-slate-300 disabled:shadow-none"
