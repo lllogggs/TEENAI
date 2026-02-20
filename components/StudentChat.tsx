@@ -680,9 +680,35 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             {errorNotice && <div className="text-sm text-red-600 font-bold">{errorNotice}</div>}
 
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full opacity-20 absolute inset-0">
-                <div className="text-6xl mb-6">💬</div>
-                <p className="text-sm font-black text-brand-900">당신의 이야기를 들려주세요.</p>
+              <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto px-4 mt-8 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="bg-white/80 backdrop-blur-md p-8 md:p-12 rounded-[2rem] md:rounded-[3rem] shadow-xl shadow-slate-200/50 border border-slate-100/50 w-full text-center">
+                  <div className="w-20 h-20 md:w-24 md:h-24 mb-6 mx-auto bg-gradient-to-tr from-brand-100 to-brand-50 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center shadow-inner border border-white">
+                    <span className="text-4xl md:text-5xl">✨</span>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-3 tracking-tight text-balance">ForTen AI에 오신 것을 환영해요!</h2>
+                  <p className="text-slate-500 font-bold mb-10 text-sm md:text-base leading-relaxed text-balance">
+                    어떤 고민이든, 어떤 질문이든 편하게 이야기해 주세요.<br className="hidden md:block" />
+                    아래의 3가지 기능을 활용하면 더욱 생생한 대화가 가능해요.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 text-left text-slate-700">
+                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100/50 flex flex-col items-center text-center group hover:-translate-y-1 transition-transform">
+                      <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform">📝</span>
+                      <h3 className="font-black text-slate-800 text-sm mb-1">텍스트 대화</h3>
+                      <p className="text-xs text-slate-500 font-bold leading-relaxed">하단 입력창에 궁금한 점을 적어서 보내주세요.</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100/50 flex flex-col items-center text-center group hover:-translate-y-1 transition-transform">
+                      <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform">📷</span>
+                      <h3 className="font-black text-slate-800 text-sm mb-1">이미지 분석</h3>
+                      <p className="text-xs text-slate-500 font-bold leading-relaxed">어려운 숙제나 풀고 싶은 문제를 사진으로 찍어 올리세요.</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100/50 flex flex-col items-center text-center group hover:-translate-y-1 transition-transform">
+                      <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform">🎙️</span>
+                      <h3 className="font-black text-slate-800 text-sm mb-1">실시간 음성</h3>
+                      <p className="text-xs text-slate-500 font-bold leading-relaxed">마이크 아이콘을 누르고 말하거나 대화 모드를 켜보세요.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="pb-40">
