@@ -592,7 +592,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </button>
           <div className="w-9 h-9 md:w-14 md:h-14 bg-brand-900 rounded-xl md:rounded-[1.25rem] flex items-center justify-center text-lg md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
           <div>
-            <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">ForTeenAI 멘토</h1>
+            <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">ForTen AI 멘토</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>

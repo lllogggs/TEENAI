@@ -115,7 +115,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
 
   const termsContent = (
     <div className="space-y-3">
-      <p><strong>제1조 (목적)</strong><br />본 약관은 ForTeenAI(이하 "회사")가 제공하는 인공지능 채팅 서비스(이하 "서비스")의 이용 조건 및 절차를 규정합니다.</p>
+      <p><strong>제1조 (목적)</strong><br />본 약관은 ForTen AI(이하 "회사")가 제공하는 인공지능 채팅 서비스(이하 "서비스")의 이용 조건 및 절차를 규정합니다.</p>
       <p><strong>제2조 (AI의 한계 및 면책)</strong><br />1. 본 서비스는 인공지능 기술을 기반으로 하며, AI가 생성하는 답변의 정확성, 신뢰성, 완전성을 보장하지 않습니다.<br />2. AI는 때때로 부정확하거나(환각 현상), 편향되거나, 의도치 않은 답변을 할 수 있습니다.<br />3. 본 서비스는 전문 심리 상담이나 의료 진단을 대체할 수 없으며, 위급한 상황에서는 반드시 전문가나 관련 기관의 도움을 받아야 합니다.</p>
       <p><strong>제3조 (이용자의 의무)</strong><br />1. 이용자는 서비스를 불법적이거나 타인의 권리를 침해하는 목적으로 사용해서는 안 됩니다.<br />2. 욕설, 비방, 성적 수치심을 유발하는 대화 등 부적절한 사용 시 이용이 제한될 수 있습니다.</p>
       <p><strong>제4조 (부모의 감독 권한)</strong><br />1. 본 서비스는 청소년 보호를 위해 학부모가 자녀의 대화 내용 및 심리 상태 보고서를 열람할 수 있는 기능을 제공합니다.<br />2. 학부모 및 자녀 회원은 이에 동의한 것으로 간주합니다.</p>
@@ -136,7 +136,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     return (
       <div className="min-h-[100dvh] bg-[#F1F5F9] flex flex-col items-center justify-center p-4 md:p-10">
         <div className="text-center mb-8 md:mb-20 animate-in fade-in zoom-in duration-700">
-          <h1 className="text-5xl md:text-7xl font-black text-brand-900 tracking-tighter mb-3 md:mb-6">ForTeenAI</h1>
+          <h1 className="text-5xl md:text-7xl font-black text-brand-900 tracking-tighter mb-3 md:mb-6">ForTen AI</h1>
           <p className="text-slate-500 font-bold text-sm md:text-lg">청소년을 위한 가장 안전한 AI 성장의 공간</p>
         </div>
 
@@ -173,7 +173,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
           {isSignup ? 'Signup' : 'Login'}
         </h2>
         <p className="text-slate-400 text-sm font-bold mb-10">
-          {isSignup ? '새로운 포틴에이아이 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
+          {isSignup ? '새로운 포텐 AI 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">

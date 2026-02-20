@@ -233,7 +233,7 @@ const VoiceModeModal: React.FC<VoiceModeModalProps> = ({ isOpen, onClose, onVoic
                         <rect x="14" y="9" width="1.5" height="6" rx="0.75" fill="white" />
                     </svg>
                 </div>
-                <h2 className="text-3xl font-black text-white mb-3">포틴에이아이 대화 모드</h2>
+                <h2 className="text-3xl font-black text-white mb-3">포텐 AI 대화 모드</h2>
                 <p className={`font-bold transition-colors ${status === 'processing' ? 'text-brand-300 animate-pulse' : 'text-brand-200'}`}>
                     {getStatusText()}
                 </p>
