@@ -162,26 +162,26 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center p-10">
-      <div className="max-w-lg w-full bg-white rounded-[3rem] shadow-2xl p-14 relative overflow-hidden">
-        <button onClick={goBack} className="text-slate-400 hover:text-slate-800 mb-10 flex items-center gap-2 font-black text-xs uppercase tracking-widest transition-colors">
+    <div className="min-h-[100dvh] bg-[#F1F5F9] flex items-center justify-center p-4 xl:p-10">
+      <div className="max-w-lg w-full bg-white rounded-3xl md:rounded-[3rem] shadow-2xl p-6 md:p-14 relative overflow-hidden">
+        <button onClick={goBack} className="text-slate-400 hover:text-slate-800 mb-6 md:mb-10 flex items-center gap-2 font-black text-xs uppercase tracking-widest transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Back
         </button>
 
-        <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tighter">
+        <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tighter">
           {view === 'parent-auth' ? 'Parent ' : 'Student '}
           {isSignup ? 'Signup' : 'Login'}
         </h2>
-        <p className="text-slate-400 text-sm font-bold mb-10">
+        <p className="text-slate-400 text-xs md:text-sm font-bold mb-6 md:mb-10 text-balance">
           {isSignup ? '새로운 포텐 AI 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-7 py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
           />
           <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-7 py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
           />
 
           {view === 'parent-auth' && isSignup && (
@@ -223,13 +223,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
             </div>
           )}
 
-          <button type="submit" disabled={loading} className="w-full bg-brand-900 text-white font-black py-6 rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-lg">
+          <button type="submit" disabled={loading} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
             {loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}
           </button>
         </form>
 
-        <div className="mt-10 text-center">
-          <button onClick={() => setIsSignup(!isSignup)} className="text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
+        <div className="mt-6 md:mt-10 text-center">
+          <button onClick={() => setIsSignup(!isSignup)} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
             {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
           </button>
         </div>
