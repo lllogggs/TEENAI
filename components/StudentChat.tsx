@@ -148,7 +148,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [isMicRecording, setIsMicRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -184,41 +184,59 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const startMicRecord = async () => {
+  const startMicRecord = () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('이 브라우저에서는 실시간 음성 인식을 지원하지 않습니다. Chrome 브라우저를 사용해 주세요.');
+        return;
+      }
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'ko-KR';
+      recognition.interimResults = true;
+      // Note: Keep continuous false so it stops nicely, or true if we want keep recording until release.
+      // Since it's a "hold to talk" button, continuous=true is good to prevent it from cutting out mid-sentence.
+      recognition.continuous = true;
+
+      const currentInputLength = input.length;
+      const prefix = input ? input + (input.endsWith(' ') ? '' : ' ') : '';
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        setInput(prefix + finalTranscript + interimTranscript);
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result as string;
-          // Send immediately when stopped
-          await handleSend(base64Audio);
-        };
-        // Stop stream
-        stream.getTracks().forEach(track => track.stop());
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        if (event.error !== 'no-speech') {
+          stopMicRecord();
+        }
       };
 
-      mediaRecorder.start();
+      speechRecognitionRef.current = recognition;
+      recognition.start();
       setIsMicRecording(true);
     } catch (err) {
       console.error('Mic access error:', err);
       alert('마이크 접근 권한이 필요합니다.');
+      setIsMicRecording(false);
     }
   };
 
   const stopMicRecord = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+      speechRecognitionRef.current = null;
     }
     setIsMicRecording(false);
   };
@@ -759,14 +777,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={isMicRecording ? "음성 입력 모드 켜짐 : 녹음 중... 손을 떼면 전송됩니다" : "궁금한걸 말해주세요..."}
+                  placeholder={isMicRecording ? "음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다" : "궁금한걸 말해주세요..."}
                   disabled={isMicRecording}
                   className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
                   autoComplete="off"
                 />
                 <button
                   onClick={() => handleSend()}
-                  disabled={loading || (!input.trim() && !imageThumbnail)}
+                  disabled={loading || (!input.trim() && !imageThumbnail) || isMicRecording}
                   className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center bg-brand-900 text-white hover:bg-black hover:-translate-y-0.5 active:scale-95 transition-all shadow-lg shadow-brand-900/20 disabled:bg-slate-300 disabled:shadow-none"
                 >
                   <svg className="w-5 h-5 md:w-6 md:h-6 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
