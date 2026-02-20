@@ -479,34 +479,42 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         ) : (
           <>
             <section className="premium-card p-4 md:p-5 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {connectedStudents.map((student) => {
-                  const account = studentAccounts[student.user_id];
-                  const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
-                  const active = selectedStudentId === student.user_id;
-                  return (
-                    <button
-                      key={student.user_id}
-                      onClick={() => setSelectedStudentId(student.user_id)}
-                      className={`group relative px-4 py-2.5 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
-                    >
-                      {studentName}
-                      {active && !isNameEditing && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsNameEditing(true);
-                          }}
-                          className="opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
-                          role="button"
-                          aria-label="학생 이름 편집"
-                        >
-                          ✏️
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="flex flex-col md:flex-row justify-between gap-3 md:items-start">
+                <div className="flex flex-wrap items-center gap-2">
+                  {connectedStudents.map((student) => {
+                    const account = studentAccounts[student.user_id];
+                    const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
+                    const active = selectedStudentId === student.user_id;
+                    return (
+                      <button
+                        key={student.user_id}
+                        onClick={() => setSelectedStudentId(student.user_id)}
+                        className={`group relative px-4 py-2.5 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                      >
+                        {studentName}
+                        {active && !isNameEditing && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsNameEditing(true);
+                            }}
+                            className="opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                            role="button"
+                            aria-label="학생 이름 편집"
+                          >
+                            ✏️
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {inviteCode !== 'LIMIT_REACHED' && (
+                  <div className="flex items-center justify-between md:justify-end gap-2 px-3 py-2 lg:py-1.5 bg-brand-50 rounded-xl border border-brand-100 shrink-0">
+                    <span className="text-xs font-bold text-brand-900">학생 추가 코드: <span className="font-black tracking-widest ml-1">{inviteCode || '...'}</span></span>
+                    <button onClick={copyInviteCode} disabled={!inviteCode} className="text-[10px] bg-white border border-brand-200 px-2 py-0.5 rounded shadow-sm hover:bg-brand-100 font-bold transition-colors disabled:opacity-50">복사</button>
+                  </div>
+                )}
               </div>
               {isNameEditing && (
                 <div className="rounded-2xl border border-brand-100 bg-brand-50/40 p-3 md:p-4 max-w-md">
@@ -650,15 +658,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
               <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">4) 멘토 말투 성향</h2>
-                <div className="space-y-1.5 lg:space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {mentorToneOptions.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => updateMentorTone(option.value)}
                       className={`w-full text-left px-3 py-2.5 lg:px-4 lg:py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
                     >
-                      <p className="font-black text-sm">{option.label}</p>
-                      <p className="text-xs text-slate-500 mt-1">{option.description}</p>
+                      <p className="font-black text-sm mb-1">{option.label}</p>
+                      <p className="text-[10px] lg:text-xs text-slate-500 leading-tight">{option.description}</p>
                     </button>
                   ))}
                 </div>
