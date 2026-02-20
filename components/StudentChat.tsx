@@ -582,9 +582,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsVoiceModeOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-brand-200 bg-brand-50 text-brand-900 font-bold text-xs uppercase tracking-tight hover:bg-brand-100 transition-colors mr-2">
-            <span className="text-sm">🎧</span> 실시간 대화 모드
-          </button>
           <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors">새 대화</button>
           <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-xs uppercase tracking-tighter transition-colors">Logout</button>
         </div>
@@ -694,10 +691,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             )}
 
-            <div className="max-w-4xl mx-auto flex items-center gap-2">
-              <div className="flex bg-white/90 backdrop-blur-2xl p-1 rounded-full border border-slate-200 shadow-sm items-center">
-                <button onClick={() => fileInputRef.current?.click()} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl hover:bg-slate-100 rounded-full transition-colors text-slate-600">
-                  <span className="sr-only">이미지 첨부</span>📷
+            {/* Visual Action Bar (Camera, Voice Modes) */}
+            <div className="max-w-4xl mx-auto flex items-center justify-between mb-3 px-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-xs uppercase tracking-tight hover:bg-slate-100 transition-colors shadow-sm"
+                >
+                  <span className="text-sm">📷</span> 이미지 첨부
                 </button>
                 <input
                   type="file"
@@ -706,24 +707,41 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   ref={fileInputRef}
                   onChange={handleImageUpload}
                 />
+              </div>
+
+              <div className="flex gap-2">
                 <button
                   onMouseDown={startMicRecord}
                   onMouseUp={stopMicRecord}
                   onMouseLeave={stopMicRecord}
                   onTouchStart={startMicRecord}
                   onTouchEnd={stopMicRecord}
-                  className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl rounded-full transition-colors ${isMicRecording ? 'bg-rose-100 text-rose-600 animate-pulse' : 'hover:bg-slate-100 text-slate-600'}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-xs uppercase tracking-tight ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
                 >
-                  <span className="sr-only">음성 메시지</span>🎙️
+                  <span className="text-sm">🎙️</span> 음성 입력 모드
+                </button>
+                <button
+                  onClick={() => setIsVoiceModeOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand-900 font-bold text-xs uppercase tracking-tight hover:bg-brand-100 transition-colors shadow-sm"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="11" fill="currentColor" />
+                    <rect x="8.5" y="10" width="1.5" height="4" rx="0.75" fill="white" />
+                    <rect x="11.25" y="7" width="1.5" height="10" rx="0.75" fill="white" />
+                    <rect x="14" y="9" width="1.5" height="6" rx="0.75" fill="white" />
+                  </svg>
+                  음성 대화 모드
                 </button>
               </div>
+            </div>
 
+            <div className="max-w-4xl mx-auto flex items-center gap-2">
               <div className="flex-1 flex flex-col md:flex-row items-center gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-5 md:pl-7 rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={isMicRecording ? "녹음 중... 손을 떼면 전송됩니다" : "궁금한걸 말해주세요..."}
+                  placeholder={isMicRecording ? "음성 입력 모드 켜짐 : 녹음 중... 손을 떼면 전송됩니다" : "궁금한걸 말해주세요..."}
                   disabled={isMicRecording}
                   className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
                   autoComplete="off"
