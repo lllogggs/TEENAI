@@ -149,6 +149,15 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const speechRecognitionRef = useRef<any>(null);
   const isIntentionalStopRef = useRef<boolean>(true);
 
+  const CHAT_PLACEHOLDERS = [
+    "요즘 가장 고민되는 게 뭐야? 편하게 말해줘.",
+    "오늘 하루 중 제일 재밌었던 일은?",
+    "궁금한 거나 물어보고 싶은 거 다 얘기해 봐!",
+    "지금 기분이 어때? 무슨 생각이 들어?",
+    "숙제나 공부하다 막히는 부분이 있으면 도와줄게."
+  ];
+  const [randomPlaceholder] = useState(() => CHAT_PLACEHOLDERS[Math.floor(Math.random() * CHAT_PLACEHOLDERS.length)]);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -664,14 +673,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center max-w-2xl mx-auto px-1 mt-2 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="bg-white/80 backdrop-blur-md p-5 md:p-12 rounded-[2rem] md:rounded-[3rem] shadow-xl shadow-slate-200/50 border border-slate-100/50 w-full text-center">
-                  <div className="w-14 h-14 md:w-24 md:h-24 mb-3 md:mb-6 mx-auto bg-gradient-to-tr from-brand-100 to-brand-50 rounded-[1rem] md:rounded-[2rem] flex items-center justify-center shadow-inner border border-white">
-                    <span className="text-2xl md:text-5xl">✨</span>
+                <div className="bg-white/80 backdrop-blur-md p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-100/50 w-full text-center">
+                  <div className="w-12 h-12 md:w-16 md:h-16 mb-4 md:mb-6 mx-auto bg-gradient-to-tr from-brand-100 to-brand-50 rounded-[1rem] flex items-center justify-center shadow-inner border border-white">
+                    <span className="text-2xl md:text-3xl">✨</span>
                   </div>
-                  <h2 className="text-lg md:text-3xl font-black text-slate-800 mb-1 md:mb-3 tracking-tight text-balance">ForTen AI에 오신 것을 환영해요!</h2>
-                  <p className="text-slate-500 font-bold mb-4 md:mb-10 text-[11px] md:text-base leading-relaxed text-balance">
-                    어떤 고민이든, 어떤 질문이든 편하게 이야기해 주세요.<br className="hidden md:block" />
-                    아래의 3가지 기능을 활용하면 더욱 생생한 대화가 가능해요.
+                  <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">무엇이든 물어보세요</h2>
+                  <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
+                    글, 사진, 음성 중 편한 방법으로 대화를 시작하세요.
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-5 text-left text-slate-700">
@@ -770,7 +778,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={isMicRecording ? "음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다" : "궁금한걸 말해주세요..."}
+                  placeholder={isMicRecording ? "음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다" : randomPlaceholder}
                   disabled={isMicRecording}
                   className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
                   autoComplete="off"
