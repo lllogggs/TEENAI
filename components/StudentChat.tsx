@@ -307,7 +307,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const nextSessions = (data || []) as ChatSession[];
     setSessions(nextSessions);
 
-    const firstId = forceSessionId || nextSessions[0]?.id || null;
+    const firstId = forceSessionId || null;
     if (!currentSessionId && firstId) {
       setCurrentSessionId(firstId);
     }

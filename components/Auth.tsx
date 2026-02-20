@@ -140,7 +140,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
           <p className="text-slate-500 font-bold text-sm md:text-lg">청소년을 위한 가장 안전한 AI 성장의 공간</p>
         </div>
 
-        <div className="max-w-[320px] sm:max-w-sm md:max-w-5xl w-[95%] md:w-full grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10 mx-auto">
+        <div className="mx-auto w-[280px] md:w-[680px] flex flex-col gap-5 md:gap-10">
           <button onClick={() => setView('student-auth')} className="group flex flex-col items-center p-8 md:p-14 bg-brand-900 rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-brand-900/30 hover:-translate-y-2 transition-all text-center border border-slate-800 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-white/5 rounded-full -mr-12 -mt-12 md:-mr-16 md:-mt-16 group-hover:bg-white/10 transition-colors"></div>
             <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 rounded-2xl md:rounded-3xl flex items-center justify-center text-3xl md:text-5xl mb-5 md:mb-8 group-hover:scale-110 transition-transform">🎓</div>
