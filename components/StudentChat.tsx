@@ -310,6 +310,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const firstId = forceSessionId || null;
     if (!currentSessionId && firstId) {
       setCurrentSessionId(firstId);
+      fetchMessages(firstId);
     }
   };
 
@@ -337,13 +338,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     fetchSessions();
   }, [user.id]);
 
-  useEffect(() => {
-    if (!currentSessionId) {
-      setMessages([]);
-      return;
-    }
-    fetchMessages(currentSessionId);
-  }, [currentSessionId]);
+  // useEffect on currentSessionId removed to avoid wiping optimistic messages on session creation
 
   const createSession = async () => {
     const { data, error } = await supabase
@@ -550,6 +545,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   const openSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
+    fetchMessages(sessionId);
     setShowMobileChat(true);
     setErrorNotice('');
   };
