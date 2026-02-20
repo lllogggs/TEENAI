@@ -428,215 +428,266 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       </nav>
 
       <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
-        <section className="premium-card p-4 md:p-5 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {connectedStudents.length === 0 && <p className="text-sm text-slate-400">연결된 학생이 없습니다.</p>}
-            {connectedStudents.map((student) => {
-              const account = studentAccounts[student.user_id];
-              const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
-              const active = selectedStudentId === student.user_id;
-              return (
-                <button
-                  key={student.user_id}
-                  onClick={() => setSelectedStudentId(student.user_id)}
-                  className={`group relative px-4 py-2.5 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
-                >
-                  {studentName}
-                  {active && !isNameEditing && (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsNameEditing(true);
-                      }}
-                      className="opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
-                      role="button"
-                      aria-label="학생 이름 편집"
-                    >
-                      ✏️
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {isNameEditing && (
-            <div className="rounded-2xl border border-brand-100 bg-brand-50/40 p-3 md:p-4 max-w-md">
-              <p className="text-xs font-bold text-slate-600 mb-2">선택한 학생 이름 수정</p>
-              <div className="space-y-2">
-                <input
-                  value={nameDraft}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                  placeholder="학생 이름"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800"
-                />
-                <div className="flex items-center gap-2">
-                  <button onClick={handleSaveStudentName} className="px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-black">저장</button>
-                  <button
-                    onClick={() => {
-                      setIsNameEditing(false);
-                      setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
-                    }}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-slate-500 bg-white"
-                  >
-                    취소
-                  </button>
+        {connectedStudents.length === 0 ? (
+          <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+            <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-400 to-brand-600"></div>
+              <div className="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-brand-100">
+                <span className="text-4xl text-brand-900">👨‍👩‍👧‍👦</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-4 tracking-tight">환영합니다! 자녀를 연결해 주세요</h2>
+              <p className="text-slate-500 font-bold mb-10 text-balance leading-relaxed text-sm md:text-base">
+                포텐 AI는 부모님과 자녀가 함께 만들어가는 안전한 성장의 공간입니다.<br className="hidden md:block" />
+                아래 3단계 가이드에 따라 자녀와 계정을 연결하고 멘토링 현황을 확인해 보세요.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 text-left">
+                <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative shadow-sm hover:shadow-md transition-shadow">
+                  <div className="absolute -top-4 -left-4 w-10 h-10 bg-brand-900 text-white rounded-full flex items-center justify-center font-black border-4 border-white shadow-sm shadow-brand-900/20 text-lg">1</div>
+                  <h3 className="font-black text-brand-900 mb-2 mt-2 text-lg">코드 확인</h3>
+                  <p className="text-sm text-slate-500 font-bold leading-relaxed">계정 생성 시 발급된 전용 초대 코드를 아래에서 확인하세요.</p>
+                </div>
+                <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative shadow-sm hover:shadow-md transition-shadow">
+                  <div className="absolute -top-4 -left-4 w-10 h-10 bg-brand-900 text-white rounded-full flex items-center justify-center font-black border-4 border-white shadow-sm shadow-brand-900/20 text-lg">2</div>
+                  <h3 className="font-black text-brand-900 mb-2 mt-2 text-lg">코드 전달</h3>
+                  <p className="text-sm text-slate-500 font-bold leading-relaxed">복사 버튼을 눌러 자녀의 카카오톡이나 문자로 코드를 보내주세요.</p>
+                </div>
+                <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative shadow-sm hover:shadow-md transition-shadow">
+                  <div className="absolute -top-4 -left-4 w-10 h-10 bg-brand-900 text-white rounded-full flex items-center justify-center font-black border-4 border-white shadow-sm shadow-brand-900/20 text-lg">3</div>
+                  <h3 className="font-black text-brand-900 mb-2 mt-2 text-lg">학생 접속</h3>
+                  <p className="text-sm text-slate-500 font-bold leading-relaxed">자녀가 포텐 AI 앱의 '학생 시작하기'에 코드를 입력하면 즉시 연결됩니다.</p>
                 </div>
               </div>
-            </div>
-          )}
-        </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
-            <div className="h-56 flex items-end justify-around gap-3">
-              {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
-                const count = riskCounts[level];
-                const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
-                const active = riskFilter === level;
-                const theme = riskBarTheme[level];
-                return (
-                  <button
-                    key={level}
-                    onClick={() => setRiskFilter(level)}
-                    className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
-                  >
-                    <p className="text-xs font-black text-slate-500">{count}개</p>
-                    <div className="w-10 h-56 rounded-xl bg-slate-100 flex items-end overflow-hidden">
-                      <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
+              <div className="bg-brand-50/50 rounded-3xl p-6 md:p-10 border border-brand-100/50">
+                {inviteCode === 'LIMIT_REACHED' ? (
+                  <p className="text-red-500 font-bold">더 이상 학생을 추가할 수 없습니다.</p>
+                ) : !inviteCode ? (
+                  <div className="text-brand-900 font-black animate-pulse">초대 코드 발급 중...</div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <p className="text-sm font-black text-brand-700 mb-4 uppercase tracking-widest">자녀에게 전달할 코드</p>
+                    <div className="flex flex-col md:flex-row items-center gap-4 bg-white border border-slate-200 pl-8 pr-3 py-3 rounded-2xl shadow-sm">
+                      <span className="text-3xl md:text-4xl font-black tracking-[0.25em] text-slate-800">{inviteCode}</span>
+                      <button onClick={copyInviteCode} className="w-full md:w-auto bg-brand-900 text-white px-6 py-3 font-black rounded-xl shadow-lg shadow-brand-900/20 hover:bg-black hover:-translate-y-0.5 transition-all text-sm">복사하기</button>
                     </div>
-                    <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setRiskFilter('all')}
-              className="mt-4 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
-            >
-              전체 보기
-            </button>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-2">
-            <h2 className="font-black text-lg mb-4">2) 대화 목록</h2>
-            <div className="space-y-3 h-[300px] overflow-y-auto custom-scrollbar pr-2">
-              {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
-              {filteredSessions.map((session) => {
-                const risk = normalizeRiskLevel(session.risk_level);
-                return (
-                  <div
-                    key={session.id}
-                    onClick={() => {
-                      setSelectedSessionId(session.id);
-                      setOpenedSessionId(session.id);
-                    }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer group relative ${selectedSessionId === session.id
-                      ? 'bg-brand-50 border-brand-500 ring-1 ring-brand-500'
-                      : 'bg-white border-slate-100 hover:border-brand-200 hover:shadow-md'
-                      } ${session.is_deleted_by_student ? 'opacity-75 bg-slate-50' : ''}`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${risk === 'stable' ? 'bg-emerald-100 text-emerald-700' :
-                        risk === 'normal' ? 'bg-amber-100 text-amber-700' :
-                          'bg-rose-100 text-rose-700'
-                        }`}>
-                        {risk.toUpperCase()}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-400">{new Date(session.started_at).toLocaleDateString()}</span>
-                    </div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-1 line-clamp-1 flex items-center gap-2">
-                      {session.title || '새 대화'}
-                      {session.is_deleted_by_student && (
-                        <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">학생이 삭제함</span>
-                      )}
-                    </h4>
-                    <p className="text-xs text-slate-400 font-medium line-clamp-1">
-                      {session.student_intent || '분석 중...'}
-                    </p>
-
-                    {/* Permanent Delete Button (Only for sessions deleted by student) */}
-                    {session.is_deleted_by_student && (
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (confirm("이 대화 기록을 영구적으로 삭제하시겠습니까? 복구할 수 없습니다.")) {
-                            const { error } = await supabase.from('chat_sessions').delete().eq('id', session.id);
-                            if (error) alert("삭제 실패: " + error.message);
-                            // Session list will auto-update via realtime subscription
-                          }
-                        }}
-                        className="absolute right-4 bottom-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-lg"
-                        title="영구 삭제"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                      </button>
-                    )}
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-2">
-            <h2 className="font-black text-lg mb-4">3) AI 개별 지시사항 관리</h2>
-            <textarea
-              value={normalizedSettings.ai_style_prompt}
-              onChange={(event) => {
-                const value = event.target.value;
-                setConnectedStudents((prev) =>
-                  prev.map((student) =>
-                    student.user_id === selectedStudentId
-                      ? { ...student, settings: toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) }
-                      : student
-                  )
-                );
-              }}
-              placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
-              className="w-full min-h-48 rounded-2xl border border-slate-200 p-4 text-sm"
-            />
-            <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
-            {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-1">
-            <h2 className="font-black text-lg mb-4">4) 멘토 말투 성향</h2>
-            <div className="space-y-2">
-              {mentorToneOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => updateMentorTone(option.value)}
-                  className={`w-full text-left px-4 py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
-                >
-                  <p className="font-black text-sm">{option.label}</p>
-                  <p className="text-xs text-slate-500 mt-1">{option.description}</p>
-                </button>
-              ))}
-            </div>
-          </article>
-
-          <article className="premium-card p-6 lg:col-span-3">
-            <h2 className="font-black text-lg mb-4">5) 필수 안심 가드레일</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-              {guardrailMeta.map((item) => {
-                const enabled = normalizedSettings.guardrails[item.key];
-                return (
-                  <button key={item.key} onClick={() => toggleGuardrail(item.key)} className="w-full border border-slate-100 rounded-2xl p-4 text-left bg-white">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-black text-slate-900">{item.label}</p>
-                        <p className="text-xs text-slate-500 mt-1">{item.description}</p>
-                      </div>
-                      <span className={`w-10 h-6 rounded-full transition-all ${enabled ? 'bg-brand-900' : 'bg-slate-300'} relative`}>
-                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${enabled ? 'left-5' : 'left-1'}`}></span>
-                      </span>
+          </div>
+        ) : (
+          <>
+            <section className="premium-card p-4 md:p-5 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {connectedStudents.map((student) => {
+                  const account = studentAccounts[student.user_id];
+                  const studentName = normalizeSettings(student.settings).parent_student_name?.trim() || account?.name || '학생';
+                  const active = selectedStudentId === student.user_id;
+                  return (
+                    <button
+                      key={student.user_id}
+                      onClick={() => setSelectedStudentId(student.user_id)}
+                      className={`group relative px-4 py-2.5 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${active ? 'bg-brand-900 text-white border-brand-900 shadow-md shadow-brand-900/20' : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'}`}
+                    >
+                      {studentName}
+                      {active && !isNameEditing && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsNameEditing(true);
+                          }}
+                          className="opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                          role="button"
+                          aria-label="학생 이름 편집"
+                        >
+                          ✏️
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {isNameEditing && (
+                <div className="rounded-2xl border border-brand-100 bg-brand-50/40 p-3 md:p-4 max-w-md">
+                  <p className="text-xs font-bold text-slate-600 mb-2">선택한 학생 이름 수정</p>
+                  <div className="space-y-2">
+                    <input
+                      value={nameDraft}
+                      onChange={(event) => setNameDraft(event.target.value)}
+                      placeholder="학생 이름"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button onClick={handleSaveStudentName} className="px-3 py-1.5 rounded-lg bg-brand-900 text-white text-xs font-black">저장</button>
+                      <button
+                        onClick={() => {
+                          setIsNameEditing(false);
+                          setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-slate-500 bg-white"
+                      >
+                        취소
+                      </button>
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          </article>
-        </section>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <article className="premium-card p-6 lg:col-span-1">
+                <h2 className="font-black text-lg mb-4">1) 심리 안정도 통계</h2>
+                <div className="h-56 flex items-end justify-around gap-3">
+                  {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
+                    const count = riskCounts[level];
+                    const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
+                    const active = riskFilter === level;
+                    const theme = riskBarTheme[level];
+                    return (
+                      <button
+                        key={level}
+                        onClick={() => setRiskFilter(level)}
+                        className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
+                      >
+                        <p className="text-xs font-black text-slate-500">{count}개</p>
+                        <div className="w-10 h-56 rounded-xl bg-slate-100 flex items-end overflow-hidden">
+                          <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
+                        </div>
+                        <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setRiskFilter('all')}
+                  className="mt-4 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
+                >
+                  전체 보기
+                </button>
+              </article>
+
+              <article className="premium-card p-6 lg:col-span-2">
+                <h2 className="font-black text-lg mb-4">2) 대화 목록</h2>
+                <div className="space-y-3 h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                  {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
+                  {filteredSessions.map((session) => {
+                    const risk = normalizeRiskLevel(session.risk_level);
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => {
+                          setSelectedSessionId(session.id);
+                          setOpenedSessionId(session.id);
+                        }}
+                        className={`p-5 rounded-2xl border transition-all cursor-pointer group relative ${selectedSessionId === session.id
+                          ? 'bg-brand-50 border-brand-500 ring-1 ring-brand-500'
+                          : 'bg-white border-slate-100 hover:border-brand-200 hover:shadow-md'
+                          } ${session.is_deleted_by_student ? 'opacity-75 bg-slate-50' : ''}`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${risk === 'stable' ? 'bg-emerald-100 text-emerald-700' :
+                            risk === 'normal' ? 'bg-amber-100 text-amber-700' :
+                              'bg-rose-100 text-rose-700'
+                            }`}>
+                            {risk.toUpperCase()}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400">{new Date(session.started_at).toLocaleDateString()}</span>
+                        </div>
+                        <h4 className="font-bold text-slate-800 text-sm mb-1 line-clamp-1 flex items-center gap-2">
+                          {session.title || '새 대화'}
+                          {session.is_deleted_by_student && (
+                            <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">학생이 삭제함</span>
+                          )}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium line-clamp-1">
+                          {session.student_intent || '분석 중...'}
+                        </p>
+
+                        {/* Permanent Delete Button (Only for sessions deleted by student) */}
+                        {session.is_deleted_by_student && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm("이 대화 기록을 영구적으로 삭제하시겠습니까? 복구할 수 없습니다.")) {
+                                const { error } = await supabase.from('chat_sessions').delete().eq('id', session.id);
+                                if (error) alert("삭제 실패: " + error.message);
+                                // Session list will auto-update via realtime subscription
+                              }
+                            }}
+                            className="absolute right-4 bottom-4 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-lg"
+                            title="영구 삭제"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="premium-card p-6 lg:col-span-2">
+                <h2 className="font-black text-lg mb-4">3) AI 개별 지시사항 관리</h2>
+                <textarea
+                  value={normalizedSettings.ai_style_prompt}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setConnectedStudents((prev) =>
+                      prev.map((student) =>
+                        student.user_id === selectedStudentId
+                          ? { ...student, settings: toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) }
+                          : student
+                      )
+                    );
+                  }}
+                  placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
+                  className="w-full min-h-48 rounded-2xl border border-slate-200 p-4 text-sm"
+                />
+                <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
+                {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
+              </article>
+
+              <article className="premium-card p-6 lg:col-span-1">
+                <h2 className="font-black text-lg mb-4">4) 멘토 말투 성향</h2>
+                <div className="space-y-2">
+                  {mentorToneOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => updateMentorTone(option.value)}
+                      className={`w-full text-left px-4 py-3 rounded-2xl border ${normalizedSettings.mentor_tone === option.value ? 'bg-brand-50 border-brand-400 text-brand-900' : 'bg-white border-slate-100'}`}
+                    >
+                      <p className="font-black text-sm">{option.label}</p>
+                      <p className="text-xs text-slate-500 mt-1">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </article>
+
+              <article className="premium-card p-6 lg:col-span-3">
+                <h2 className="font-black text-lg mb-4">5) 필수 안심 가드레일</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  {guardrailMeta.map((item) => {
+                    const enabled = normalizedSettings.guardrails[item.key];
+                    return (
+                      <button key={item.key} onClick={() => toggleGuardrail(item.key)} className="w-full border border-slate-100 rounded-2xl p-4 text-left bg-white">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-black text-slate-900">{item.label}</p>
+                            <p className="text-xs text-slate-500 mt-1">{item.description}</p>
+                          </div>
+                          <span className={`w-10 h-6 rounded-full transition-all ${enabled ? 'bg-brand-900' : 'bg-slate-300'} relative`}>
+                            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${enabled ? 'left-5' : 'left-1'}`}></span>
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+            </section>
+          </>
+        )}
       </main>
 
       {openedSessionId && (
