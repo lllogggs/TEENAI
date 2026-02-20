@@ -137,7 +137,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [loading, setLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState('');
-  const [showMobileChat, setShowMobileChat] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Desktop sidebar toggle
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const settingsCacheRef = useRef<NormalizedSettings | null>(null);
@@ -368,8 +368,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const created = data as ChatSession;
     setSessions((prev) => [created, ...prev]);
     setCurrentSessionId(created.id);
-    setMessages([]);
-    setShowMobileChat(true);
     return created.id;
   };
 
@@ -471,7 +469,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
     setErrorNotice('');
     const userText = input.trim() || (inlineAudioBase64 ? '(음성 메시지)' : '(이미지 전송)');
-    const userMsg: ChatMessage = { role: 'user', text: userText, timestamp: Date.now() };
+
+    // Embed the image in text for DB storage
+    const contentToPersist = imageThumbnail ? `[IMAGE]${imageThumbnail}[/IMAGE]\n${userText}` : userText;
+
+    const userMsg: ChatMessage = { role: 'user', text: contentToPersist, timestamp: Date.now() };
     const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
 
     const currentImage = imageThumbnail;
@@ -487,7 +489,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       return;
     }
 
-    await persistMessage(sessionId, 'user', userText);
+    await persistMessage(sessionId, 'user', contentToPersist);
 
     // [최우선] API 호출 비용 최적화 로직
     const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
@@ -555,16 +557,39 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setErrorNotice('');
   };
 
-  const handleNewSession = async () => {
+  const handleNewSession = () => {
     setErrorNotice('');
     settingsCacheRef.current = null;
-    await createSession();
+    setCurrentSessionId(null);
+    setMessages([]);
+    setShowMobileChat(true);
+  };
+
+  const renderMessageContent = (text: string) => {
+    const imgRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
+    const match = text.match(imgRegex);
+    if (match) {
+      const base64 = match[1];
+      const pureText = text.replace(imgRegex, '').trim();
+      return (
+        <div className="flex flex-col gap-2">
+          <img src={base64} alt="attached view" className="max-w-[150px] md:max-w-[200px] max-h-[300px] object-contain rounded-xl shadow-sm border border-black/5" />
+          {pureText && <span>{pureText}</span>}
+        </div>
+      );
+    }
+    return text;
   };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] flex-col overflow-hidden">
-      <header className="px-5 md:px-10 py-5 md:py-7 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
-        <div className="flex items-center gap-3 md:gap-5">
+      <header className="px-4 md:px-10 py-3 md:py-6 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
+        <div className="flex items-center gap-2 md:gap-5">
+          {/* Mobile Hamburger toggle */}
+          <button onClick={() => setShowMobileChat(false)} className={`${showMobileChat ? 'flex' : 'hidden'} lg:hidden w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
             {isSidebarOpen ? (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
@@ -572,18 +597,18 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             )}
           </button>
-          <div className="w-11 h-11 md:w-14 md:h-14 bg-brand-900 rounded-[1.25rem] flex items-center justify-center text-xl md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
+          <div className="w-9 h-9 md:w-14 md:h-14 bg-brand-900 rounded-xl md:rounded-[1.25rem] flex items-center justify-center text-lg md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
           <div>
-            <h1 className="text-base md:text-lg font-black text-brand-900 tracking-tight">ForTeenAI 멘토</h1>
+            <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">ForTeenAI 멘토</h1>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">LIVE MENTORING</p>
+              <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors">새 대화</button>
-          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-xs uppercase tracking-tighter transition-colors">Logout</button>
+        <div className="flex items-center gap-2 md:gap-3">
+          <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors hidden md:block">새 대화</button>
+          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-[10px] md:text-xs uppercase tracking-tighter transition-colors">Logout</button>
         </div>
       </header>
 
@@ -664,7 +689,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                         : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
                         }`}
                     >
-                      {m.text}
+                      {renderMessageContent(m.text)}
                     </div>
                   </div>
                 ))}
@@ -692,13 +717,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
 
             {/* Visual Action Bar (Camera, Voice Modes) */}
-            <div className="max-w-4xl mx-auto flex items-center justify-between mb-3 px-2">
-              <div className="flex gap-2">
+            <div className="max-w-4xl mx-auto flex items-center justify-between mb-2 md:mb-3 px-1 md:px-2">
+              <div className="flex gap-1.5 md:gap-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-xs uppercase tracking-tight hover:bg-slate-100 transition-colors shadow-sm"
+                  className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-[10px] md:text-xs tracking-tight hover:bg-slate-100 transition-colors shadow-sm"
+                  title="이미지 첨부"
                 >
-                  <span className="text-sm">📷</span> 이미지 첨부
+                  <span className="text-sm md:text-sm">📷</span> <span className="hidden md:inline">이미지 첨부</span>
                 </button>
                 <input
                   type="file"
@@ -709,28 +735,30 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 md:gap-2">
                 <button
                   onMouseDown={startMicRecord}
                   onMouseUp={stopMicRecord}
                   onMouseLeave={stopMicRecord}
                   onTouchStart={startMicRecord}
                   onTouchEnd={stopMicRecord}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-xs uppercase tracking-tight ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  className={`flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-[10px] md:text-xs tracking-tight ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  title="음성 입력 모드"
                 >
-                  <span className="text-sm">🎙️</span> 음성 입력 모드
+                  <span className="text-sm md:text-sm">🎙️</span> <span className="hidden md:inline">음성 입력 모드</span>
                 </button>
                 <button
                   onClick={() => setIsVoiceModeOpen(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand-900 font-bold text-xs uppercase tracking-tight hover:bg-brand-100 transition-colors shadow-sm"
+                  className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand-900 font-bold text-[10px] md:text-xs tracking-tight hover:bg-brand-100 transition-colors shadow-sm"
+                  title="음성 대화 모드"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-3.5 h-3.5 md:w-4 md:h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="11" fill="currentColor" />
                     <rect x="8.5" y="10" width="1.5" height="4" rx="0.75" fill="white" />
                     <rect x="11.25" y="7" width="1.5" height="10" rx="0.75" fill="white" />
                     <rect x="14" y="9" width="1.5" height="6" rx="0.75" fill="white" />
                   </svg>
-                  음성 대화 모드
+                  <span className="hidden md:inline">음성 대화 모드</span>
                 </button>
               </div>
             </div>
