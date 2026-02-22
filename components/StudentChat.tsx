@@ -678,6 +678,15 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </aside>
 
+        {!showMobileChat && (
+          <button
+            type="button"
+            onClick={() => setShowMobileChat(true)}
+            className="flex-1 lg:hidden bg-transparent"
+            aria-label="대화 화면으로 돌아가기"
+          />
+        )}
+
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
           <div className="px-5 md:px-10 py-5 md:py-8 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
