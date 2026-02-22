@@ -616,7 +616,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </button>
           <div className="w-9 h-9 md:w-14 md:h-14 bg-brand-900 rounded-xl md:rounded-[1.25rem] flex items-center justify-center text-lg md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
           <div>
-            <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">ForTen AI 멘토</h1>
+            <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">Forteen AI 멘토</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
@@ -816,7 +816,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             <div className="max-w-4xl mx-auto mt-2 md:mt-3 text-center px-4">
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
-                Gemini는 AI이며 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다. <a href="#" className="underline hover:text-slate-500 transition-colors">개인 정보 보호 및 Gemini</a>
+                Forteen AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다. <a href="#" className="underline hover:text-slate-500 transition-colors">개인 정보 보호 및 Forteen AI</a>
               </p>
             </div>
           </div>
