@@ -4,7 +4,7 @@ import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
-import { ForteenLogo, SparklesIcon, TextIcon, ImageIcon, VoiceIcon, StopIcon } from './Icons';
+import { ForteenLogo, AnimalIcons, TextIcon, ImageIcon, VoiceIcon, StopIcon } from './Icons';
 
 interface StudentChatProps {
   user: User;
@@ -132,6 +132,11 @@ const formatSessionTime = (iso: string) => {
 };
 
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
+  const RandomAnimalIcon = useMemo(() => {
+    const randomIndex = Math.floor(Math.random() * AnimalIcons.length);
+    return AnimalIcons[randomIndex];
+  }, []);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [input, setInput] = useState('');
@@ -675,10 +680,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
-          <div className="px-5 md:px-10 py-3 border-b border-transparent bg-transparent flex items-center gap-3 relative z-30 shrink-0 pointer-events-none">
-
-            {/* Absolute positioning container for buttons to stick top-left inside the content area */}
-            <div className="absolute left-5 md:left-10 top-1/2 -translate-y-1/2 flex items-center gap-3 pointer-events-auto">
+          <div className="px-5 md:px-10 py-5 md:py-8 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
+            {/* Container for buttons to stick top-left inside the content area */}
+            <div className="flex items-center gap-3 pointer-events-auto">
               {/* Mobile Sidebar Toggle (Back) */}
               <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-sm border border-slate-100 text-slate-500 hover:bg-slate-50 transition-colors shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -694,13 +698,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </button>
 
               {/* PC New Chat Button */}
-              <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl hover:bg-brand-100 font-bold text-[11px] tracking-tighter transition-colors whitespace-nowrap">
+              <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl hover:bg-brand-100 font-bold text-[11px] tracking-tighter transition-colors whitespace-nowrap shadow-sm">
                 + 새 대화
               </button>
-            </div>
-
-            {/* Desktop spacer - no title display */}
-            <div className="flex-1 lg:pl-44 flex justify-center items-center">
             </div>
 
             <div className="w-[1px] h-4 bg-slate-200 lg:hidden mx-1"></div>
@@ -713,7 +713,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div className="flex flex-col items-center justify-center max-w-2xl mx-auto px-1 mt-2 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="bg-white/80 backdrop-blur-md p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-100/50 w-full text-center">
                   <div className="w-12 h-12 md:w-16 md:h-16 mb-4 md:mb-6 mx-auto bg-gradient-to-tr from-brand-100 to-brand-50 rounded-[1rem] flex items-center justify-center shadow-inner border border-white">
-                    <SparklesIcon className="w-6 h-6 md:w-8 md:h-8 text-brand-600 drop-shadow-sm" />
+                    <RandomAnimalIcon className="w-6 h-6 md:w-8 md:h-8 text-brand-600 drop-shadow-sm" />
                   </div>
                   <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">무엇이든 물어보세요</h2>
                   <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
