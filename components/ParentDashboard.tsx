@@ -570,7 +570,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </button>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
+              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">2) 대화 목록</h2>
                 <div className="space-y-3 h-[200px] lg:h-[300px] overflow-y-auto custom-scrollbar pr-2">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
@@ -672,7 +672,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-3">
+              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">5) 필수 안심 가드레일</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-2 lg:gap-3">
                   {guardrailMeta.map((item) => {
