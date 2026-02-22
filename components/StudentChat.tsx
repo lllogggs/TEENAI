@@ -3,6 +3,7 @@ import { User, ChatMessage, ChatSession, SessionRiskLevel, StudentSettings } fro
 import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
+import PrivacyPolicyModal from './PrivacyPolicyModal';
 
 interface StudentChatProps {
   user: User;
@@ -147,6 +148,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   }, [input]);
   const lastRecognizedRef = useRef<string>('');
   const isNewInstanceRef = useRef<boolean>(true);
+
+  // Modal states
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   // Multimodal states
   const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
@@ -816,12 +820,23 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             <div className="max-w-4xl mx-auto mt-2 md:mt-3 text-center px-4">
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
-                Forteen AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다. <a href="#" className="underline hover:text-slate-500 transition-colors">개인 정보 보호 및 Forteen AI</a>
+                Forteen AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
+                <button
+                  onClick={() => setIsPrivacyModalOpen(true)}
+                  className="underline hover:text-slate-500 transition-colors"
+                >
+                  개인 정보 보호 및 Forteen AI
+                </button>
               </p>
             </div>
           </div>
         </section>
       </div>
+
+      <PrivacyPolicyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+      />
     </div>
   );
 };
