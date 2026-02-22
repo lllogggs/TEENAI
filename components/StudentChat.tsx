@@ -614,8 +614,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-10 h-10 md:w-14 md:h-14 shrink-0 shadow-lg shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
-            <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">Forteen AI 멘토</h1>
-            <div className="flex items-center gap-1.5">
+            <h1 className="text-xl md:text-2xl font-black text-brand-900 tracking-tight">Forteen AI</h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
             </div>
@@ -630,7 +630,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         {/* Sidebar */}
         <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px] border-r' : 'lg:w-0 border-r-0'} lg:block border-slate-100 bg-white/70 backdrop-blur-sm transition-all duration-300 overflow-hidden`}>
           <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 w-[320px]">
-            <button onClick={handleNewSession} className="w-full rounded-2xl border border-brand-100 bg-brand-50 py-3 text-sm font-black text-brand-900">+ 새 대화</button>
+            <button onClick={handleNewSession} className="w-full rounded-[1.25rem] border border-brand-100 bg-brand-50 py-4 text-base md:text-lg font-black text-brand-900 shadow-sm hover:bg-brand-100 transition-colors">+ 새 대화</button>
             {sessions.map((session) => {
               const isActive = session.id === currentSessionId;
               return (
@@ -698,7 +698,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </button>
 
               {/* PC New Chat Button */}
-              <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl hover:bg-brand-100 font-bold text-[11px] tracking-tighter transition-colors whitespace-nowrap shadow-sm">
+              <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-4 py-2 rounded-xl hover:bg-brand-100 font-black text-sm md:text-base tracking-tighter transition-colors whitespace-nowrap shadow-sm">
                 + 새 대화
               </button>
             </div>
@@ -712,8 +712,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center max-w-2xl mx-auto px-1 mt-2 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="bg-white/80 backdrop-blur-md p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-100/50 w-full text-center">
-                  <div className="w-12 h-12 md:w-16 md:h-16 mb-4 md:mb-6 mx-auto bg-gradient-to-tr from-brand-100 to-brand-50 rounded-[1rem] flex items-center justify-center shadow-inner border border-white">
-                    <RandomAnimalIcon className="w-6 h-6 md:w-8 md:h-8 text-brand-600 drop-shadow-sm" />
+                  <div className="mb-4 md:mb-8 mx-auto flex items-center justify-center">
+                    <RandomAnimalIcon className="w-24 h-24 md:w-36 md:h-36 drop-shadow-xl hover:scale-105 transition-transform duration-300" />
                   </div>
                   <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">무엇이든 물어보세요</h2>
                   <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
