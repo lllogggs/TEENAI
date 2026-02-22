@@ -135,109 +135,32 @@ export const ForteenLogo: React.FC<IconProps> = ({ size = 32, className = '', ..
 );
 
 // -----------------------------------------------------------------------------
-// Animal Mentors Icons
+// Animal Mentors Icons (IMGs)
 // -----------------------------------------------------------------------------
 
-export const CatIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="M5 3L8 7H16L19 3V9C19 14.5 16 19 12 19C8 19 5 14.5 5 9V3Z" />
-        <circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none" />
-        <circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
-        <path d="M12 14.5C11.5 15.5 10.5 16 9.5 15.5" />
-        <path d="M12 14.5C12.5 15.5 13.5 16 14.5 15.5" />
-    </svg>
-);
+const createAnimalImg = (src: string, alt: string) => {
+    const ImgIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+        <img
+            src={src}
+            width={size}
+            height={size}
+            className={`object-contain rounded-xl drop-shadow-sm ${className}`}
+            alt={alt}
+        />
+    );
+    return ImgIcon;
+};
 
-export const DogIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="M10 5.17C10 3.78 8.42 2.68 6.5 3c-2.82.47-4.11 2.54-4 4 .19 2.44 1.5 5 5.5 5h8c4 0 5.31-2.56 5.5-5 .11-1.46-1.18-3.53-4-4-1.92-.32-3.5 1.18-3.5 2.57V6a2 2 0 01-2 2h-2a2 2 0 01-2-2v-.83z" />
-        <circle cx="8.5" cy="14.5" r="1.5" fill="currentColor" stroke="none" />
-        <circle cx="15.5" cy="14.5" r="1.5" fill="currentColor" stroke="none" />
-        <path d="M12 18v1" />
-    </svg>
-);
-
-export const RabbitIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="M13 5a3 3 0 0 0-6 0v5a3 3 0 0 0 6 0V5z" />
-        <path d="M17 5a3 3 0 0 0-6 0v5a3 3 0 0 0 6 0V5z" />
-        <circle cx="12" cy="16" r="6" />
-        <circle cx="10" cy="15" r="1" fill="currentColor" stroke="none" />
-        <circle cx="14" cy="15" r="1" fill="currentColor" stroke="none" />
-        <path d="M12 18v1" />
-    </svg>
-);
-
-export const BearIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <circle cx="12" cy="13" r="7" />
-        <circle cx="6.5" cy="7.5" r="2.5" />
-        <circle cx="17.5" cy="7.5" r="2.5" />
-        <path d="M12 16v1" />
-        <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
-        <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-);
-
-export const HamsterIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <ellipse cx="12" cy="14" rx="8" ry="6" />
-        <path d="M7 10C7 7.5 9.5 6 12 6s5 1.5 5 4" />
-        <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
-        <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
-        <path d="M12 14v1" />
-    </svg>
-);
-
-export const FoxIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="M4 4l4 5 4-2 4 2 4-5v8a8 8 0 0 1-16 0V4z" />
-        <circle cx="9" cy="13" r="1.5" fill="currentColor" stroke="none" />
-        <circle cx="15" cy="13" r="1.5" fill="currentColor" stroke="none" />
-        <path d="M12 17v1" />
-    </svg>
-);
-
-export const KoalaIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <ellipse cx="12" cy="14" rx="7" ry="6" />
-        <circle cx="5" cy="9" r="3.5" />
-        <circle cx="19" cy="9" r="3.5" />
-        <circle cx="9" cy="13" r="1" fill="currentColor" stroke="none" />
-        <circle cx="15" cy="13" r="1" fill="currentColor" stroke="none" />
-        <ellipse cx="12" cy="15.5" rx="1.5" ry="2" fill="currentColor" stroke="none" />
-    </svg>
-);
-
-export const PandaIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="M12 21A8 8 0 1 0 12 5a8 8 0 0 0 0 16z" />
-        <circle cx="7" cy="6" r="3" />
-        <circle cx="17" cy="6" r="3" />
-        <ellipse cx="9" cy="12" rx="2" ry="2.5" fill="currentColor" stroke="none" />
-        <ellipse cx="15" cy="12" rx="2" ry="2.5" fill="currentColor" stroke="none" />
-        <circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none" />
-    </svg>
-);
-
-export const PenguinIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="M12 3c-4.5 0-6 4.5-6 9 0 4.5 2 8 6 8s6-3.5 6-8c0-4.5-1.5-9-6-9z" />
-        <circle cx="9.5" cy="10" r="1" fill="currentColor" stroke="none" />
-        <circle cx="14.5" cy="10" r="1" fill="currentColor" stroke="none" />
-        <path d="M11 13l1 2 1-2H11z" fill="currentColor" stroke="none" />
-    </svg>
-);
-
-export const ChickIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <circle cx="12" cy="14" r="7" />
-        <path d="M12 7c-2 0-3.5 1.5-3.5 3.5" />
-        <circle cx="9.5" cy="12" r="1" fill="currentColor" stroke="none" />
-        <circle cx="14.5" cy="12" r="1" fill="currentColor" stroke="none" />
-        <path d="M11 15l1 2 1-2H11z" fill="currentColor" stroke="none" />
-    </svg>
-);
+export const CatIcon = createAnimalImg('/mentors/cat.png', 'Cat Mentor');
+export const DogIcon = createAnimalImg('/mentors/dog.png', 'Dog Mentor');
+export const RabbitIcon = createAnimalImg('/mentors/rabbit.png', 'Rabbit Mentor');
+export const BearIcon = createAnimalImg('/mentors/bear.png', 'Bear Mentor');
+export const HamsterIcon = createAnimalImg('/mentors/hamster.png', 'Hamster Mentor');
+export const FoxIcon = createAnimalImg('/mentors/fox.png', 'Fox Mentor');
+export const KoalaIcon = createAnimalImg('/mentors/koala.png', 'Koala Mentor');
+export const PandaIcon = createAnimalImg('/mentors/panda.png', 'Panda Mentor');
+export const PenguinIcon = createAnimalImg('/mentors/penguin.png', 'Penguin Mentor');
+export const ChickIcon = createAnimalImg('/mentors/chick.png', 'Chick Mentor');
 
 export const AnimalIcons = [
     CatIcon,
