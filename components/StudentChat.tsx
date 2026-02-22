@@ -674,7 +674,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50`}>
-          <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3 relative z-10">
+          <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/80 backdrop-blur-md flex items-center gap-3 relative z-20 shrink-0">
             {/* Mobile Sidebar Toggle (Back) */}
             <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -739,7 +739,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 </div>
               </div>
             ) : (
-              <div className="pb-40">
+              <div className="pb-40 max-w-4xl mx-auto w-full">
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                     <div
