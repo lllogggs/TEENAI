@@ -616,14 +616,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-            {isSidebarOpen ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            )}
-          </button>
-          <button onClick={handleNewSession} className="text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 md:px-4 md:py-2 rounded-xl hover:bg-brand-100 font-bold text-[11px] md:text-sm tracking-tighter transition-colors hidden md:block whitespace-nowrap">+ 새 대화</button>
           <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-[10px] md:text-xs uppercase tracking-tighter transition-colors ml-1 md:ml-2">Logout</button>
         </div>
       </header>
@@ -683,9 +675,27 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50`}>
           <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3 relative z-10">
+            {/* Mobile Sidebar Toggle (Back) */}
             <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
+
+            {/* PC Sidebar Toggle */}
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0">
+              {isSidebarOpen ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+              )}
+            </button>
+
+            {/* PC New Chat Button */}
+            <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl hover:bg-brand-100 font-bold text-[11px] tracking-tighter transition-colors whitespace-nowrap">
+              + 새 대화
+            </button>
+
+            <div className="h-4 w-[1px] bg-slate-200 hidden lg:block mx-1"></div>
+
             <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
