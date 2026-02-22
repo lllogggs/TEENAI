@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
+import { ForteenLogo, SparklesIcon, TextIcon, ImageIcon, VoiceIcon, StopIcon } from './Icons';
 
 interface StudentChatProps {
   user: User;
@@ -606,7 +607,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     <div className="flex h-screen bg-[#F8FAFC] flex-col overflow-hidden">
       <header className="px-4 md:px-10 py-3 md:py-6 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-2 md:gap-5">
-          <div className="w-9 h-9 md:w-14 md:h-14 bg-brand-900 rounded-xl md:rounded-[1.25rem] flex items-center justify-center text-lg md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
+          <ForteenLogo className="w-10 h-10 md:w-14 md:h-14 shrink-0 shadow-lg shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
             <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">Forteen AI 멘토</h1>
             <div className="flex items-center gap-1.5">
@@ -698,9 +699,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </button>
             </div>
 
-            {/* Desktop centering empty placeholder div and Title Display*/}
+            {/* Desktop spacer - no title display */}
             <div className="flex-1 lg:pl-44 flex justify-center items-center">
-              <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
             </div>
 
             <div className="w-[1px] h-4 bg-slate-200 lg:hidden mx-1"></div>
@@ -713,7 +713,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div className="flex flex-col items-center justify-center max-w-2xl mx-auto px-1 mt-2 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="bg-white/80 backdrop-blur-md p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-100/50 w-full text-center">
                   <div className="w-12 h-12 md:w-16 md:h-16 mb-4 md:mb-6 mx-auto bg-gradient-to-tr from-brand-100 to-brand-50 rounded-[1rem] flex items-center justify-center shadow-inner border border-white">
-                    <span className="text-2xl md:text-3xl">✨</span>
+                    <SparklesIcon className="w-6 h-6 md:w-8 md:h-8 text-brand-600 drop-shadow-sm" />
                   </div>
                   <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">무엇이든 물어보세요</h2>
                   <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
@@ -722,21 +722,27 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-5 text-left text-slate-700">
                     <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
-                      <span className="text-2xl md:text-3xl md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none">📝</span>
+                      <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
+                        <TextIcon className="w-6 h-6 md:w-8 md:h-8" />
+                      </div>
                       <div>
                         <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">텍스트 대화</h3>
                         <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">하단 입력창에 궁금한 점을 적어서 보내주세요.</p>
                       </div>
                     </div>
                     <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
-                      <span className="text-2xl md:text-3xl md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none">📷</span>
+                      <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
+                        <ImageIcon className="w-6 h-6 md:w-8 md:h-8" />
+                      </div>
                       <div>
                         <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">이미지 분석</h3>
                         <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">배우고 싶은 문제를 사진으로 찍어 올리세요.</p>
                       </div>
                     </div>
                     <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
-                      <span className="text-2xl md:text-3xl md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none">🎙️</span>
+                      <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
+                        <VoiceIcon className="w-6 h-6 md:w-8 md:h-8" />
+                      </div>
                       <div>
                         <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">음성 입력</h3>
                         <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">마이크 버튼을 눌러 편하게 말로 질문하세요.</p>
@@ -787,9 +793,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div className="flex gap-1.5 md:gap-2 shrink-0">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-[11px] md:text-xs tracking-tight hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap"
+                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-[11px] md:text-xs tracking-tight hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap"
                 >
-                  <span className="text-sm">📷</span> 이미지 첨부
+                  <ImageIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-slate-600" /> <span className="pt-[1px]">이미지 첨부</span>
                 </button>
                 <input
                   type="file"
@@ -803,9 +809,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div className="flex gap-1.5 md:gap-2 shrink-0">
                 <button
                   onClick={toggleMicRecord}
-                  className={`flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 rounded-full border transition-colors shadow-sm font-bold text-[11px] md:text-xs tracking-tight whitespace-nowrap ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border transition-colors shadow-sm font-bold text-[11px] md:text-xs tracking-tight whitespace-nowrap ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
                 >
-                  <span className="text-sm">{isMicRecording ? '🛑' : '🎙️'}</span> {isMicRecording ? '정지' : '음성 입력'}
+                  {isMicRecording ? <StopIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-rose-500" /> : <VoiceIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-slate-600" />}
+                  <span className="pt-[1px]">{isMicRecording ? '정지' : '음성 입력'}</span>
                 </button>
               </div>
             </div>
