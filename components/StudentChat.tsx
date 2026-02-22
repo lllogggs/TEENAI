@@ -673,30 +673,37 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         </aside>
 
         {/* Chat Area */}
-        <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50`}>
-          <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/80 backdrop-blur-md flex items-center gap-3 relative z-20 shrink-0">
-            {/* Mobile Sidebar Toggle (Back) */}
-            <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </button>
+        <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
+          <div className="px-5 md:px-10 py-3 border-b border-transparent bg-transparent flex items-center gap-3 relative z-30 shrink-0 pointer-events-none">
 
-            {/* PC Sidebar Toggle */}
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0">
-              {isSidebarOpen ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
-              ) : (
+            {/* Absolute positioning container for buttons to stick top-left inside the content area */}
+            <div className="absolute left-5 md:left-10 top-1/2 -translate-y-1/2 flex items-center gap-3 pointer-events-auto">
+              {/* Mobile Sidebar Toggle (Back) */}
+              <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-sm border border-slate-100 text-slate-500 hover:bg-slate-50 transition-colors shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-              )}
-            </button>
+              </button>
 
-            {/* PC New Chat Button */}
-            <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl hover:bg-brand-100 font-bold text-[11px] tracking-tighter transition-colors whitespace-nowrap">
-              + 새 대화
-            </button>
+              {/* PC Sidebar Toggle */}
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-sm border border-slate-100 text-slate-500 hover:bg-slate-50 transition-colors shrink-0">
+                {isSidebarOpen ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                )}
+              </button>
 
-            <div className="h-4 w-[1px] bg-slate-200 hidden lg:block mx-1"></div>
+              {/* PC New Chat Button */}
+              <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl hover:bg-brand-100 font-bold text-[11px] tracking-tighter transition-colors whitespace-nowrap">
+                + 새 대화
+              </button>
+            </div>
 
-            <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
+            {/* Desktop centering empty placeholder div and Title Display*/}
+            <div className="flex-1 lg:pl-44 flex justify-center items-center">
+              <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
+            </div>
+
+            <div className="w-[1px] h-4 bg-slate-200 lg:hidden mx-1"></div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar relative">
