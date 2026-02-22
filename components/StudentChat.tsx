@@ -606,18 +606,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     <div className="flex h-screen bg-[#F8FAFC] flex-col overflow-hidden">
       <header className="px-4 md:px-10 py-3 md:py-6 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-2 md:gap-5">
-          {/* Mobile Hamburger toggle */}
-          <button onClick={() => setShowMobileChat(false)} className={`${showMobileChat ? 'flex' : 'hidden'} lg:hidden w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-          </button>
-
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-            {isSidebarOpen ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            )}
-          </button>
           <div className="w-9 h-9 md:w-14 md:h-14 bg-brand-900 rounded-xl md:rounded-[1.25rem] flex items-center justify-center text-lg md:text-2xl shadow-lg shadow-brand-900/20">💜</div>
           <div>
             <h1 className="text-sm md:text-lg font-black text-brand-900 tracking-tight">Forteen AI 멘토</h1>
@@ -628,8 +616,15 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
-          <button onClick={handleNewSession} className="text-slate-500 hover:text-brand-900 font-bold text-xs uppercase tracking-tighter transition-colors hidden md:block">새 대화</button>
-          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-[10px] md:text-xs uppercase tracking-tighter transition-colors">Logout</button>
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+            {isSidebarOpen ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            )}
+          </button>
+          <button onClick={handleNewSession} className="text-brand-900 bg-brand-50 border border-brand-100 px-3 py-1.5 md:px-4 md:py-2 rounded-xl hover:bg-brand-100 font-bold text-[11px] md:text-sm tracking-tighter transition-colors hidden md:block whitespace-nowrap">+ 새 대화</button>
+          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-[10px] md:text-xs uppercase tracking-tighter transition-colors ml-1 md:ml-2">Logout</button>
         </div>
       </header>
 
@@ -687,8 +682,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50`}>
-          <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3">
-            <button onClick={() => setShowMobileChat(false)} className="lg:hidden text-xs font-black text-brand-900">← 뒤로</button>
+          <div className="px-5 md:px-10 py-3 border-b border-slate-100 bg-white/60 flex items-center gap-3 relative z-10">
+            <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
             <p className="text-xs text-slate-500 truncate">{activeSession?.title || '대화를 선택하거나 새로 시작해 주세요.'}</p>
           </div>
 
