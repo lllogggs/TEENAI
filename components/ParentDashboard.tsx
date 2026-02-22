@@ -190,8 +190,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     const fetchInviteCode = async () => {
       // Check student count limit first
       const { count, error: countError } = await supabase
-        .from('users')
-        .select('id', { count: 'exact', head: true })
+        .from('student_profiles')
+        .select('user_id', { count: 'exact', head: true })
         .eq('parent_user_id', user.id);
 
       if (countError) {
@@ -413,7 +413,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           <ForteenLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
           <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
             Forteen AI
-            <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded uppercase tracking-tighter">Parent</span>
+            <span className="text-[9px] bg-brand-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tight">Parent</span>
           </h1>
         </div>
         <div className="flex items-center gap-3 md:gap-5 flex-wrap justify-end">
@@ -583,7 +583,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </button>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
+              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">2) 대화 목록</h2>
                 <div className="space-y-3 h-[200px] lg:h-[300px] overflow-y-auto custom-scrollbar pr-2">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
@@ -685,9 +685,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-3">
+              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">5) 필수 안심 가드레일</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 lg:gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-2 lg:gap-3">
                   {guardrailMeta.map((item) => {
                     const enabled = normalizedSettings.guardrails[item.key];
                     return (
