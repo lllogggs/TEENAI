@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, ChatSession, MessageRow, StudentSettings, SessionRiskLevel } from '../types';
 import { supabase } from '../utils/supabase';
+import { ForteenLogo } from './Icons';
 
 interface ParentDashboardProps {
   user: User;
@@ -406,9 +407,16 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
   return (
     <div className="min-h-screen bg-[#F4F7FC]">
-      <nav className="sticky top-0 z-40 px-5 md:px-10 py-5 md:py-6 flex justify-between items-center bg-white/90 backdrop-blur-xl border-b border-slate-100">
-        <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Forteen AI <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded ml-1 uppercase tracking-tighter">Parent</span></h1>
-        <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
+      {/* Header */}
+      <header className="px-5 md:px-10 py-5 md:py-8 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
+        <div className="flex items-center gap-2 md:gap-3">
+          <ForteenLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+            Forteen AI
+            <span className="text-[10px] bg-brand-900 text-white px-2 py-0.5 rounded uppercase tracking-tighter">Parent</span>
+          </h1>
+        </div>
+        <div className="flex items-center gap-3 md:gap-5 flex-wrap justify-end">
           <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
           {!!inviteCode && (
             <div className="flex items-center gap-2 rounded-2xl border border-brand-100 bg-brand-50 px-3 py-2">
@@ -425,7 +433,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           )}
           <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>
         </div>
-      </nav>
+      </header>
 
       <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
         {connectedStudents.length === 0 ? (

@@ -11,13 +11,13 @@ const getBearerToken = (req: any): string | null => {
   return token;
 };
 
-const normalizeRpcCode = (value: unknown): string => {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object' && 'generate_invite_code' in value) {
-    const code = (value as { generate_invite_code?: unknown }).generate_invite_code;
-    return typeof code === 'string' ? code : '';
+const generateRandomCode = (length = 6): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return '';
+  return result;
 };
 
 export default async function handler(req: any, res: any) {
@@ -79,12 +79,7 @@ export default async function handler(req: any, res: any) {
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const rpcResult = await supabase.rpc('generate_invite_code');
-    const nextCode = normalizeRpcCode(rpcResult.data);
-
-    if (rpcResult.error || !nextCode) {
-      continue;
-    }
+    const nextCode = generateRandomCode();
 
     const { data: updatedRow } = await supabase
       .from('users')
