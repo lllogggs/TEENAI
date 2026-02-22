@@ -145,6 +145,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   useEffect(() => {
     latestInputRef.current = input;
   }, [input]);
+  const lastRecognizedRef = useRef<string>('');
+  const isNewInstanceRef = useRef<boolean>(true);
 
   // Multimodal states
   const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
@@ -210,25 +212,40 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       recognition.interimResults = true;
       recognition.continuous = true;
 
+      const instanceStartTime = Date.now();
+      isNewInstanceRef.current = true;
       let sessionBaseText = latestInputRef.current ? latestInputRef.current + (latestInputRef.current.endsWith(' ') ? '' : ' ') : '';
 
       recognition.onresult = (event: any) => {
-        let finalSegment = '';
-        let interimSegment = '';
+        let currentFinal = '';
+        let currentInterim = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalSegment += event.results[i][0].transcript;
+            currentFinal += event.results[i][0].transcript;
           } else {
-            interimSegment += event.results[i][0].transcript;
+            currentInterim += event.results[i][0].transcript;
           }
         }
 
-        if (finalSegment) {
-          sessionBaseText += finalSegment + ' ';
-          setInput(sessionBaseText + interimSegment);
+        if (isNewInstanceRef.current && (currentFinal || currentInterim)) {
+          const combined = (currentFinal + currentInterim).trim();
+          const isGhostTimeWindow = Date.now() - instanceStartTime < 1500;
+
+          if (combined && isGhostTimeWindow && lastRecognizedRef.current && lastRecognizedRef.current.startsWith(combined)) {
+            return;
+          }
+          if (combined) {
+            isNewInstanceRef.current = false;
+          }
+        }
+
+        if (currentFinal) {
+          lastRecognizedRef.current = currentFinal.trim();
+          sessionBaseText += currentFinal + ' ';
+          setInput(sessionBaseText + currentInterim);
         } else {
-          setInput(sessionBaseText + interimSegment);
+          setInput(sessionBaseText + currentInterim);
         }
       };
 
@@ -795,6 +812,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   <svg className="w-5 h-5 md:w-6 md:h-6 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
                 </button>
               </div>
+            </div>
+
+            <div className="max-w-4xl mx-auto mt-2 md:mt-3 text-center px-4">
+              <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
+                Gemini는 AI이며 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다. <a href="#" className="underline hover:text-slate-500 transition-colors">개인 정보 보호 및 Gemini</a>
+              </p>
             </div>
           </div>
         </section>
