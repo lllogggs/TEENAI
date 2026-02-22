@@ -411,26 +411,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       <header className="px-5 md:px-10 py-5 md:py-8 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
         <div className="flex items-center gap-2 md:gap-3">
           <ForteenLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-end gap-1.5">
             Forteen AI
-            <span className="text-[9px] bg-brand-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tight">Parent</span>
+            <span className="text-[9px] bg-brand-900 text-white px-1.5 py-[1px] rounded uppercase tracking-tight leading-none">Parent</span>
           </h1>
         </div>
         <div className="flex items-center gap-3 md:gap-5 flex-wrap justify-end">
           <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
-          {!!inviteCode && (
-            <div className="flex items-center gap-2 rounded-2xl border border-brand-100 bg-brand-50 px-3 py-2">
-              {inviteCode === 'LIMIT_REACHED' ? (
-                <span className="text-xs font-bold text-red-500">학생 연결 3명 초과 (추가 불가)</span>
-              ) : (
-                <>
-                  <span className="text-[11px] md:text-xs font-black text-brand-900 whitespace-nowrap">학생 인증코드:</span>
-                  <span className="text-sm md:text-base font-black tracking-[0.18em] text-brand-900">{inviteCode}</span>
-                  <button onClick={copyInviteCode} className="text-[11px] md:text-xs font-black text-brand-700 hover:text-brand-900 bg-white px-2 py-1 rounded-lg border border-brand-100">복사</button>
-                </>
-              )}
-            </div>
-          )}
           <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>
         </div>
       </header>
@@ -519,7 +506,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
                 {inviteCode !== 'LIMIT_REACHED' && (
                   <div className="flex items-center justify-between md:justify-end gap-2 px-3 py-2 lg:py-1.5 bg-brand-50 rounded-xl border border-brand-100 shrink-0">
-                    <span className="text-xs font-bold text-brand-900">학생 추가 코드: <span className="font-black tracking-widest ml-1">{inviteCode || '...'}</span></span>
+                    <span className="text-xs font-bold text-brand-900">학생 인증코드: <span className="font-black tracking-widest ml-1">{inviteCode || '...'}</span></span>
                     <button onClick={copyInviteCode} disabled={!inviteCode} className="text-[10px] bg-white border border-brand-200 px-2 py-0.5 rounded shadow-sm hover:bg-brand-100 font-bold transition-colors disabled:opacity-50">복사</button>
                   </div>
                 )}
@@ -671,7 +658,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
               <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">4) 멘토 말투 성향</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   {mentorToneOptions.map((option) => (
                     <button
                       key={option.value}
@@ -695,7 +682,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                         <div className="flex items-center justify-between gap-2">
                           <div>
                             <p className="text-sm font-black text-slate-900">{item.label}</p>
-                            <p className="text-xs text-slate-500 mt-1">{item.description}</p>
+                            <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2 min-h-[2.5rem]">{item.description}</p>
                           </div>
                           <span className={`w-10 h-6 rounded-full transition-all ${enabled ? 'bg-brand-900' : 'bg-slate-300'} relative`}>
                             <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${enabled ? 'left-5' : 'left-1'}`}></span>
