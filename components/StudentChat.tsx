@@ -780,7 +780,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[env(safe-area-inset-bottom,3rem)] md:pb-8 lg:pb-10 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
+          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] md:pb-8 lg:pb-10 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
             {imageThumbnail && (
               <div className="max-w-4xl mx-auto mb-2 relative inline-block">
                 <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
