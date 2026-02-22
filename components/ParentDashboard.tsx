@@ -141,6 +141,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [inviteCode, setInviteCode] = useState('');
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const [aiInstructionDraft, setAiInstructionDraft] = useState('');
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -154,6 +155,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     const customName = normalizedSettings.parent_student_name.trim();
     return customName || selectedStudentAccount?.name || '학생';
   }, [normalizedSettings.parent_student_name, selectedStudentAccount?.name]);
+
+  const aiInstructionList = useMemo(
+    () =>
+      normalizedSettings.ai_style_prompt
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    [normalizedSettings.ai_style_prompt]
+  );
 
   const riskCounts = useMemo(() => {
     const counts: Record<SessionRiskLevel, number> = { stable: 0, normal: 0, caution: 0 };
@@ -341,6 +351,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     setOpenedSessionId('');
     setIsNameEditing(false);
     setNameDraft('');
+    setAiInstructionDraft('');
   }, [selectedStudentId]);
 
   // Duplicate logic removed.
@@ -390,6 +401,23 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
   const updateAiStylePrompt = async (prompt: string) => {
     await updateStudentSettings({ ...normalizedSettings, ai_style_prompt: prompt });
+  };
+
+  const addAiInstruction = async () => {
+    const trimmed = aiInstructionDraft.trim();
+    if (!trimmed) return;
+
+    const nextPrompt = [...aiInstructionList, trimmed].join('\n');
+    await updateAiStylePrompt(nextPrompt);
+    setAiInstructionDraft('');
+  };
+
+  const removeAiInstruction = async (targetIndex: number) => {
+    const nextPrompt = aiInstructionList
+      .filter((_, index) => index !== targetIndex)
+      .join('\n');
+
+    await updateAiStylePrompt(nextPrompt);
   };
 
   const handleSaveStudentName = async () => {
@@ -635,25 +663,34 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
+              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">3) AI 개별 지시사항 관리</h2>
                 <textarea
-                  value={normalizedSettings.ai_style_prompt}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setConnectedStudents((prev) =>
-                      prev.map((student) =>
-                        student.user_id === selectedStudentId
-                          ? { ...student, settings: toStudentSettings({ ...normalizedSettings, ai_style_prompt: value }) }
-                          : student
-                      )
-                    );
-                  }}
+                  value={aiInstructionDraft}
+                  onChange={(event) => setAiInstructionDraft(event.target.value)}
                   placeholder="예: 아이가 불안해할 때는 짧고 명확하게 안심 문장을 먼저 말해 주세요."
-                  className="w-full min-h-32 lg:min-h-48 rounded-2xl border border-slate-200 p-3 lg:p-4 text-sm"
+                  className="w-full min-h-32 rounded-2xl border border-slate-200 p-3 lg:p-4 text-sm"
                 />
-                <button onClick={() => updateAiStylePrompt(normalizedSettings.ai_style_prompt)} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">저장</button>
+                <button onClick={addAiInstruction} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">리스트에 추가</button>
                 {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
+              </article>
+
+              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
+                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">3) 저장된 지시사항</h2>
+                <div className="space-y-2 h-[210px] lg:h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                  {aiInstructionList.length === 0 && <p className="text-sm text-slate-400">아직 등록된 지시사항이 없습니다.</p>}
+                  {aiInstructionList.map((instruction, index) => (
+                    <div key={`${instruction}-${index}`} className="rounded-xl border border-slate-100 bg-white p-3 flex items-start justify-between gap-2">
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{instruction}</p>
+                      <button
+                        onClick={() => removeAiInstruction(index)}
+                        className="shrink-0 text-xs font-black text-rose-500 hover:text-rose-700"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </article>
 
               <article className="premium-card p-4 lg:p-6 lg:col-span-1">
