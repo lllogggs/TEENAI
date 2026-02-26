@@ -5,6 +5,8 @@ import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
 import { ForteenLogo, AnimalIcons, TextIcon, ImageIcon, VoiceIcon, StopIcon } from './Icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface StudentChatProps {
   user: User;
@@ -600,12 +602,18 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       const pureText = text.replace(imgRegex, '').trim();
       return (
         <div className="flex flex-col gap-2">
-          <img src={base64} alt="attached view" className="max-w-[150px] md:max-w-[200px] max-h-[300px] object-contain rounded-xl shadow-sm border border-black/5" />
-          {pureText && <span>{pureText}</span>}
+          <img src={base64} alt="attached view" className="max-w-[150px] md:max-w-[200px] max-h-[300px] object-contain rounded-xl shadow-sm border border-black/5 select-none" />
+          <div className="markdown-body text-sm font-medium">
+            {pureText && <ReactMarkdown remarkPlugins={[remarkGfm]}>{pureText}</ReactMarkdown>}
+          </div>
         </div>
       );
     }
-    return text;
+    return (
+      <div className="markdown-body text-sm font-medium">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
+    );
   };
 
   return (
@@ -614,8 +622,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-10 h-10 md:w-14 md:h-14 shrink-0 shadow-lg shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-brand-900 tracking-tight">Forteen AI</h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <h1 className="text-xl md:text-2xl font-black text-brand-900 tracking-tight select-none">Forteen AI</h1>
+            <div className="flex items-center gap-1.5 mt-0.5 select-none">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
             </div>
@@ -811,7 +819,16 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   accept="image/*"
                   className="hidden"
                   ref={fileInputRef}
-                  onChange={handleImageUpload}
+                  onChange={(e) => {
+                    handleImageUpload(e);
+                    // After short delay, if no text provided, let the user know they can just send or type something.
+                    setTimeout(() => {
+                      const inputField = document.querySelector('input[placeholder]');
+                      if (inputField) {
+                        (inputField as HTMLInputElement).focus();
+                      }
+                    }, 100);
+                  }}
                 />
               </div>
 

@@ -135,7 +135,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
   if (view === 'selection') {
     return (
       <div className="min-h-[100dvh] bg-[#F1F5F9] flex flex-col items-center justify-center p-4 md:p-10">
-        <div className="text-center mb-8 md:mb-20 animate-in fade-in zoom-in duration-700">
+        <div className="text-center mb-8 md:mb-20 animate-in fade-in zoom-in duration-700 select-none">
           <h1 className="text-5xl md:text-7xl font-black text-brand-900 tracking-tighter mb-3 md:mb-6">Forteen AI</h1>
           <p className="text-slate-500 font-bold text-sm md:text-lg">청소년을 위한 가장 안전한 AI 성장의 공간</p>
         </div>
