@@ -34,6 +34,17 @@ alter table public.chat_sessions
 기존 DB가 오래된 스키마(`title` nullable, `risk_level`에 `warn/high` 포함)라면
 `supabase/migrations/20260218_fix_chat_sessions_title_and_risk_constraint.sql`도 추가로 실행하세요.
 
+
+## Mobile App (웹 쌍둥이 버전)
+
+동일한 UI/기능을 앱으로 제공하려면 `mobile-app`(Expo + WebView)을 사용하세요.
+
+1. `cd mobile-app && npm install`
+2. `mobile-app/app.json`의 `expo.extra.webAppUrl`에 웹 배포 URL 입력
+3. `npm run start`
+
+상세 내용은 `mobile-app/README.md`를 참고하세요.
+
 ## Vercel Environment Variables
 
 Vercel에 아래 환경 변수를 반드시 설정해야 동작합니다.
