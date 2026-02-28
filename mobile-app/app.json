@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "TEENAI",
-    "slug": "forteenai-mobile",
+    "slug": "forteenai",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",

@@ -41,6 +41,8 @@ Supabase SQL Editor에서 아래 순서대로 실행하세요.
 
 상세 내용은 `mobile-app/README.md`를 참고하세요.
 
+- 모바일 앱은 2차 개선으로 로딩/오류 재시도, Android 뒤로가기 WebView 연동, pull-to-refresh, 외부링크 브라우저 분리를 포함합니다.
+
 ## Vercel Environment Variables
 
 Vercel에 아래 환경 변수를 반드시 설정해야 동작합니다.
