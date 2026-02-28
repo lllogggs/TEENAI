@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface TermsModalProps {
     isOpen: boolean;
@@ -20,15 +20,39 @@ const TermsModal: React.FC<TermsModalProps> = ({
     requireScrollToConfirm = false,
 }) => {
     const [canConfirm, setCanConfirm] = useState(!requireScrollToConfirm);
+    const contentRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (isOpen) {
-            setCanConfirm(!requireScrollToConfirm);
             document.body.style.overflow = 'hidden';
             return;
         }
         document.body.style.overflow = 'unset';
-    }, [isOpen, requireScrollToConfirm]);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (!requireScrollToConfirm) {
+            setCanConfirm(true);
+            return;
+        }
+
+        const el = contentRef.current;
+        if (!el) {
+            setCanConfirm(false);
+            return;
+        }
+
+        const threshold = 12;
+        const hasOverflow = el.scrollHeight > el.clientHeight + threshold;
+        if (!hasOverflow) {
+            setCanConfirm(true);
+            return;
+        }
+
+        const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+        setCanConfirm(isAtBottom);
+    }, [content, isOpen, requireScrollToConfirm, title]);
 
     useEffect(() => {
         return () => {
@@ -71,6 +95,7 @@ const TermsModal: React.FC<TermsModalProps> = ({
                     </button>
                 </div>
                 <div
+                    ref={contentRef}
                     onScroll={handleScroll}
                     className="p-6 overflow-y-auto custom-scrollbar text-sm leading-relaxed text-slate-600 space-y-4"
                 >
