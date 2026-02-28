@@ -460,7 +460,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               </div>
               <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-4 tracking-tight">환영합니다! 자녀를 연결해 주세요</h2>
               <p className="text-slate-500 font-bold mb-10 text-balance leading-relaxed text-sm md:text-base">
-                포텐 AI는 부모님과 자녀가 함께 만들어가는 안전한 성장의 공간입니다.<br className="hidden md:block" />
+                포틴 AI는 부모님과 자녀가 함께 만들어가는 안전한 성장의 공간입니다.<br className="hidden md:block" />
                 아래 3단계 가이드에 따라 자녀와 계정을 연결하고 멘토링 현황을 확인해 보세요.
               </p>
 
@@ -478,7 +478,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative shadow-sm hover:shadow-md transition-shadow">
                   <div className="absolute -top-4 -left-4 w-10 h-10 bg-brand-900 text-white rounded-full flex items-center justify-center font-black border-4 border-white shadow-sm shadow-brand-900/20 text-lg">3</div>
                   <h3 className="font-black text-brand-900 mb-2 mt-2 text-lg">학생 접속</h3>
-                  <p className="text-sm text-slate-500 font-bold leading-relaxed">자녀가 포텐 AI 앱의 '학생 시작하기'에 코드를 입력하면 즉시 연결됩니다.</p>
+                  <p className="text-sm text-slate-500 font-bold leading-relaxed">자녀가 포틴 AI 앱의 '학생 시작하기'에 코드를 입력하면 즉시 연결됩니다.</p>
                 </div>
               </div>
 
