@@ -404,6 +404,16 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     return createSession();
   };
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+
+    return {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    };
+  };
+
   const loadStudentSettings = async () => {
     if (settingsCacheRef.current) return settingsCacheRef.current;
 
@@ -442,9 +452,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (!session) return;
 
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch('/api/session-meta', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           firstMessage,
           transcript,
@@ -548,9 +559,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       const settings = await loadStudentSettings();
       const parentStylePrompt = buildSystemPromptFromSettings(settings);
 
+      const headers = await getAuthHeaders();
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           newMessage: userText,
           history: nextHistory,

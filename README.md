@@ -22,17 +22,13 @@
 Supabase SQL Editor에서 아래 순서대로 실행하세요.
 
 1. `supabase/schema.sql`
-2. 제목 컬럼 마이그레이션 SQL
+2. `supabase/migrations/*.sql` 파일을 **파일명 순서대로 전체 실행**
+   - `20260215_chat_summary_and_invite_code.sql`
+   - `20260217_add_chat_title.sql`
+   - `20260218_fix_chat_sessions_title_and_risk_constraint.sql`
+   - `20260220_admin_codes_and_ops_tables.sql`
 
-```sql
-alter table public.chat_sessions
-  add column if not exists title text not null default '새 대화';
-```
-
-또는 `supabase/migrations/20260217_add_chat_title.sql` 파일을 실행해도 됩니다.
-
-기존 DB가 오래된 스키마(`title` nullable, `risk_level`에 `warn/high` 포함)라면
-`supabase/migrations/20260218_fix_chat_sessions_title_and_risk_constraint.sql`도 추가로 실행하세요.
+> 참고: `supabase_schema.sql`은 더 이상 실행 대상이 아니며, 과거 내용을 migration으로 이관한 안내 파일입니다.
 
 
 ## Mobile App (웹 쌍둥이 버전)
@@ -52,6 +48,7 @@ Vercel에 아래 환경 변수를 반드시 설정해야 동작합니다.
 - `GEMINI_API_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (부모 등록코드 기반 서버 회원가입 API에서 사용)
 
 ## Notes
 

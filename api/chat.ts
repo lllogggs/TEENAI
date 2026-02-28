@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { enforceRateLimit, requireSupabaseUser, validateOptionalBase64DataUrl, validateTextLength } from './_lib/request-guards';
 
 const getApiKey = () => process.env.GEMINI_API_KEY || '';
 
@@ -12,6 +13,13 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const authContext = await requireSupabaseUser(req, res);
+  if (!authContext) return;
+
+  const rateAllowed = enforceRateLimit(res, `chat:user:${authContext.userId}`, 20, 60_000)
+    && enforceRateLimit(res, `chat:ip:${authContext.ip}`, 60, 60_000);
+  if (!rateAllowed) return;
+
   const apiKey = getApiKey();
   if (!apiKey) {
     res.status(500).json({ error: 'GEMINI_API_KEY is missing on server environment.' });
@@ -20,6 +28,20 @@ export default async function handler(req: any, res: any) {
 
   try {
     const { history, newMessage, parentStylePrompt, imageData, audioData } = req.body || {};
+    if (!validateTextLength(String(newMessage || ''), 2000)) {
+      res.status(400).json({ error: 'newMessage is required and must be <= 2000 chars.' });
+      return;
+    }
+
+    if (!validateOptionalBase64DataUrl(imageData, /^image\/(jpeg|jpg|png|webp)$/i, 3 * 1024 * 1024)) {
+      res.status(400).json({ error: 'Invalid imageData format or image too large.' });
+      return;
+    }
+
+    if (!validateOptionalBase64DataUrl(audioData, /^audio\/(webm|wav|mpeg|mp3|ogg|mp4)$/i, 5 * 1024 * 1024)) {
+      res.status(400).json({ error: 'Invalid audioData format or audio too large.' });
+      return;
+    }
     const userMessage = String(newMessage || '');
     const userChars = Math.max(countChars(userMessage), 1);
     const minChars = Math.floor(userChars * 0.8);
@@ -90,7 +112,13 @@ export default async function handler(req: any, res: any) {
     const result = await chat.sendMessage({ message: userParts });
     res.status(200).json({ text: result.text || '' });
   } catch (error) {
-    console.error('Gemini chat error:', error);
+    console.error('Gemini chat error:', {
+      error,
+      userId: authContext.userId,
+      inputLength: String(req.body?.newMessage || '').length,
+      hasImage: Boolean(req.body?.imageData),
+      hasAudio: Boolean(req.body?.audioData),
+    });
     res.status(500).json({ error: 'AI 응답 생성 중 오류가 발생했습니다.' });
   }
 }

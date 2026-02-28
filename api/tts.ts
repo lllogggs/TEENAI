@@ -1,4 +1,5 @@
 import textToSpeech from '@google-cloud/text-to-speech';
+import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards';
 
 let credentials;
 try {
@@ -17,9 +18,16 @@ export default async function handler(req: any, res: any) {
         return;
     }
 
+    const authContext = await requireSupabaseUser(req, res);
+    if (!authContext) return;
+
+    const rateAllowed = enforceRateLimit(res, `tts:user:${authContext.userId}`, 10, 60_000)
+        && enforceRateLimit(res, `tts:ip:${authContext.ip}`, 30, 60_000);
+    if (!rateAllowed) return;
+
     const { text } = req.body || {};
-    if (!text) {
-        res.status(400).json({ error: 'Text is required for TTS' });
+    if (!validateTextLength(String(text || ''), 1200)) {
+        res.status(400).json({ error: 'Text is required for TTS and must be <= 1200 chars' });
         return;
     }
 
@@ -38,7 +46,7 @@ export default async function handler(req: any, res: any) {
 
         res.status(200).json({ audioContent: base64Audio });
     } catch (error) {
-        console.error('TTS error:', error);
+        console.error('TTS error:', { error, inputLength: String(req.body?.text || '').length });
         res.status(500).json({ error: '음성 생성 중 오류가 발생했습니다.' });
     }
 }

@@ -123,22 +123,43 @@ function App() {
 
           // Check if parent has reached student limit (max 3)
           const { count, error: countError } = await supabase
-            .from('users')
-            .select('id', { count: 'exact', head: true })
+            .from('student_profiles')
+            .select('user_id', { count: 'exact', head: true })
             .eq('parent_user_id', parents[0].id);
 
-          if (countError) throw countError;
+          if (countError) {
+            console.error('student count lookup error:', countError);
+            throw countError;
+          }
           if ((count || 0) >= 3) {
             throw new Error('해당 부모님 계정의 학생 수가 최대(3명)에 도달했습니다.');
           }
 
           parentId = parents[0].id;
         } else if (role === UserRole.PARENT) {
-          // "code" argument is treated as Registration Code for Parents
           if (!code) throw new Error('관리자 등록 코드가 필요합니다.');
           registrationCode = code.trim();
-          // Validation is done in Auth.tsx, but good to re-verify or just proceed to mark used.
-          // We will mark it used AFTER successful signup.
+
+          const parentSignupResponse = await fetch('/api/parent-signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, registrationCode }),
+          });
+
+          const parentSignupPayload = await parentSignupResponse.json().catch(() => ({}));
+          if (!parentSignupResponse.ok) {
+            throw new Error(parentSignupPayload?.error || '부모 계정 생성에 실패했습니다.');
+          }
+
+          const { data: parentLoginData, error: parentLoginError } = await supabase.auth.signInWithPassword({ email, password });
+          if (parentLoginError) throw parentLoginError;
+
+          if (parentLoginData.user) {
+            await ensureProfileLoaded(parentLoginData.user.id, parentLoginData.user.email || email);
+            return;
+          }
+
+          throw new Error('부모 계정 로그인에 실패했습니다.');
         }
 
         const normalizedInviteCode = role === UserRole.STUDENT ? code?.trim().toUpperCase() : undefined;
@@ -168,17 +189,17 @@ function App() {
         if (authError) throw authError;
         if (!authData.user) throw new Error('가입 실패');
 
-        // If parent signup successful, mark registration code as used
-        if (role === UserRole.PARENT && registrationCode) {
-          const { error: codeError } = await supabase
-            .from('admin_codes')
-            .update({ is_used: true, used_at: new Date().toISOString() })
-            .eq('code', registrationCode);
+        if (role === UserRole.STUDENT && authData.session?.user && parentId) {
+          const { error: studentProfileError } = await supabase
+            .from('student_profiles')
+            .upsert({
+              user_id: authData.user.id,
+              invite_code: normalizedInviteCode,
+              parent_user_id: parentId,
+            });
 
-          if (codeError) {
-            console.error('Failed to mark registration code as used:', codeError);
-            // Non-fatal error for the user, but needs admin attention. 
-            // We might want to alert or log this system-wide.
+          if (studentProfileError) {
+            console.error('student_profiles upsert after signup error:', studentProfileError);
           }
         }
 

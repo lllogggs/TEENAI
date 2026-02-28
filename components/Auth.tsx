@@ -1,7 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
 import { UserRole } from '../types';
-import { supabase } from '../utils/supabase';
 import TermsModal from './TermsModal';
 
 interface AuthProps {
@@ -27,18 +26,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const verifyRegistrationCode = async (code: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from('admin_codes')
-      .select('code, is_used')
-      .eq('code', code)
-      .eq('is_used', false)
-      .single();
-
-    if (error || !data) return false;
-    return true;
-  };
-
 
 
   const hasAcceptedRequiredPolicies = useMemo(() => termsAccepted && privacyAccepted, [termsAccepted, privacyAccepted]);
@@ -59,21 +46,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
           alert("관리자 등록 코드가 필요합니다.");
           return;
         }
-        const isValid = await verifyRegistrationCode(registrationCode);
-        if (!isValid) {
-          alert("유효하지 않거나 이미 사용된 등록 코드입니다.");
-          return;
-        }
-        // Code will be marked as used AFTER successful signup in the parent component or via a triggered function ideally.
-        // But here we rely on the onLogin callback. 
-        // NOTE: For stricter security, code verification and usage should be atomic on server side.
-        // For this implementation, we will mark it used after successful auth in the callback context if possible.
-        // However, onLogin is passed from App.tsx. We will assume validation is enough here and update App.tsx to handle post-signup logic or handle it here?
-        // Let's modify logic: onLogin will handle the actual duplicate check. 
-        // We will just pass validation here.
-        // Checking code validity is done. Mark used happens inside App.tsx or we do it here right before calling onLogin?
-        // If onLogin fails, we shouldn't mark it used.
-        // Ideally App.tsx should handle the "mark used" part.
       }
 
       if (view === 'student-auth' && inviteCode.length < 6) {
@@ -83,17 +55,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     }
 
     if (view === 'parent-auth') {
-      // Pass registration code as the last argument if needed, or handle it within App.tsx by passing it as 'code'.
-      // The interface for onLogin is: (..., inviteCode?: string, ...)
-      // We can overload inviteCode for parents to be "Registration Code".
       await onLogin(email, password, UserRole.PARENT, isSignup ? registrationCode : undefined, isSignup);
-
-      if (isSignup && view === 'parent-auth') {
-        // Best effort to mark code used if login/signup didn't throw (onLogin returns Promise<void>).
-        // But onLogin in App.tsx might fail.
-        // Let's rely on App.tsx to handle the business logic of "using" the code to avoid race conditions or split logic.
-        // Actually, App.tsx doesn't know about admin_codes table yet. We'll update App.tsx next.
-      }
     } else {
       await onLogin(email, password, UserRole.STUDENT, inviteCode, isSignup);
     }

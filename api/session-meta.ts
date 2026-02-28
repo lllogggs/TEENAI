@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards';
 
 type SessionRiskLevel = 'stable' | 'normal' | 'caution';
 
@@ -36,6 +37,13 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const authContext = await requireSupabaseUser(req, res);
+  if (!authContext) return;
+
+  const rateAllowed = enforceRateLimit(res, `meta:user:${authContext.userId}`, 15, 60_000)
+    && enforceRateLimit(res, `meta:ip:${authContext.ip}`, 45, 60_000);
+  if (!rateAllowed) return;
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     res.status(500).json({ error: 'GEMINI_API_KEY is missing on server environment.' });
@@ -43,13 +51,27 @@ export default async function handler(req: any, res: any) {
   }
 
   const title = String(req.body?.title || '').trim();
+  if (title.length > 60) {
+    res.status(400).json({ error: 'title must be <= 60 chars' });
+    return;
+  }
+
   const firstMessage = String(req.body?.firstMessage || '').trim();
+  if (firstMessage && !validateTextLength(firstMessage, 2000)) {
+    res.status(400).json({ error: 'firstMessage must be <= 2000 chars' });
+    return;
+  }
   const transcript = Array.isArray(req.body?.transcript)
     ? req.body.transcript
       .filter((item: any) => item && (item.role === 'user' || item.role === 'model') && typeof item.content === 'string')
       .slice(-16)
       .map((item: any) => ({ role: item.role, content: item.content.trim().slice(0, 400) }))
     : [];
+
+  if (transcript.some((item: any) => typeof item.content !== 'string' || item.content.length > 2000)) {
+    res.status(400).json({ error: 'transcript item content must be <= 2000 chars' });
+    return;
+  }
 
   if (!firstMessage && transcript.length === 0) {
     res.status(400).json({ error: 'firstMessage or transcript is required' });
@@ -102,7 +124,13 @@ export default async function handler(req: any, res: any) {
       risk_level: normalizeRiskLevel(parsed?.risk_level),
     });
   } catch (error) {
-    console.error('Gemini session-meta error:', error);
+    console.error('Gemini session-meta error:', {
+      error,
+      userId: authContext.userId,
+      titleLength: title.length,
+      firstMessageLength: firstMessage.length,
+      transcriptCount: transcript.length,
+    });
     res.status(500).json({ error: '세션 메타데이터 생성 중 오류가 발생했습니다.' });
   }
 }
