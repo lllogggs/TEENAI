@@ -48,13 +48,10 @@ export default async function handler(req: any, res: any) {
   const codeUsedAt = new Date().toISOString();
 
   try {
-    const { data: claimedCode, error: claimError } = await adminClient
-      .from('admin_codes')
-      .update({ is_used: true, used_at: codeUsedAt })
-      .eq('code', registrationCode)
-      .eq('is_used', false)
-      .select('code')
-      .maybeSingle();
+    const { data: claimedCode, error: claimError } = await adminClient.rpc('claim_admin_code_use', {
+      p_code: registrationCode,
+      p_used_at: codeUsedAt,
+    });
 
     if (claimError) {
       console.error('admin code claim error:', claimError);
@@ -63,7 +60,7 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!claimedCode) {
-      res.status(400).json({ error: '유효하지 않거나 이미 사용된 등록 코드입니다.' });
+      res.status(400).json({ error: '유효하지 않거나 사용 가능한 횟수를 초과한 등록 코드입니다.' });
       return;
     }
 
@@ -83,11 +80,10 @@ export default async function handler(req: any, res: any) {
     });
 
     if (createUserError || !createdUser.user) {
-      await adminClient
-        .from('admin_codes')
-        .update({ is_used: false, used_at: null })
-        .eq('code', registrationCode)
-        .eq('used_at', codeUsedAt);
+      await adminClient.rpc('decrement_admin_code_use', {
+        p_code: registrationCode,
+        p_used_at: codeUsedAt,
+      });
 
       throw createUserError || new Error('Failed to create parent user.');
     }
