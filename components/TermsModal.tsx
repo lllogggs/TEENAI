@@ -1,14 +1,87 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface TermsModalProps {
     isOpen: boolean;
     onClose: () => void;
     title: string;
     content: React.ReactNode;
+    onConfirm?: () => void;
+    confirmLabel?: string;
+    requireScrollToConfirm?: boolean;
 }
 
-const TermsModal: React.FC<TermsModalProps> = ({ isOpen, onClose, title, content }) => {
+const TermsModal: React.FC<TermsModalProps> = ({
+    isOpen,
+    onClose,
+    title,
+    content,
+    onConfirm,
+    confirmLabel = '확인했습니다',
+    requireScrollToConfirm = false,
+}) => {
+    const [canConfirm, setCanConfirm] = useState(!requireScrollToConfirm);
+    const contentRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+            return;
+        }
+        document.body.style.overflow = 'unset';
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (!requireScrollToConfirm) {
+            setCanConfirm(true);
+            return;
+        }
+
+        const el = contentRef.current;
+        if (!el) {
+            setCanConfirm(false);
+            return;
+        }
+
+        const threshold = 12;
+        const hasOverflow = el.scrollHeight > el.clientHeight + threshold;
+        if (!hasOverflow) {
+            setCanConfirm(true);
+            return;
+        }
+
+        const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+        setCanConfirm(isAtBottom);
+    }, [content, isOpen, requireScrollToConfirm, title]);
+
+    useEffect(() => {
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
+
+    const confirmButtonLabel = useMemo(() => {
+        if (!requireScrollToConfirm) return confirmLabel;
+        return canConfirm ? confirmLabel : '끝까지 읽어주세요';
+    }, [canConfirm, confirmLabel, requireScrollToConfirm]);
+
     if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        if (!canConfirm) return;
+        onConfirm?.();
+        onClose();
+    };
+
+    const handleScroll: React.UIEventHandler<HTMLDivElement> = (e) => {
+        if (!requireScrollToConfirm) return;
+        const el = e.currentTarget;
+        const threshold = 12;
+        const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+        if (isAtBottom) {
+            setCanConfirm(true);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -21,12 +94,20 @@ const TermsModal: React.FC<TermsModalProps> = ({ isOpen, onClose, title, content
                         </svg>
                     </button>
                 </div>
-                <div className="p-6 overflow-y-auto custom-scrollbar text-sm leading-relaxed text-slate-600 space-y-4">
+                <div
+                    ref={contentRef}
+                    onScroll={handleScroll}
+                    className="p-6 overflow-y-auto custom-scrollbar text-sm leading-relaxed text-slate-600 space-y-4"
+                >
                     {content}
                 </div>
                 <div className="p-5 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end sticky bottom-0 z-10">
-                    <button onClick={onClose} className="px-5 py-2.5 bg-brand-900 text-white font-bold rounded-xl hover:bg-black transition-colors">
-                        확인했습니다
+                    <button
+                        onClick={handleConfirm}
+                        disabled={!canConfirm}
+                        className="px-5 py-2.5 bg-brand-900 text-white font-bold rounded-xl hover:bg-black transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed disabled:hover:bg-slate-300"
+                    >
+                        {confirmButtonLabel}
                     </button>
                 </div>
             </div>
