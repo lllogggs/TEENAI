@@ -1,10 +1,18 @@
 import { GoogleGenAI } from '@google/genai';
+import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+
+  const authContext = await requireSupabaseUser(req, res);
+  if (!authContext) return;
+
+  const rateAllowed = enforceRateLimit(res, `title:user:${authContext.userId}`, 20, 60_000)
+    && enforceRateLimit(res, `title:ip:${authContext.ip}`, 60, 60_000);
+  if (!rateAllowed) return;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -13,8 +21,8 @@ export default async function handler(req: any, res: any) {
   }
 
   const firstMessage = String(req.body?.firstMessage || '').trim();
-  if (!firstMessage) {
-    res.status(400).json({ error: 'firstMessage is required' });
+  if (!validateTextLength(firstMessage, 2000)) {
+    res.status(400).json({ error: 'firstMessage is required and must be <= 2000 chars' });
     return;
   }
 
@@ -47,7 +55,7 @@ export default async function handler(req: any, res: any) {
     const title = normalizedTitle || '새 대화';
     res.status(200).json({ title });
   } catch (error) {
-    console.error('Gemini title error:', error);
+    console.error('Gemini title error:', { error, userId: authContext.userId, inputLength: firstMessage.length });
     res.status(500).json({ error: '대화 제목 생성 중 오류가 발생했습니다.' });
   }
 }
