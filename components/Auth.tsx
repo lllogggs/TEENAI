@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { UserRole } from '../types';
 import { supabase } from '../utils/supabase';
 import TermsModal from './TermsModal';
@@ -39,12 +39,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     return true;
   };
 
-  const markRegistrationCodeUsed = async (code: string) => {
-    await supabase
-      .from('admin_codes')
-      .update({ is_used: true, used_at: new Date().toISOString() })
-      .eq('code', code);
-  };
+
+
+  const hasAcceptedRequiredPolicies = useMemo(() => termsAccepted && privacyAccepted, [termsAccepted, privacyAccepted]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +49,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     if (password.length < 6) { alert("비밀번호는 6자리 이상이어야 합니다."); return; }
 
     if (isSignup) {
-      if (!termsAccepted || !privacyAccepted) {
+      if (!hasAcceptedRequiredPolicies) {
         alert("이용약관 및 개인정보처리방침에 동의해주세요.");
         return;
       }
@@ -205,38 +202,65 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
 
           {isSignup && (
             <div className="space-y-3 pt-2">
-              <label className="flex items-center gap-3 px-2 cursor-pointer group">
-                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="w-5 h-5 rounded-lg border-slate-300 text-brand-900 focus:ring-brand-500" />
-                <span className="text-xs font-bold text-slate-500 group-hover:text-slate-800 transition-colors">
-                  <span className="underline underline-offset-2" onClick={(e) => { e.preventDefault(); setShowTerms(true); }}>서비스 이용약관</span>에 동의합니다. (필수)
+              <button
+                type="button"
+                onClick={() => setShowTerms(true)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-colors border-slate-200 hover:border-slate-300"
+              >
+                <span className="text-xs font-bold text-slate-600">서비스 이용약관 전체 읽기 (필수)</span>
+                <span className={`text-[11px] font-black ${termsAccepted ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {termsAccepted ? '읽음 완료' : '미완료'}
                 </span>
-              </label>
-              <label className="flex items-center gap-3 px-2 cursor-pointer group">
-                <input type="checkbox" checked={privacyAccepted} onChange={(e) => setPrivacyAccepted(e.target.checked)} className="w-5 h-5 rounded-lg border-slate-300 text-brand-900 focus:ring-brand-500" />
-                <span className="text-xs font-bold text-slate-500 group-hover:text-slate-800 transition-colors">
-                  <span className="underline underline-offset-2" onClick={(e) => { e.preventDefault(); setShowPrivacy(true); }}>개인정보 수집 및 이용</span>에 동의합니다. (필수)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPrivacy(true)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-colors border-slate-200 hover:border-slate-300"
+              >
+                <span className="text-xs font-bold text-slate-600">개인정보 처리방침 전체 읽기 (필수)</span>
+                <span className={`text-[11px] font-black ${privacyAccepted ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {privacyAccepted ? '읽음 완료' : '미완료'}
                 </span>
-              </label>
+              </button>
+
               <p className="text-[10px] text-slate-400 px-2 mt-1">
+                * 스크롤하여 약관/방침 끝까지 읽은 뒤에만 동의 처리가 됩니다.
+              </p>
+              <p className="text-[10px] text-slate-400 px-2">
                 * 만 14세 미만 가입 시 법정대리인의 동의가 필요합니다.
               </p>
             </div>
           )}
 
-          <button type="submit" disabled={loading} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
+          <button type="submit" disabled={loading || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
             {loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}
           </button>
         </form>
 
         <div className="mt-6 md:mt-10 text-center">
-          <button onClick={() => setIsSignup(!isSignup)} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
+          <button onClick={() => { setIsSignup(!isSignup); setTermsAccepted(false); setPrivacyAccepted(false); }} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
             {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
           </button>
         </div>
       </div>
 
-      <TermsModal isOpen={showTerms} onClose={() => setShowTerms(false)} title="서비스 이용약관" content={termsContent} />
-      <TermsModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} title="개인정보 처리방침" content={privacyContent} />
+      <TermsModal
+        isOpen={showTerms}
+        onClose={() => setShowTerms(false)}
+        onConfirm={() => setTermsAccepted(true)}
+        title="서비스 이용약관"
+        content={termsContent}
+        requireScrollToConfirm
+      />
+      <TermsModal
+        isOpen={showPrivacy}
+        onClose={() => setShowPrivacy(false)}
+        onConfirm={() => setPrivacyAccepted(true)}
+        title="개인정보 처리방침"
+        content={privacyContent}
+        requireScrollToConfirm
+      />
     </div>
   );
 };
