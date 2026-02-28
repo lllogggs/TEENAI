@@ -22,7 +22,7 @@
       "package": "com.forteenai.app"
     },
     "extra": {
-      "webAppUrl": "https://teenai.vercel.app",
+      "webAppUrl": "https://forteenai.com",
       "eas": {
         "projectId": "c68010ef-6472-4dcd-bd45-36b3cc3d654e"
       }
