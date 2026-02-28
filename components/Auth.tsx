@@ -132,7 +132,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
           {isSignup ? 'Signup' : 'Login'}
         </h2>
         <p className="text-slate-400 text-xs md:text-sm font-bold mb-6 md:mb-10 text-balance">
-          {isSignup ? '새로운 포텐 AI 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
+          {isSignup ? '새로운 포틴 AI 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
