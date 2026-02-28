@@ -9,15 +9,24 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.forteenai.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.forteenai.app"
     },
     "extra": {
-      "webAppUrl": "https://YOUR-WEB-APP-URL"
-    }
+      "webAppUrl": "https://teenai.vercel.app",
+      "eas": {
+        "projectId": "c68010ef-6472-4dcd-bd45-36b3cc3d654e"
+      }
+    },
+    "owner": "forteenai"
   }
 }
