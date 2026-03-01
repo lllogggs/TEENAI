@@ -436,21 +436,21 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   return (
     <div className="min-h-[100dvh] bg-[#F4F7FC] pt-[env(safe-area-inset-top,0px)]">
       {/* Header */}
-      <header className="px-4 md:px-8 py-3.5 md:py-5 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
+      <header className="px-3 md:px-7 py-2.5 md:py-4 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
         <div className="flex items-center gap-2 md:gap-3">
-          <ForteenLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
+          <ForteenLogo className="w-10 h-10 md:w-11 md:h-11 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
           <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-end gap-1.5">
             포틴AI
             <span className="text-[9px] bg-brand-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tight leading-none">Parent</span>
           </h1>
         </div>
-        <div className="flex items-center gap-3 md:gap-5 flex-wrap justify-end">
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end">
           <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
-          <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 p-3 rounded-2xl transition-all">Logout</button>
+          <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 px-3 py-2 md:p-3 rounded-2xl transition-all">Logout</button>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-7 lg:px-8 py-4 md:py-5 space-y-2">
+      <main className="max-w-6xl mx-auto px-3 md:px-6 lg:px-7 py-3 md:py-4 space-y-2">
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
@@ -566,8 +566,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               )}
             </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-3">
-              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+            <section className="grid grid-cols-1 lg:grid-cols-4 gap-2 md:gap-2.5 lg:gap-3">
+              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-2">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">1) 심리 안정도 요약</h2>
                 <div className="h-32 lg:h-40 flex items-end justify-around gap-2">
                   {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
@@ -598,9 +598,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </button>
               </article>
 
-              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-2">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록</h2>
-                <div className="space-y-2 h-[220px] lg:h-[340px] overflow-y-auto custom-scrollbar">
+                <div className="space-y-2 h-[200px] md:h-[240px] lg:h-[320px] overflow-y-auto custom-scrollbar">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
                   {filteredSessions.map((session) => {
                     const risk = normalizeRiskLevel(session.risk_level);
@@ -663,7 +663,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-2">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">3) AI 개별 지시사항 관리</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                   <div>
@@ -693,7 +693,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-2">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">4) 멘토 말투 성향</h2>
                 <div className="grid grid-cols-1 gap-2">
                   {mentorToneOptions.map((option) => (
