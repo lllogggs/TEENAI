@@ -434,13 +434,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F4F7FC]">
+    <div className="min-h-[100dvh] bg-[#F4F7FC] pt-[env(safe-area-inset-top,0px)]">
       {/* Header */}
-      <header className="px-5 md:px-10 py-5 md:py-8 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
+      <header className="px-4 md:px-8 py-3.5 md:py-5 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
         <div className="flex items-center gap-2 md:gap-3">
           <ForteenLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
           <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-end gap-1.5">
-            Forteen AI
+            포틴AI
             <span className="text-[9px] bg-brand-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tight leading-none">Parent</span>
           </h1>
         </div>
@@ -450,7 +450,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-7 lg:px-8 py-5 md:py-7 space-y-3">
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
@@ -464,7 +464,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 아래 3단계 가이드에 따라 자녀와 계정을 연결하고 멘토링 현황을 확인해 보세요.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 text-left">
                 <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative shadow-sm hover:shadow-md transition-shadow">
                   <div className="absolute -top-4 -left-4 w-10 h-10 bg-brand-900 text-white rounded-full flex items-center justify-center font-black border-4 border-white shadow-sm shadow-brand-900/20 text-lg">1</div>
                   <h3 className="font-black text-brand-900 mb-2 mt-2 text-lg">코드 확인</h3>
@@ -566,7 +566,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               )}
             </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
               <article className="premium-card p-4 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">1) 심리 안정도 통계</h2>
                 <div className="h-40 lg:h-56 flex items-end justify-around gap-2 lg:gap-3">

@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
-import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,6 +33,7 @@ export default function App() {
   const webUrl = useMemo(() => getWebUrl(), []);
   const allowedOrigins = useMemo(() => (webUrl ? getAllowedOrigins(webUrl) : []), [webUrl]);
   const webViewRef = useRef<WebView>(null);
+  const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -65,8 +66,8 @@ export default function App() {
         const isAllowed = allowedOrigins.includes(requestOrigin);
 
         if (!isAllowed) {
-          Linking.openURL(requestUrl);
-          return false;
+          // Keep navigation inside in-app WebView for store compliance.
+          return true;
         }
       } catch {
         return true;
@@ -96,9 +97,9 @@ export default function App() {
   if (!webUrl || webUrl.includes('YOUR-WEB-APP-URL')) {
     return (
       <SafeAreaView style={styles.fallbackContainer}>
-        <StatusBar style="dark" />
+        <StatusBar style="dark" translucent backgroundColor="transparent" />
         <View style={styles.fallbackBox}>
-          <Text style={styles.title}>TEENAI 모바일 앱 설정 필요</Text>
+          <Text style={styles.title}>포틴AI 모바일 앱 설정 필요</Text>
           <Text style={styles.description}>
             mobile-app/app.json의 expo.extra.webAppUrl에 웹 배포 URL을 넣어주세요.
           </Text>
@@ -109,7 +110,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
       {hasLoadError ? (
         <View style={styles.errorContainer}>
@@ -127,7 +128,7 @@ export default function App() {
         <WebView
           ref={webViewRef}
           source={{ uri: webUrl }}
-          style={styles.webview}
+          style={[styles.webview, { marginTop: insets.top }]}
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loadingContainer}>

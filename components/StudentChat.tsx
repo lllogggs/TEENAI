@@ -629,12 +629,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] flex-col overflow-hidden">
-      <header className="px-4 md:px-10 py-3 md:py-6 bg-white/80 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
+    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden pt-[env(safe-area-inset-top,0px)]">
+      <header className="px-4 md:px-10 py-2.5 md:py-5 bg-white/85 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-10 h-10 md:w-14 md:h-14 shrink-0 shadow-lg shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-brand-900 tracking-tight select-none">Forteen AI</h1>
+            <h1 className="text-xl md:text-2xl font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
             <div className="flex items-center gap-1.5 mt-0.5 select-none">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
@@ -735,7 +735,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             <div className="w-[1px] h-4 bg-slate-200 lg:hidden mx-1"></div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-10 space-y-8 custom-scrollbar relative">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar relative">
             {errorNotice && <div className="text-sm text-red-600 font-bold">{errorNotice}</div>}
 
             {messages.length === 0 ? (
@@ -809,7 +809,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] md:pb-8 lg:pb-10 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
+          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] md:pb-6 lg:pb-8 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
             {imageThumbnail && (
               <div className="max-w-4xl mx-auto mb-2 relative inline-block">
                 <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
@@ -879,12 +879,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             <div className="max-w-4xl mx-auto mt-2 md:mt-3 text-center px-4">
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
-                Forteen AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
+                포틴AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
                 <button
                   onClick={() => setIsPrivacyModalOpen(true)}
                   className="underline hover:text-slate-500 transition-colors"
                 >
-                  개인 정보 보호 및 Forteen AI
+                  개인 정보 보호 및 포틴AI
                 </button>
               </p>
             </div>
