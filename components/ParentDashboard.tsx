@@ -450,7 +450,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-7 lg:px-8 py-5 md:py-7 space-y-3">
+      <main className="max-w-7xl mx-auto px-4 md:px-7 lg:px-8 py-4 md:py-5 space-y-2">
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
@@ -566,10 +566,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               )}
             </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
-              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">1) 심리 안정도 통계</h2>
-                <div className="h-40 lg:h-56 flex items-end justify-around gap-2 lg:gap-3">
+            <section className="grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-3">
+              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">1) 심리 안정도 요약</h2>
+                <div className="h-32 lg:h-40 flex items-end justify-around gap-2">
                   {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
                     const count = riskCounts[level];
                     const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
@@ -582,7 +582,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                         className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
                       >
                         <p className="text-[10px] lg:text-xs font-black text-slate-500">{count}개</p>
-                        <div className="w-8 lg:w-10 h-32 lg:h-56 rounded-xl bg-slate-100 flex items-end overflow-hidden">
+                        <div className="w-8 lg:w-10 h-24 lg:h-32 rounded-xl bg-slate-100 flex items-end overflow-hidden">
                           <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
                         </div>
                         <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
@@ -592,15 +592,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
                 <button
                   onClick={() => setRiskFilter('all')}
-                  className="mt-4 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
+                  className="mt-2 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
                 >
                   전체 보기
                 </button>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">2) 대화 목록</h2>
-                <div className="space-y-3 h-[200px] lg:h-[300px] overflow-y-auto custom-scrollbar">
+              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록</h2>
+                <div className="space-y-2 h-[220px] lg:h-[340px] overflow-y-auto custom-scrollbar">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
                   {filteredSessions.map((session) => {
                     const risk = normalizeRiskLevel(session.risk_level);
@@ -611,7 +611,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                           setSelectedSessionId(session.id);
                           setOpenedSessionId(session.id);
                         }}
-                        className={`p-5 rounded-2xl border transition-all cursor-pointer group relative ${selectedSessionId === session.id
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer group relative ${selectedSessionId === session.id
                           ? 'bg-brand-50 border-brand-500 ring-1 ring-brand-500'
                           : 'bg-white border-slate-100 hover:border-brand-200 hover:shadow-md'
                           } ${session.is_deleted_by_student ? 'opacity-75 bg-slate-50' : ''}`}
@@ -663,8 +663,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">3) AI 개별 지시사항 관리</h2>
+              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">3) AI 개별 지시사항 관리</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                   <div>
                     <textarea
@@ -693,8 +693,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">4) 멘토 말투 성향</h2>
+              <article className="premium-card p-4 lg:p-5 lg:col-span-2">
+                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">4) 멘토 말투 성향</h2>
                 <div className="grid grid-cols-1 gap-2">
                   {mentorToneOptions.map((option) => (
                     <button
@@ -709,8 +709,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-3">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">5) 필수 안심 가드레일</h2>
+              <article className="premium-card p-4 lg:p-5 lg:col-span-4">
+                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">5) 필수 안심 가드레일</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 lg:gap-3">
                   {guardrailMeta.map((item) => {
                     const enabled = normalizedSettings.guardrails[item.key];

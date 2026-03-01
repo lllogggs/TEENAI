@@ -1,6 +1,5 @@
 import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,7 +32,6 @@ export default function App() {
   const webUrl = useMemo(() => getWebUrl(), []);
   const allowedOrigins = useMemo(() => (webUrl ? getAllowedOrigins(webUrl) : []), [webUrl]);
   const webViewRef = useRef<WebView>(null);
-  const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -128,7 +126,7 @@ export default function App() {
         <WebView
           ref={webViewRef}
           source={{ uri: webUrl }}
-          style={[styles.webview, { marginTop: insets.top }]}
+          style={styles.webview}
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loadingContainer}>
@@ -185,7 +183,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     position: 'absolute',
-    top: 10,
+    top: 16,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
