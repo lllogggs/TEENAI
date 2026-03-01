@@ -98,7 +98,7 @@ export default function App() {
       <SafeAreaView style={styles.fallbackContainer}>
         <StatusBar style="dark" />
         <View style={styles.fallbackBox}>
-          <Text style={styles.title}>TEENAI 모바일 앱 설정 필요</Text>
+          <Text style={styles.title}>포틴 AI 모바일 앱 설정 필요</Text>
           <Text style={styles.description}>
             mobile-app/app.json의 expo.extra.webAppUrl에 웹 배포 URL을 넣어주세요.
           </Text>

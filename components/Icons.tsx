@@ -105,33 +105,14 @@ export const StopIcon: React.FC<IconProps> = ({ size = 24, className = '', ...pr
 // -----------------------------------------------------------------------------
 
 export const ForteenLogo: React.FC<IconProps> = ({ size = 32, className = '', ...props }) => (
-    <svg
+    <img
+        src="/brand/fortin-icon.svg"
         width={size}
         height={size}
-        viewBox="0 0 40 40"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
         className={className}
+        alt="포틴 AI 로고"
         {...props}
-    >
-        <rect width="40" height="40" rx="12" fill="currentColor" className="text-brand-900" />
-        <path
-            d="M26 14H18C15.7909 14 14 15.7909 14 18V26"
-            stroke="white"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-        <path
-            d="M14 20H22"
-            stroke="white"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-        {/* Stylized sparkle/brain node on top right */}
-        <circle cx="26" cy="14" r="2.5" fill="white" />
-    </svg>
+    />
 );
 
 // -----------------------------------------------------------------------------

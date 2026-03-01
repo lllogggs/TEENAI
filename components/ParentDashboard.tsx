@@ -142,6 +142,16 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [aiInstructionDraft, setAiInstructionDraft] = useState('');
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    sessions: false,
+    instructions: true,
+    tone: true,
+    guardrails: true,
+  });
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -434,13 +444,13 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F4F7FC]">
+    <div className="min-h-[100dvh] bg-[#F4F7FC]">
       {/* Header */}
-      <header className="px-5 md:px-10 py-5 md:py-8 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
+      <header className="px-5 md:px-10 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-4 md:py-8 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
         <div className="flex items-center gap-2 md:gap-3">
           <ForteenLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
           <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-end gap-1.5">
-            Forteen AI
+            포틴 AI
             <span className="text-[9px] bg-brand-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tight leading-none">Parent</span>
           </h1>
         </div>
@@ -450,7 +460,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-5 md:px-8 lg:px-10 py-8 md:py-10 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 lg:px-10 py-4 md:py-10 pb-[max(env(safe-area-inset-bottom,0px),1rem)] space-y-3 md:space-y-6">
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
@@ -501,7 +511,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           </div>
         ) : (
           <>
-            <section className="premium-card p-4 md:p-5 space-y-3">
+            <section className="premium-card p-3 md:p-5 space-y-2">
               <div className="flex flex-col md:flex-row justify-between gap-3 md:items-start">
                 <div className="flex flex-wrap items-center gap-2">
                   {connectedStudents.map((student) => {
@@ -566,8 +576,27 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               )}
             </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              <article className="premium-card p-3">
+                <p className="text-[11px] font-bold text-slate-500">안정</p>
+                <p className="text-xl font-black text-emerald-600">{riskCounts.stable}</p>
+              </article>
+              <article className="premium-card p-3">
+                <p className="text-[11px] font-bold text-slate-500">주의</p>
+                <p className="text-xl font-black text-amber-600">{riskCounts.normal}</p>
+              </article>
+              <article className="premium-card p-3">
+                <p className="text-[11px] font-bold text-slate-500">위험</p>
+                <p className="text-xl font-black text-rose-600">{riskCounts.caution}</p>
+              </article>
+              <article className="premium-card p-3">
+                <p className="text-[11px] font-bold text-slate-500">총 대화</p>
+                <p className="text-xl font-black text-slate-800">{sessions.length}</p>
+              </article>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-6">
+              <article className="premium-card p-3 lg:p-6 lg:col-span-1">
                 <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">1) 심리 안정도 통계</h2>
                 <div className="h-40 lg:h-56 flex items-end justify-around gap-2 lg:gap-3">
                   {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
@@ -598,8 +627,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </button>
               </article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">2) 대화 목록</h2>
+              <article className="premium-card p-3 lg:p-6 lg:col-span-2">
+                <button onClick={() => toggleSection('sessions')} className="w-full flex items-center justify-between font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록 <span className="text-xs text-slate-500">{collapsedSections.sessions ? '열기' : '접기'}</span></button>
+                {!collapsedSections.sessions && (
                 <div className="space-y-3 h-[200px] lg:h-[300px] overflow-y-auto custom-scrollbar">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
                   {filteredSessions.map((session) => {
@@ -661,10 +691,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     );
                   })}
                 </div>
-              </article>
+              )}</article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-2">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">3) AI 개별 지시사항 관리</h2>
+              <article className="premium-card p-3 lg:p-6 lg:col-span-2">
+                <button onClick={() => toggleSection('instructions')} className="w-full flex items-center justify-between font-black text-base lg:text-lg mb-2 lg:mb-3">3) AI 개별 지시사항 관리 <span className="text-xs text-slate-500">{collapsedSections.instructions ? '열기' : '접기'}</span></button>
+                {!collapsedSections.instructions && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                   <div>
                     <textarea
@@ -691,10 +722,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     ))}
                   </div>
                 </div>
-              </article>
+              )}</article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-1">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">4) 멘토 말투 성향</h2>
+              <article className="premium-card p-3 lg:p-6 lg:col-span-1">
+                <button onClick={() => toggleSection('tone')} className="w-full flex items-center justify-between font-black text-base lg:text-lg mb-2 lg:mb-3">4) 멘토 말투 성향 <span className="text-xs text-slate-500">{collapsedSections.tone ? '열기' : '접기'}</span></button>
+                {!collapsedSections.tone && (
                 <div className="grid grid-cols-1 gap-2">
                   {mentorToneOptions.map((option) => (
                     <button
@@ -707,10 +739,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     </button>
                   ))}
                 </div>
-              </article>
+              )}</article>
 
-              <article className="premium-card p-4 lg:p-6 lg:col-span-3">
-                <h2 className="font-black text-base lg:text-lg mb-3 lg:mb-4">5) 필수 안심 가드레일</h2>
+              <article className="premium-card p-3 lg:p-6 lg:col-span-3">
+                <button onClick={() => toggleSection('guardrails')} className="w-full flex items-center justify-between font-black text-base lg:text-lg mb-2 lg:mb-3">5) 필수 안심 가드레일 <span className="text-xs text-slate-500">{collapsedSections.guardrails ? '열기' : '접기'}</span></button>
+                {!collapsedSections.guardrails && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 lg:gap-3">
                   {guardrailMeta.map((item) => {
                     const enabled = normalizedSettings.guardrails[item.key];
@@ -729,7 +762,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     );
                   })}
                 </div>
-              </article>
+              )}</article>
             </section>
           </>
         )}
