@@ -30,8 +30,8 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 md:p-8 border-b border-slate-100">
                     <div>
-                        <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">개인정보처리방침 및 Forteen AI 안내</h2>
-                        <p className="text-xs md:text-sm font-bold text-brand-600 mt-1">Forteen AI Privacy Hub</p>
+                        <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">개인정보처리방침 및 포틴AI 안내</h2>
+                        <p className="text-xs md:text-sm font-bold text-brand-600 mt-1">포틴AI Privacy Hub</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -55,7 +55,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
                                 <li className="flex gap-4">
                                     <span className="text-brand-500 shrink-0 mt-0.5">•</span>
                                     <div className="flex flex-col md:flex-row gap-1 md:gap-4 md:items-baseline">
-                                        <strong className="text-slate-700 whitespace-nowrap min-w-[120px]">Forteen AI는 인<br className="hidden md:block" />공지능입니다.</strong>
+                                        <strong className="text-slate-700 whitespace-nowrap min-w-[120px]">포틴AI는 인<br className="hidden md:block" />공지능입니다.</strong>
                                         <span>따라서 인물, 사실, 사건에 관한 정보를 제공할 때 부정확하거나 환각 (Hallucination) 현상이 포함된 답변을 생성할 수 있습니다.</span>
                                     </div>
                                 </li>
@@ -72,7 +72,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
                         <section>
                             <h3 className="text-[17px] font-black text-slate-800 mb-4 px-1">수집하는 데이터</h3>
                             <div className="bg-white p-6 md:p-8 rounded-[1.5rem] border border-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] space-y-5">
-                                <p className="font-bold text-[14px] text-slate-700">Forteen AI 이용 시 다음 정보가 수집 및 저장됩니다.</p>
+                                <p className="font-bold text-[14px] text-slate-700">포틴AI 이용 시 다음 정보가 수집 및 저장됩니다.</p>
                                 <div className="space-y-3 text-[13px] md:text-sm text-slate-500 font-bold">
                                     <div className="flex gap-3"><strong className="text-slate-700 shrink-0">가입 정보:</strong> <span>이름, 학교, 이메일 등 계정 정보</span></div>
                                     <div className="flex gap-3"><strong className="text-slate-700 shrink-0">대화 기록:</strong> <span>프롬프트(질문), 업로드한 이미지 및 AI의 답변 내용 원문</span></div>
@@ -84,7 +84,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
                         <section className="px-1">
                             <h3 className="text-[17px] font-black text-slate-800 mb-4">데이터의 활용 및 부모 모니터링</h3>
                             <p className="text-[13px] md:text-sm text-slate-500 leading-relaxed mb-5 font-bold">
-                                Forteen AI는 청소년의 <strong className="text-slate-700">안전한 AI 이용 환경</strong>을 최우선으로 합니다.
+                                포틴AI는 청소년의 <strong className="text-slate-700">안전한 AI 이용 환경</strong>을 최우선으로 합니다.
                                 청소년 자녀(학생 멤버)의 계정은 부모(학부모 멤버)의 계정과 연동되며, 이에 따라 다음과 같은 모니터링 기능이 작동합니다.
                             </p>
                             <div className="grid gap-3 md:grid-cols-2">
@@ -103,7 +103,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
                             <ul className="list-disc pl-5 space-y-2 text-sm leading-relaxed">
                                 <li>사용자가 대화 세션을 삭제(Soft Delete)할 수 있으나, 안전을 위해 서버 상에는 일정 기간 보관될 수 있습니다.</li>
                                 <li>회원 탈퇴 시 모든 대화 기록과 연동 정보는 관련 법령에 따라 즉시 파기되거나 익명화 처리됩니다.</li>
-                                <li>Forteen AI는 사용자의 개인 대화 및 이미지를 본 서비스 응답 외의 외부 인공지능 학습(Training)용으로 임의 탈취하거나 제공하지 않습니다.</li>
+                                <li>포틴AI는 사용자의 개인 대화 및 이미지를 본 서비스 응답 외의 외부 인공지능 학습(Training)용으로 임의 탈취하거나 제공하지 않습니다.</li>
                             </ul>
                         </section>
 
