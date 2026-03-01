@@ -17,7 +17,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "package": "com.forteenai.app"
     },
@@ -27,6 +28,12 @@
         "projectId": "c68010ef-6472-4dcd-bd45-36b3cc3d654e"
       }
     },
-    "owner": "forteenai"
+    "owner": "forteenai",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    }
   }
 }

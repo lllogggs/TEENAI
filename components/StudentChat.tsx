@@ -630,7 +630,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden pt-[env(safe-area-inset-top,0px)]">
-      <header className="px-4 md:px-10 py-2.5 md:py-5 bg-white/85 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
+      <header className="px-4 md:px-10 py-2.5 md:py-5 bg-white/85 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-[env(safe-area-inset-top,0px)] z-20">
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-10 h-10 md:w-14 md:h-14 shrink-0 shadow-lg shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
@@ -646,7 +646,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden flex flex-row">
+      <div className="flex-1 overflow-hidden flex flex-row min-h-0">
         {/* Sidebar */}
         <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px] border-r' : 'lg:w-0 border-r-0'} lg:block border-slate-100 bg-white/70 backdrop-blur-sm transition-all duration-300 overflow-hidden`}>
           <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 w-[320px]">
@@ -781,7 +781,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 </div>
               </div>
             ) : (
-              <div className="pb-40 max-w-4xl mx-auto w-full">
+              <div className="pb-24 md:pb-28 max-w-4xl mx-auto w-full">
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                     <div
@@ -809,7 +809,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] md:pb-6 lg:pb-8 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
+          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[env(safe-area-inset-bottom,0px)] md:pb-2 lg:pb-3 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
             {imageThumbnail && (
               <div className="max-w-4xl mx-auto mb-2 relative inline-block">
                 <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
