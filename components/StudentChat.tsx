@@ -629,12 +629,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden pt-[env(safe-area-inset-top,0px)]">
-      <header className="px-4 md:px-10 py-2.5 md:py-5 bg-white/85 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-[env(safe-area-inset-top,0px)] z-20">
+    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden pt-[calc(env(safe-area-inset-top,0px)+0px)]">
+      <header className="px-3 md:px-8 py-1.5 md:py-3 bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-[env(safe-area-inset-top,0px)] z-20">
         <div className="flex items-center gap-2 md:gap-5">
-          <ForteenLogo className="w-10 h-10 md:w-14 md:h-14 shrink-0 shadow-lg shadow-brand-900/10 rounded-xl md:rounded-2xl" />
+          <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-md shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
+            <h1 className="text-2xl md:text-2xl font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
             <div className="flex items-center gap-1.5 mt-0.5 select-none">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
@@ -809,7 +809,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[env(safe-area-inset-bottom,0px)] md:pb-2 lg:pb-3 pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
+          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[calc(env(safe-area-inset-bottom,0px)+0.5px)] md:pb-[2.5px] lg:pb-[3.5px] pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
             {imageThumbnail && (
               <div className="max-w-4xl mx-auto mb-2 relative inline-block">
                 <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
@@ -877,7 +877,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className="max-w-4xl mx-auto mt-2 md:mt-3 text-center px-4">
+            <div className="max-w-4xl mx-auto mt-2.5 md:mt-3 text-center px-4 pb-[0.5px]">
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
                 포틴AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
                 <button
