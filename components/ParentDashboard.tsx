@@ -434,9 +434,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
   return (
-    <div className="min-h-[100dvh] bg-[#F4F7FC] pt-[env(safe-area-inset-top,0px)]">
+    <div className="h-[100dvh] bg-[#F4F7FC] pt-[env(safe-area-inset-top,0px)] overflow-hidden flex flex-col">
       {/* Header */}
-      <header className="px-3 md:px-7 py-2.5 md:py-4 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 z-10 relative">
+      <header className="px-3 md:px-7 py-2.5 md:py-4 flex justify-between items-center bg-white shadow-sm border-b border-slate-100 sticky top-0 z-20 shrink-0">
         <div className="flex items-center gap-2 md:gap-3">
           <ForteenLogo className="w-10 h-10 md:w-11 md:h-11 shrink-0 shadow-md shadow-brand-900/10 rounded-xl" />
           <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-end gap-1.5">
@@ -450,7 +450,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-3 md:px-6 lg:px-7 py-3 md:py-4 space-y-2">
+      <main className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <div className="max-w-6xl mx-auto px-3 md:px-6 lg:px-7 py-3 md:py-4 space-y-2">
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
@@ -733,6 +734,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </section>
           </>
         )}
+        </div>
       </main>
 
       {openedSessionId && (
