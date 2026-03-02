@@ -629,8 +629,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
-      <header className="px-3 md:px-8 py-1.5 md:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.4rem)] bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
+    <div className="flex h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
+      <header className="px-3 md:px-8 py-1.5 md:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.4rem)] bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20 shrink-0">
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-md shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
@@ -648,8 +648,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       <div className="flex-1 overflow-hidden flex flex-row min-h-0">
         {/* Sidebar */}
-        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px] border-r' : 'lg:w-0 border-r-0'} lg:block border-slate-100 bg-white/70 backdrop-blur-sm transition-all duration-300 overflow-hidden`}>
-          <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 w-[320px]">
+        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px] border-r' : 'lg:w-0 border-r-0'} lg:block min-h-0 border-slate-100 bg-white/70 backdrop-blur-sm transition-all duration-300 overflow-hidden`}>
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 w-[320px]">
             <button onClick={handleNewSession} className="w-full rounded-[1.25rem] border border-brand-100 bg-brand-50 py-4 text-base md:text-lg font-black text-brand-900 shadow-sm hover:bg-brand-100 transition-colors">+ 새 대화</button>
             {sessions.map((session) => {
               const isActive = session.id === currentSessionId;
