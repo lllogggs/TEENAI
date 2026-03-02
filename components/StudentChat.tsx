@@ -630,7 +630,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
-      <header className="px-3 md:px-8 py-1.5 md:py-3 bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
+      <header className="px-3 md:px-8 py-1.5 md:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.4rem)] bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-md shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
@@ -711,14 +711,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
           <div className="px-5 md:px-10 py-2 md:py-3 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
             {/* Container for buttons to stick top-left inside the content area */}
-            <div className="fixed left-4 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:top-[calc(env(safe-area-inset-top,0px)+5.5rem)] z-40 flex items-center gap-3 pointer-events-auto">
+            <div className="fixed left-4 top-[calc(env(safe-area-inset-top,0px)+5.15rem)] md:top-[calc(env(safe-area-inset-top,0px)+5.9rem)] z-40 flex items-center gap-3 pointer-events-auto">
               {/* Mobile Sidebar Toggle (Back) */}
-              <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-sm border border-slate-100 text-slate-500 hover:bg-slate-50 transition-colors shrink-0">
+              <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-10 h-10 items-center justify-center rounded-xl bg-white text-slate-700 border border-slate-200 shadow-md shadow-slate-300/30 hover:bg-brand-50 hover:text-brand-800 hover:border-brand-200 transition-colors shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
               </button>
 
               {/* PC Sidebar Toggle */}
-              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-sm border border-slate-100 text-slate-500 hover:bg-slate-50 transition-colors shrink-0">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-white text-slate-700 border border-slate-200 shadow-md shadow-slate-300/30 hover:bg-brand-50 hover:text-brand-800 hover:border-brand-200 transition-colors shrink-0">
                 {isSidebarOpen ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
                 ) : (

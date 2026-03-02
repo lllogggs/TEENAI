@@ -568,7 +568,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
             <section className="grid grid-cols-1 lg:grid-cols-4 gap-2 md:gap-2.5 lg:gap-3">
               <article className="premium-card p-3 md:p-3.5 lg:p-4 lg:col-span-1">
-                <h2 className="font-black text-base lg:text-lg mb-2">1) 심리 안정도 요약</h2>
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <h2 className="font-black text-base lg:text-lg">1) 심리 안정도 요약</h2>
+                  <button
+                    onClick={() => setRiskFilter('all')}
+                    className="text-[10px] md:text-[11px] font-black px-2 py-1 rounded-lg border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900 shrink-0 -mt-1"
+                  >
+                    전체 보기
+                  </button>
+                </div>
                 <div className="h-28 lg:h-32 flex items-end justify-around gap-1.5">
                   {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
                     const count = riskCounts[level];
@@ -590,19 +598,14 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     );
                   })}
                 </div>
-                <button
-                  onClick={() => setRiskFilter('all')}
-                  className="mt-2 w-full text-[11px] font-black px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
-                >
-                  전체 보기
-                </button>
+
               </article>
 
               <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-3">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록</h2>
-                <div className="space-y-2 h-[200px] md:h-[240px] lg:h-[320px] overflow-y-auto custom-scrollbar">
+                <div className="space-y-2 min-h-[204px] md:min-h-[236px]">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
-                  {filteredSessions.slice(0, 3).map((session) => {
+                  {filteredSessions.map((session) => {
                     const risk = normalizeRiskLevel(session.risk_level);
                     return (
                       <div
@@ -621,7 +624,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                             risk === 'normal' ? 'bg-amber-100 text-amber-700' :
                               'bg-rose-100 text-rose-700'
                             }`}>
-                            {risk.toUpperCase()}
+                            {riskText[risk]}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400">{new Date(session.started_at).toLocaleDateString()}</span>
                         </div>
@@ -631,9 +634,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                             <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">학생이 삭제함</span>
                           )}
                         </h4>
-                        <p className="text-xs text-slate-400 font-medium line-clamp-1">
-                          {session.student_intent || '분석 중...'}
-                        </p>
 
                         {/* Permanent Delete Button (Only for sessions deleted by student) */}
                         {session.is_deleted_by_student && (
