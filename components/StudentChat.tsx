@@ -163,31 +163,19 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   // Multimodal states
   const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
   const [isMicRecording, setIsMicRecording] = useState(false);
-  const [sendErrorMessage, setSendErrorMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const speechRecognitionRef = useRef<any>(null);
   const isIntentionalStopRef = useRef<boolean>(true);
 
-  const QUESTION_PROMPTS = [
-    '이 수학 문제 풀이 과정을 단계별로 알려줘.',
-    '사진 속 영어 문장을 해석해줘.',
-    '과학 개념을 중학생 눈높이로 설명해줘.',
-    '오늘 공부 계획을 같이 세워줘.',
+  const CHAT_PLACEHOLDERS = [
+    "요즘 가장 고민되는 게 뭐야? 편하게 말해줘.",
+    "오늘 하루 중 제일 재밌었던 일은?",
+    "궁금한 거나 물어보고 싶은 거 다 얘기해 봐!",
+    "지금 기분이 어때? 무슨 생각이 들어?",
+    "숙제나 공부하다 막히는 부분이 있으면 도와줄게."
   ];
-
-  const updateLastUserMessageStatus = (status: 'sending' | 'sent' | 'failed') => {
-    setMessages((prev) => {
-      const next = [...prev];
-      for (let index = next.length - 1; index >= 0; index -= 1) {
-        if (next[index].role === 'user') {
-          next[index] = { ...next[index], deliveryStatus: status };
-          break;
-        }
-      }
-      return next;
-    });
-  };
+  const [randomPlaceholder] = useState(() => CHAT_PLACEHOLDERS[Math.floor(Math.random() * CHAT_PLACEHOLDERS.length)]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -456,10 +444,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (error) {
       console.error('messages insert error:', error);
       setErrorNotice('일부 메시지 저장에 실패했습니다. 관리자에게 문의해 주세요.');
-      return error;
     }
-
-    return null;
   };
 
   const updateSessionMetaWithAI = async (sessionId: string, firstMessage: string, transcript: { role: 'user' | 'model'; content: string }[]) => {
@@ -522,13 +507,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (loading) return;
 
     setErrorNotice('');
-    setSendErrorMessage('');
     const userText = input.trim() || (inlineAudioBase64 ? '(음성 메시지)' : '(이미지 전송)');
 
     // Embed the image in text for DB storage
     const contentToPersist = imageThumbnail ? `[IMAGE]${imageThumbnail}[/IMAGE]\n${userText}` : userText;
 
-    const userMsg: ChatMessage = { role: 'user', text: contentToPersist, timestamp: Date.now(), deliveryStatus: 'sending' };
+    const userMsg: ChatMessage = { role: 'user', text: contentToPersist, timestamp: Date.now() };
     const nextHistory = messages.map((m) => ({ role: m.role, content: m.text }));
 
     const currentImage = imageThumbnail;
@@ -540,19 +524,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
     const sessionId = await ensureSession();
     if (!sessionId) {
-      updateLastUserMessageStatus('failed');
-      setSendErrorMessage('전송할 세션을 만들지 못했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.');
       setLoading(false);
       return;
     }
 
-    const userPersistError = await persistMessage(sessionId, 'user', contentToPersist);
-    if (userPersistError) {
-      updateLastUserMessageStatus('failed');
-      setSendErrorMessage('메시지 저장에 실패했어요. 아래 재전송 버튼을 눌러주세요.');
-      setLoading(false);
-      return;
-    }
+    await persistMessage(sessionId, 'user', contentToPersist);
 
     // [최우선] API 호출 비용 최적화 로직
     const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
@@ -605,35 +581,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-      updateLastUserMessageStatus('sent');
       await persistMessage(sessionId, 'model', aiText);
 
     } catch (err) {
       console.error('chat response error:', err);
       setErrorNotice('AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
-      updateLastUserMessageStatus('failed');
-      setSendErrorMessage('메시지 전송이 완료되지 않았습니다. 재전송을 시도해 주세요.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePromptChipClick = (prompt: string) => {
-    setInput(prompt);
-    setSendErrorMessage('');
-  };
-
-  const retryLastFailedMessage = async () => {
-    const failedMessage = [...messages].reverse().find((message) => message.role === 'user' && message.deliveryStatus === 'failed');
-    if (!failedMessage) return;
-
-    const imageMatch = failedMessage.text.match(/\[IMAGE\](.*?)\[\/IMAGE\]/);
-    const pureText = failedMessage.text.replace(/\[IMAGE\](.*?)\[\/IMAGE\]\n?/, '').trim();
-    if (imageMatch?.[1]) {
-      setImageThumbnail(imageMatch[1]);
-    }
-    setInput(pureText === '(이미지 전송)' ? '' : pureText);
-    setSendErrorMessage('재전송을 위해 입력창에 복원했습니다. 전송 버튼을 눌러주세요.');
   };
 
   const openSession = (sessionId: string) => {
@@ -789,22 +744,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   <div className="mb-4 md:mb-8 mx-auto flex items-center justify-center">
                     <RandomAnimalIcon className="w-24 h-24 md:w-36 md:h-36 drop-shadow-xl hover:scale-105 transition-transform duration-300" />
                   </div>
-                  <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">문제 사진이나 질문을 바로 보내보세요</h2>
+                  <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">무엇이든 물어보세요</h2>
                   <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
-                    숙제, 시험 대비, 개념 정리까지 필요한 도움을 빠르게 시작할 수 있어요.
+                    글, 사진, 음성 중 편한 방법으로 대화를 시작하세요.
                   </p>
-
-                  <div className="flex flex-wrap justify-center gap-2 mb-6 md:mb-8">
-                    {QUESTION_PROMPTS.map((prompt) => (
-                      <button
-                        key={prompt}
-                        onClick={() => handlePromptChipClick(prompt)}
-                        className="px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-[11px] md:text-xs font-black text-brand-900 hover:bg-brand-100 transition-colors"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-5 text-left text-slate-700">
                     <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
@@ -841,25 +784,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div className="pb-24 md:pb-28 max-w-4xl mx-auto w-full">
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
-                    <div className="max-w-[82%] md:max-w-[75%]">
-                      <div
-                        className={`p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
-                          ? 'bg-brand-900 text-white rounded-tr-none'
-                          : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
-                          }`}
-                      >
-                        {renderMessageContent(m.text)}
-                      </div>
-                      {m.role === 'user' && (
-                        <div className="mt-1.5 px-1 text-[11px] font-bold text-right">
-                          {m.deliveryStatus === 'sending' && <span className="text-slate-400">전송 중...</span>}
-                          {m.deliveryStatus === 'failed' && (
-                            <button onClick={retryLastFailedMessage} className="text-rose-500 hover:text-rose-700 underline underline-offset-2">
-                              전송 실패 · 재전송
-                            </button>
-                          )}
-                        </div>
-                      )}
+                    <div
+                      className={`max-w-[82%] md:max-w-[75%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
+                        ? 'bg-brand-900 text-white rounded-tr-none'
+                        : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
+                        }`}
+                    >
+                      {renderMessageContent(m.text)}
                     </div>
                   </div>
                 ))}
@@ -930,9 +861,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={isMicRecording ? "음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다" : '모르는 문제를 텍스트나 사진으로 보내보세요.'}
+                  placeholder={isMicRecording ? "음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다" : randomPlaceholder}
                   disabled={isMicRecording}
-                  className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-500 disabled:opacity-50"
+                  className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
                   autoComplete="off"
                 />
                 <button
@@ -947,7 +878,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             </div>
 
             <div className="max-w-4xl mx-auto mt-2.5 md:mt-3 text-center px-4 pb-3 md:pb-6">
-              {sendErrorMessage && <p className="text-[11px] md:text-xs text-rose-500 font-bold mb-2">{sendErrorMessage}</p>}
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
                 포틴AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
                 <button
