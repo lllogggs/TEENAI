@@ -20,8 +20,6 @@ interface StudentAccount {
 }
 
 type MentorTone = 'kind' | 'rational' | 'friendly';
-type SessionSort = 'latest' | 'risk';
-type SessionStateFilter = 'all' | 'deleted';
 
 interface NormalizedSettings {
   guardrails: {
@@ -71,30 +69,6 @@ const riskText: Record<SessionRiskLevel, string> = {
   normal: '주의',
   caution: '위험',
 };
-
-const riskDescriptions: Record<SessionRiskLevel, { description: string; action: string; icon: string }> = {
-  stable: {
-    description: '정서 표현이 안정적이며 위험 신호가 거의 없어요.',
-    action: '권장 행동: 일상 대화를 이어가며 긍정 피드백을 유지해 주세요.',
-    icon: '✅',
-  },
-  normal: {
-    description: '걱정·불안 표현이 증가해 추가 관찰이 필요한 상태예요.',
-    action: '권장 행동: 최근 대화를 확인하고 스트레스 원인을 함께 점검해 주세요.',
-    icon: '⚠️',
-  },
-  caution: {
-    description: '즉시 확인이 필요한 위험 대화 신호가 감지되었어요.',
-    action: '권장 행동: 위험 대화를 우선 열람하고 필요 시 즉시 개입해 주세요.',
-    icon: '🚨',
-  },
-};
-
-const instructionTemplates = [
-  '공감형: 아이의 감정을 먼저 공감하고, 핵심 조언은 짧고 명확하게 제시해 주세요.',
-  '간결형: 핵심 요점 3줄 이내로 정리하고, 마지막에 다음 행동 1가지를 제안해 주세요.',
-  '질문유도형: 바로 정답을 주기보다 스스로 생각할 수 있도록 질문을 먼저 던져 주세요.',
-];
 
 const riskBarTheme: Record<SessionRiskLevel, { fill: string; text: string; border: string }> = {
   stable: { fill: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200' },
@@ -162,11 +136,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [sessionMessages, setSessionMessages] = useState<MessageRow[]>([]);
   const [openedSessionId, setOpenedSessionId] = useState('');
   const [riskFilter, setRiskFilter] = useState<SessionRiskLevel | 'all'>('all');
-  const [sessionSort, setSessionSort] = useState<SessionSort>('latest');
-  const [sessionStateFilter, setSessionStateFilter] = useState<SessionStateFilter>('all');
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
-  const [guardrailNotice, setGuardrailNotice] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -209,25 +180,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const maxRiskCount = Math.max(1, riskCounts.stable, riskCounts.normal, riskCounts.caution);
 
   const filteredSessions = useMemo(() => {
-    const filtered = sessions.filter((session) => {
+    return sessions.filter((session) => {
       if (riskFilter === 'all') return true;
       return normalizeRiskLevel(session.risk_level) === riskFilter;
     });
-
-    const byState = filtered.filter((session) => {
-      if (sessionStateFilter === 'all') return true;
-      return session.is_deleted_by_student;
-    });
-
-    return [...byState].sort((a, b) => {
-      if (sessionSort === 'risk') {
-        const riskWeight: Record<SessionRiskLevel, number> = { caution: 3, normal: 2, stable: 1 };
-        const diff = riskWeight[normalizeRiskLevel(b.risk_level)] - riskWeight[normalizeRiskLevel(a.risk_level)];
-        if (diff !== 0) return diff;
-      }
-      return new Date(b.started_at).getTime() - new Date(a.started_at).getTime();
-    });
-  }, [sessions, riskFilter, sessionSort, sessionStateFilter]);
+  }, [sessions, riskFilter]);
 
   useEffect(() => {
     if (user.subscription_expires_at) {
@@ -405,13 +362,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
   }, [normalizedSettings.parent_student_name, selectedStudentAccount?.name]);
 
-  useEffect(() => {
-    if (!guardrailNotice) return;
-    const timer = window.setTimeout(() => setGuardrailNotice(''), 2400);
-    return () => window.clearTimeout(timer);
-  }, [guardrailNotice]);
-
-  const updateStudentSettings = async (nextSettings: NormalizedSettings, successMessage = '저장되었습니다.') => {
+  const updateStudentSettings = async (nextSettings: NormalizedSettings) => {
     if (!selectedStudentId) return;
     setSaveStatus('');
 
@@ -431,19 +382,17 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         student.user_id === selectedStudentId ? { ...student, settings: mergedSettings } : student
       )
     );
-    setSaveStatus(successMessage);
+    setSaveStatus('저장되었습니다.');
   };
 
   const toggleGuardrail = async (key: keyof NormalizedSettings['guardrails']) => {
-    const nextEnabled = !normalizedSettings.guardrails[key];
     await updateStudentSettings({
       ...normalizedSettings,
       guardrails: {
         ...normalizedSettings.guardrails,
-        [key]: nextEnabled,
+        [key]: !normalizedSettings.guardrails[key],
       },
-    }, `${guardrailMeta.find((item) => item.key === key)?.label || '가드레일'}이 ${nextEnabled ? '활성화' : '비활성화'}되었습니다.`);
-    setGuardrailNotice(`${guardrailMeta.find((item) => item.key === key)?.label || '가드레일'} ${nextEnabled ? 'ON' : 'OFF'}`);
+    });
   };
 
   const updateMentorTone = async (tone: MentorTone) => {
@@ -461,18 +410,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     const nextPrompt = [...aiInstructionList, trimmed].join('\n');
     await updateAiStylePrompt(nextPrompt);
     setAiInstructionDraft('');
-  };
-
-  const applyInstructionTemplate = (template: string) => {
-    setAiInstructionDraft(template);
-  };
-
-  const resetGuardrailsToDefault = async () => {
-    await updateStudentSettings({
-      ...normalizedSettings,
-      guardrails: DEFAULT_SETTINGS.guardrails,
-    }, '가드레일을 기본 권장값으로 복구했습니다.');
-    setGuardrailNotice('가드레일 기본값 복구 완료');
   };
 
   const removeAiInstruction = async (targetIndex: number) => {
@@ -508,8 +445,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
           </h1>
         </div>
         <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end">
-          <span className="text-sm md:text-base font-bold text-slate-600">{user.name}</span>
-          <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 px-3 py-2 md:p-3 rounded-2xl transition-all font-black">Logout</button>
+          <span className="text-xs md:text-sm font-bold text-slate-500">{user.name}</span>
+          <button onClick={onLogout} className="bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 px-3 py-2 md:p-3 rounded-2xl transition-all">Logout</button>
         </div>
       </header>
 
@@ -662,48 +599,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                   })}
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
-                    const meta = riskDescriptions[level];
-                    const active = riskFilter === level;
-                    return (
-                      <button
-                        key={`desc-${level}`}
-                        onClick={() => setRiskFilter(level)}
-                        className={`w-full text-left p-2 rounded-xl border transition-colors ${active ? 'border-brand-300 bg-brand-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
-                      >
-                        <p className="text-xs font-black text-slate-800">{meta.icon} {riskText[level]}</p>
-                        <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{meta.description}</p>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{meta.action}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-
               </article>
 
               <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2 lg:mb-3">
-                  <h2 className="font-black text-base lg:text-lg">2) 대화 목록</h2>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={sessionSort}
-                      onChange={(event) => setSessionSort(event.target.value as SessionSort)}
-                      className="text-xs font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600"
-                    >
-                      <option value="latest">최신순</option>
-                      <option value="risk">위험순</option>
-                    </select>
-                    <select
-                      value={sessionStateFilter}
-                      onChange={(event) => setSessionStateFilter(event.target.value as SessionStateFilter)}
-                      className="text-xs font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600"
-                    >
-                      <option value="all">전체 상태</option>
-                      <option value="deleted">학생 삭제 대화만</option>
-                    </select>
-                  </div>
-                </div>
+                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록</h2>
                 <div className="space-y-2 min-h-[204px] md:min-h-[236px]">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
                   {filteredSessions.map((session) => {
@@ -720,7 +619,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                           : 'bg-white border-slate-100 hover:border-brand-200 hover:shadow-md'
                           } ${session.is_deleted_by_student ? 'opacity-75 bg-slate-50' : ''}`}
                       >
-                        <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${selectedSessionId === session.id ? 'bg-brand-500' : 'bg-transparent'}`}></div>
                         <div className="flex justify-between items-start mb-2">
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${risk === 'stable' ? 'bg-emerald-100 text-emerald-700' :
                             risk === 'normal' ? 'bg-amber-100 text-amber-700' :
@@ -736,9 +634,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                             <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">학생이 삭제함</span>
                           )}
                         </h4>
-                        <p className="text-xs text-slate-500 leading-relaxed line-clamp-1">
-                          {session.is_deleted_by_student ? '학생이 삭제한 대화입니다. 필요 시 영구 삭제 가능합니다.' : '대화를 클릭하면 세션 원문 전체 메시지를 확인할 수 있습니다.'}
-                        </p>
 
                         {/* Permanent Delete Button (Only for sessions deleted by student) */}
                         {session.is_deleted_by_student && (
@@ -772,18 +667,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">3) AI 개별 지시사항 관리</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                   <div>
-                    <p className="text-xs text-slate-600 font-bold mb-2">지시사항 1개만 추가해도 답변 톤을 빠르게 맞출 수 있어요.</p>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {instructionTemplates.map((template) => (
-                        <button
-                          key={template}
-                          onClick={() => applyInstructionTemplate(template)}
-                          className="text-[11px] px-2.5 py-1 rounded-full border border-brand-100 bg-brand-50 text-brand-900 font-black hover:bg-brand-100"
-                        >
-                          {template.split(':')[0]}
-                        </button>
-                      ))}
-                    </div>
                     <textarea
                       value={aiInstructionDraft}
                       onChange={(event) => setAiInstructionDraft(event.target.value)}
@@ -794,12 +677,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
                   </div>
                   <div className="space-y-2 h-[210px] lg:h-[268px] overflow-y-auto custom-scrollbar pr-1">
-                    {aiInstructionList.length === 0 && (
-                      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3">
-                        <p className="text-sm text-slate-600 font-bold">아직 등록된 지시사항이 없습니다.</p>
-                        <p className="text-xs text-slate-500 mt-1">예시를 불러오거나 직접 작성하면 다음 대화부터 즉시 반영됩니다.</p>
-                      </div>
-                    )}
+                    {aiInstructionList.length === 0 && <p className="text-sm text-slate-400">아직 등록된 지시사항이 없습니다.</p>}
                     {aiInstructionList.map((instruction, index) => (
                       <div key={`${instruction}-${index}`} className="rounded-xl border border-slate-100 bg-white p-3 flex items-start justify-between gap-2">
                         <p className="text-sm text-slate-700 whitespace-pre-wrap">{instruction}</p>
@@ -833,11 +711,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
               <article className="premium-card p-4 lg:p-5 lg:col-span-4">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">5) 필수 안심 가드레일</h2>
-                {guardrailNotice && (
-                  <div className="mb-3 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2 text-xs font-black text-brand-900">
-                    {guardrailNotice}
-                  </div>
-                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 lg:gap-3">
                   {guardrailMeta.map((item) => {
                     const enabled = normalizedSettings.guardrails[item.key];
@@ -847,8 +720,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                           <div>
                             <p className="text-sm font-black text-slate-900">{item.label}</p>
                             <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2 min-h-[2.5rem]">{item.description}</p>
-                            <p className={`text-[11px] mt-2 font-black ${enabled ? 'text-emerald-600' : 'text-slate-400'}`}>현재: {enabled ? '활성화' : '비활성화'}</p>
-                            <p className="text-[11px] text-slate-400 mt-1">적용 예시: {enabled ? '유해 표현 필터링이 즉시 적용됩니다.' : '필터가 완화된 상태입니다.'}</p>
                           </div>
                           <span className={`w-10 h-6 rounded-full transition-all ${enabled ? 'bg-brand-900' : 'bg-slate-300'} relative`}>
                             <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${enabled ? 'left-5' : 'left-1'}`}></span>
@@ -857,14 +728,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                       </button>
                     );
                   })}
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    onClick={resetGuardrailsToDefault}
-                    className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-600 hover:bg-slate-100"
-                  >
-                    기본 권장값으로 복구
-                  </button>
                 </div>
               </article>
             </section>

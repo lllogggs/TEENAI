@@ -66,7 +66,6 @@ export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
-  deliveryStatus?: 'sending' | 'sent' | 'failed';
 }
 
 export interface MessageRow {
