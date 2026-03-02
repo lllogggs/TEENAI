@@ -65,27 +65,8 @@ export default async function handler(req: any, res: any) {
     const mergedInstruction = `${baseInstruction}\n\n[Parent Style Prompt]\n${String(parentStylePrompt || '')}`;
 
     const ai = new GoogleGenAI({ apiKey });
-    const normalizedHistory = Array.isArray(history)
-      ? history
-        .map((item: any) => {
-          if (!item || (item.role !== 'user' && item.role !== 'model')) return null;
-          if (typeof item.content === 'string') {
-            return { role: item.role, parts: [{ text: item.content }] };
-          }
-          if (Array.isArray(item.parts)) {
-            return { role: item.role, parts: item.parts };
-          }
-          return null;
-        })
-        .filter(Boolean)
-      : [];
 
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: { systemInstruction: mergedInstruction, temperature: 0.7 },
-      history: normalizedHistory as any,
-    });
-
+    // 1. 현재 턴의 사용자 메시지 및 미디어 데이터 세팅
     let userParts: any[] = [{ text: userMessage }];
 
     if (imageData) {
@@ -108,6 +89,67 @@ export default async function handler(req: any, res: any) {
         }
       });
     }
+
+    // 2. 히스토리 파싱: [IMAGE] 태그를 실제 inlineData로 분리 변환
+    let normalizedHistory = Array.isArray(history)
+      ? history
+        .map((item: any) => {
+          if (!item || (item.role !== 'user' && item.role !== 'model')) return null;
+          
+          let parts: any[] = [];
+          if (typeof item.content === 'string') {
+            const imgRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
+            const match = item.content.match(imgRegex);
+            
+            if (match) {
+              const base64Full = match[1];
+              const pureText = item.content.replace(imgRegex, '').trim();
+              
+              const mimeMatch = base64Full.match(/^data:(image\/\w+);base64,/);
+              const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+              const b64Data = base64Full.replace(/^data:image\/\w+;base64,/, '');
+              
+              if (b64Data) {
+                parts.push({ inlineData: { data: b64Data, mimeType } });
+              }
+              if (pureText) {
+                parts.push({ text: pureText });
+              }
+            } else {
+              parts.push({ text: item.content });
+            }
+          } else if (Array.isArray(item.parts)) {
+            parts = item.parts;
+          }
+          
+          return parts.length > 0 ? { role: item.role, parts } : null;
+        })
+        .filter(Boolean)
+      : [];
+
+    // 3. Gemini 대화 규칙(user -> model 번갈아 등장) 준수 및 충돌 방지 로직
+    const sanitizedHistory: any[] = [];
+    for (const item of normalizedHistory) {
+      if (!item) continue;
+      const last = sanitizedHistory[sanitizedHistory.length - 1];
+      if (last && last.role === item.role) {
+        last.parts.push(...item.parts); // 연속된 동일 role이면 파트 병합
+      } else {
+        sanitizedHistory.push(item);
+      }
+    }
+    
+    // 마지막 히스토리가 'user'라면(직전 통신 실패 등), 현재 보내는 것도 'user'라 에러 발생. 빼서 현재 전송 데이터에 합침.
+    if (sanitizedHistory.length > 0 && sanitizedHistory[sanitizedHistory.length - 1].role === 'user') {
+      const poppedUser = sanitizedHistory.pop();
+      userParts.unshift(...poppedUser.parts);
+    }
+
+    const chat = ai.chats.create({
+      model: 'gemini-2.5-flash',
+      config: { systemInstruction: mergedInstruction, temperature: 0.7 },
+      history: sanitizedHistory as any,
+    });
 
     const result = await chat.sendMessage({ message: userParts });
     res.status(200).json({ text: result.text || '' });
