@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserRole } from '../types';
 import TermsModal from './TermsModal';
+import { ForteenLogo } from './Icons';
 
 interface AuthProps {
   onLogin: (email: string, password: string, role: UserRole, inviteCode?: string, isSignup?: boolean) => Promise<void>;
@@ -111,7 +112,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
       <div className="min-h-[100dvh] bg-[#F1F5F9] flex flex-col items-center justify-center p-4 md:p-10 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
         <div className="text-center mb-6 md:mb-10 animate-in fade-in zoom-in duration-700 select-none">
           <div className="flex items-center justify-center gap-3 md:gap-4 mb-3 md:mb-5">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-[1.75rem] overflow-hidden shadow-xl shadow-brand-900/20"><img src="/logo.png" alt="포틴AI 로고" className="w-full h-full object-cover" /></div>
+            <ForteenLogo className="w-20 h-20 md:w-24 md:h-24 rounded-[1.75rem] overflow-hidden shadow-xl shadow-brand-900/20" />
             <h1 className="text-5xl md:text-7xl font-black text-brand-900 tracking-tighter">포틴AI</h1>
           </div>
           <p className="text-slate-500 font-bold text-sm md:text-lg">청소년을 위한 가장 안전한 AI 성장의 공간</p>
@@ -128,7 +129,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
 
           <button onClick={() => setView('parent-auth')} className="flex-1 group flex flex-col items-center justify-between p-8 md:p-10 lg:p-14 bg-white rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-slate-200 hover:-translate-y-2 transition-all text-center border border-white relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-indigo-50/50 rounded-full -mr-12 -mt-12 md:-mr-16 md:-mt-16 group-hover:bg-indigo-50 transition-colors"></div>
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-indigo-50 rounded-2xl md:rounded-3xl flex items-center justify-center mb-5 md:mb-8 group-hover:scale-110 transition-transform overflow-hidden text-3xl md:text-4xl" aria-hidden>👨‍👩‍👧</div>
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-indigo-50 rounded-2xl md:rounded-3xl flex items-center justify-center mb-5 md:mb-8 group-hover:scale-110 transition-transform overflow-hidden text-3xl md:text-4xl" aria-hidden>👩</div>
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 mb-3 md:mb-5">학부모 시작하기</h2>
             <p className="text-slate-400 font-medium text-sm lg:text-lg leading-relaxed mb-6 md:mb-10 text-balance tracking-tight break-keep">자녀를 위해 안전 가이드를 설정하고<br />성장 리포트를 확인하세요.</p>
             <div className="mt-auto flex justify-center items-center gap-2 text-indigo-600 font-black text-xs md:text-sm uppercase tracking-widest">Parent Portal <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
