@@ -151,8 +151,13 @@ export default async function handler(req: any, res: any) {
       history: sanitizedHistory as any,
     });
 
-    const result = await chat.sendMessage({ message: userParts });
-    res.status(200).json({ text: result.text || '' });
+    // 여기서 객체 래핑({ message: userParts })을 제거하고 배열 자체를 바로 전달
+    const result = await chat.sendMessage(userParts);
+    
+    // SDK 버전에 따라 응답 객체 구조가 다를 수 있으므로 텍스트를 가장 확실하게 추출
+    const aiText = result.text || result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    res.status(200).json({ text: aiText });
   } catch (error) {
     console.error('Gemini chat error:', {
       error,
