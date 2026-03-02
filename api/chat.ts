@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { enforceRateLimit, requireSupabaseUser, validateOptionalBase64DataUrl, validateTextLength } from './_lib/request-guards';
+import { enforceRateLimit, requireSupabaseUser, validateOptionalBase64DataUrl, validateTextLength } from './_lib/request-guards.js';
 
 const getApiKey = () => process.env.GEMINI_API_KEY || '';
 
