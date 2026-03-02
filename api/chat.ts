@@ -151,8 +151,14 @@ export default async function handler(req: any, res: any) {
       history: sanitizedHistory as any,
     });
 
-    // 여기서 객체 래핑({ message: userParts })을 제거하고 배열 자체를 바로 전달
-    const result = await chat.sendMessage(userParts);
+    // @google/genai SDK 1.34+ 에서는 sendMessage 인자로 ContentUnion이 필요하므로
+    // 사용자 파트를 role/parts 형태로 감싸 message 키로 전달해야 합니다.
+    const result = await chat.sendMessage({
+      message: {
+        role: 'user',
+        parts: userParts,
+      },
+    });
     
     // SDK 버전에 따라 응답 객체 구조가 다를 수 있으므로 텍스트를 가장 확실하게 추출
     const aiText = result.text || result.candidates?.[0]?.content?.parts?.[0]?.text || '';
