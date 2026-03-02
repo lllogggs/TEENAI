@@ -629,8 +629,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden pt-[calc(env(safe-area-inset-top,0px)+0px)]">
-      <header className="px-3 md:px-8 py-1.5 md:py-3 bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-[env(safe-area-inset-top,0px)] z-20">
+    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
+      <header className="px-3 md:px-8 py-1.5 md:py-3 bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-md shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
@@ -709,9 +709,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
-          <div className="px-5 md:px-10 py-5 md:py-8 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
+          <div className="px-5 md:px-10 py-2 md:py-3 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
             {/* Container for buttons to stick top-left inside the content area */}
-            <div className="flex items-center gap-3 pointer-events-auto">
+            <div className="fixed left-4 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:top-[calc(env(safe-area-inset-top,0px)+5.5rem)] z-40 flex items-center gap-3 pointer-events-auto">
               {/* Mobile Sidebar Toggle (Back) */}
               <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-9 h-9 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-sm border border-slate-100 text-slate-500 hover:bg-slate-50 transition-colors shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -877,7 +877,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className="max-w-4xl mx-auto mt-2.5 md:mt-3 text-center px-4 pb-[0.5px]">
+            <div className="max-w-4xl mx-auto mt-2.5 md:mt-3 text-center px-4 pb-3 md:pb-6">
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
                 포틴AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
                 <button

@@ -567,9 +567,9 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-4 gap-2 md:gap-2.5 lg:gap-3">
-              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-2">
-                <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">1) 심리 안정도 요약</h2>
-                <div className="h-32 lg:h-40 flex items-end justify-around gap-2">
+              <article className="premium-card p-3 md:p-3.5 lg:p-4 lg:col-span-1">
+                <h2 className="font-black text-base lg:text-lg mb-2">1) 심리 안정도 요약</h2>
+                <div className="h-28 lg:h-32 flex items-end justify-around gap-1.5">
                   {(['stable', 'normal', 'caution'] as SessionRiskLevel[]).map((level) => {
                     const count = riskCounts[level];
                     const heightPercent = Math.max((count / maxRiskCount) * 100, count > 0 ? 18 : 8);
@@ -582,7 +582,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                         className={`flex-1 min-w-[70px] h-full rounded-2xl border p-2 flex flex-col justify-end items-center gap-2 transition-all ${active ? `${theme.border} ring-2 ring-brand-100 bg-slate-50` : 'border-slate-100 hover:border-slate-200 bg-white'}`}
                       >
                         <p className="text-[10px] lg:text-xs font-black text-slate-500">{count}개</p>
-                        <div className="w-8 lg:w-10 h-24 lg:h-32 rounded-xl bg-slate-100 flex items-end overflow-hidden">
+                        <div className="w-7 lg:w-8 h-20 lg:h-24 rounded-xl bg-slate-100 flex items-end overflow-hidden">
                           <div className={`${theme.fill} w-full rounded-xl transition-all`} style={{ height: `${heightPercent}%` }} />
                         </div>
                         <p className={`text-xs font-black ${theme.text}`}>{riskText[level]}</p>
@@ -592,17 +592,17 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                 </div>
                 <button
                   onClick={() => setRiskFilter('all')}
-                  className="mt-2 w-full text-xs font-black px-3 py-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
+                  className="mt-2 w-full text-[11px] font-black px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 bg-white hover:border-brand-200 hover:text-brand-900"
                 >
                   전체 보기
                 </button>
               </article>
 
-              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-2">
+              <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-3">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록</h2>
                 <div className="space-y-2 h-[200px] md:h-[240px] lg:h-[320px] overflow-y-auto custom-scrollbar">
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
-                  {filteredSessions.map((session) => {
+                  {filteredSessions.slice(0, 3).map((session) => {
                     const risk = normalizeRiskLevel(session.risk_level);
                     return (
                       <div
