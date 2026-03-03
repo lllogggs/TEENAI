@@ -29,5 +29,3 @@ export const SAFETY_ALERT_MESSAGE = `[Forteen AI 안전 알림]
 export const MOCK_GEN_MODEL = 'gemini-2.5-flash';
 export const MOCK_ANALYSIS_MODEL = 'gemini-2.5-flash'; // Efficient for JSON tasks
 
-export const SOCIAL_PARENT_REGISTRATION_CODE =
-  import.meta.env.VITE_PARENT_SOCIAL_REGISTRATION_CODE || 'TEST2024';
