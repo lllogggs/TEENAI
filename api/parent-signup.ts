@@ -75,6 +75,7 @@ export default async function handler(req: any, res: any) {
       user_metadata: {
         role: 'parent',
         name: signupName,
+        nickname: signupName,
         subscription_expires_at: expiresAt.toISOString(),
       },
     });
@@ -95,6 +96,7 @@ export default async function handler(req: any, res: any) {
         email,
         role: 'parent',
         name: signupName,
+        nickname: signupName,
         subscription_expires_at: expiresAt.toISOString(),
       });
 

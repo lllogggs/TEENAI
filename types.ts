@@ -15,7 +15,9 @@ export interface User {
   id: string;
   email: string;
   role: UserRole;
-  name: string;
+  name?: string;
+  nickname?: string;
+  birth_year?: number;
   avatar_url?: string;
   my_invite_code?: string;
   subscription_expires_at?: string;
@@ -63,9 +65,11 @@ export interface StudentProfile {
 }
 
 export interface ChatMessage {
+  id?: string;
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+  isSafetyNotice?: boolean;
 }
 
 export interface MessageRow {

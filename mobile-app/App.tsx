@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Audio } from 'expo-av';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -36,6 +37,10 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+
+  const postSpeechResultToWeb = useCallback((payload: { text?: string; error?: string }) => {
+    webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'NATIVE_SPEECH_RESULT', ...payload }))}, '*'); true;`);
+  }, []);
 
   const onNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
@@ -75,6 +80,27 @@ export default function App() {
     },
     [allowedOrigins],
   );
+
+
+  const handleWebMessage = useCallback(async (rawData: string) => {
+    try {
+      const payload = JSON.parse(rawData || '{}');
+      if (payload?.type !== 'REQUEST_NATIVE_SPEECH_TO_TEXT') {
+        return;
+      }
+
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        postSpeechResultToWeb({ error: '마이크 권한이 필요합니다.' });
+        return;
+      }
+
+      // Expo 기본 SDK만으로는 온디바이스 STT가 제한적이어서, 네이티브 브릿지 이벤트로 결과를 전달할 수 있는 구조를 제공합니다.
+      postSpeechResultToWeb({ error: '네이티브 음성 인식 엔진 연결이 필요합니다.' });
+    } catch {
+      postSpeechResultToWeb({ error: '네이티브 음성 인식 처리에 실패했습니다.' });
+    }
+  }, [postSpeechResultToWeb]);
 
   React.useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -154,6 +180,7 @@ export default function App() {
             setIsLoading(false);
           }}
           onShouldStartLoadWithRequest={({ url }) => handleShouldStartLoad(url)}
+          onMessage={(event) => handleWebMessage(event.nativeEvent.data)}
         />
       )}
 

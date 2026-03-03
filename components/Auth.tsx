@@ -1,79 +1,81 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserRole } from '../types';
 import TermsModal from './TermsModal';
 import { ForteenLogo } from './Icons';
 
 interface AuthProps {
-  onLogin: (email: string, password: string, role: UserRole, inviteCode?: string, isSignup?: boolean) => Promise<void>;
+  onLogin: (
+    email: string,
+    password: string,
+    role: UserRole,
+    inviteCode?: string,
+    isSignup?: boolean,
+    metadata?: { nickname?: string; birthYear?: string; parentalConsent?: boolean },
+  ) => Promise<void>;
+  onSocialLogin: (provider: 'apple' | 'google', role: UserRole) => Promise<void>;
   loading: boolean;
 }
 
-const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
+const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
   const [view, setView] = useState<'selection' | 'parent-auth' | 'student-auth'>('selection');
   const [isSignup, setIsSignup] = useState(false);
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [registrationCode, setRegistrationCode] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [parentConsent, setParentConsent] = useState(false);
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
-  const validateEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-
-
+  const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const hasAcceptedRequiredPolicies = useMemo(() => termsAccepted && privacyAccepted, [termsAccepted, privacyAccepted]);
 
   useEffect(() => {
-    const focusHandler = (event: FocusEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        setTimeout(() => {
-          target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }, 180);
-      }
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-
-    window.addEventListener('focusin', focusHandler);
-    return () => window.removeEventListener('focusin', focusHandler);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateEmail(email)) { alert("올바른 이메일 주소를 입력해주세요."); return; }
-    if (password.length < 6) { alert("비밀번호는 6자리 이상이어야 합니다."); return; }
+    if (isOffline) {
+      alert('네트워크 연결이 불안정합니다. 연결을 확인해 주세요.');
+      return;
+    }
+    if (!validateEmail(email)) return alert('올바른 이메일 주소를 입력해주세요.');
+    if (password.length < 6) return alert('비밀번호는 6자리 이상이어야 합니다.');
 
     if (isSignup) {
-      if (!hasAcceptedRequiredPolicies) {
-        alert("이용약관 및 개인정보처리방침에 동의해주세요.");
-        return;
-      }
-
-      if (view === 'parent-auth') {
-        if (!registrationCode) {
-          alert("관리자 등록 코드가 필요합니다.");
-          return;
-        }
-      }
-
-      if (view === 'student-auth' && inviteCode.length < 6) {
-        alert("올바른 초대 코드를 입력해주세요.");
-        return;
+      if (!hasAcceptedRequiredPolicies) return alert('이용약관 및 개인정보처리방침에 동의해주세요.');
+      if (view === 'parent-auth' && !registrationCode) return alert('관리자 등록 코드가 필요합니다.');
+      if (view === 'student-auth' && inviteCode.length < 6) return alert('올바른 초대 코드를 입력해주세요.');
+      if (view === 'student-auth') {
+        if (!nickname.trim()) return alert('닉네임을 입력해주세요.');
+        if (!/^\d{4}$/.test(birthYear)) return alert('출생 연도를 4자리로 입력해주세요.');
+        if (!parentConsent) return alert('법정대리인(학부모) 동의 확인이 필요합니다.');
       }
     }
 
     if (view === 'parent-auth') {
       await onLogin(email, password, UserRole.PARENT, isSignup ? registrationCode : undefined, isSignup);
     } else {
-      await onLogin(email, password, UserRole.STUDENT, inviteCode, isSignup);
+      await onLogin(email, password, UserRole.STUDENT, inviteCode, isSignup, {
+        nickname,
+        birthYear,
+        parentalConsent: parentConsent,
+      });
     }
   };
 
@@ -83,165 +85,75 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     setPassword('');
     setInviteCode('');
     setRegistrationCode('');
+    setNickname('');
+    setBirthYear('');
+    setParentConsent(false);
     setIsSignup(false);
     setTermsAccepted(false);
     setPrivacyAccepted(false);
   };
 
-  const termsContent = (
-    <div className="space-y-3">
-      <p><strong>제1조 (목적)</strong><br />본 약관은 포틴AI(이하 "회사")가 제공하는 인공지능 채팅 서비스(이하 "서비스")의 이용 조건 및 절차를 규정합니다.</p>
-      <p><strong>제2조 (AI의 한계 및 면책)</strong><br />1. 본 서비스는 인공지능 기술을 기반으로 하며, AI가 생성하는 답변의 정확성, 신뢰성, 완전성을 보장하지 않습니다.<br />2. AI는 때때로 부정확하거나(환각 현상), 편향되거나, 의도치 않은 답변을 할 수 있습니다.<br />3. 본 서비스는 전문 심리 상담이나 의료 진단을 대체할 수 없으며, 위급한 상황에서는 반드시 전문가나 관련 기관의 도움을 받아야 합니다.</p>
-      <p><strong>제3조 (이용자의 의무)</strong><br />1. 이용자는 서비스를 불법적이거나 타인의 권리를 침해하는 목적으로 사용해서는 안 됩니다.<br />2. 욕설, 비방, 성적 수치심을 유발하는 대화 등 부적절한 사용 시 이용이 제한될 수 있습니다.</p>
-      <p><strong>제4조 (부모의 감독 권한)</strong><br />1. 본 서비스는 청소년 보호를 위해 학부모가 자녀의 대화 내용 및 심리 상태 보고서를 열람할 수 있는 기능을 제공합니다.<br />2. 학부모 및 자녀 회원은 이에 동의한 것으로 간주합니다.</p>
-    </div>
-  );
-
-  const privacyContent = (
-    <div className="space-y-3">
-      <p><strong>1. 수집하는 개인정보 항목</strong><br />이메일, 비밀번호, 이름, 대화 내용, 심리 분석 데이터, 서비스 이용 기록</p>
-      <p><strong>2. 개인정보의 수집 및 이용 목적</strong><br />서비스 제공, 회원 관리, AI 모델 학습 및 서비스 개선, 심리 분석 리포트 생성, 안전 가드레일 작동</p>
-      <p><strong>3. 개인정보의 제공</strong><br />회사는 법령에 따른 경우를 제외하고는 이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 다만, '학생' 회원의 대화 요약 및 위험 징후 데이터는 연결된 '학부모' 회원에게 제공됩니다.</p>
-      <p><strong>4. 개인정보의 보유 및 이용 기간</strong><br />회원 탈퇴 시까지 보유하며, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관합니다.</p>
-      <p><strong>5. 서비스 모니터링 및 안전 관리</strong><br />회사는 이용자의 안전을 보호하고, 서비스 품질 개선 및 AI 모델의 고도화를 위해 필요한 경우 대화 내용을 검토 및 모니터링할 수 있습니다. 이는 성범죄, 폭력, 자해 등 위험 상황을 방지하고 더 나은 서비스를 제공하기 위함입니다.</p>
-    </div>
-  );
+  const termsContent = <p>서비스 이용약관 전체 확인 후 동의해주세요.</p>;
+  const privacyContent = <p>개인정보 처리방침 전체 확인 후 동의해주세요.</p>;
 
   if (view === 'selection') {
     return (
-      <div className="min-h-[100dvh] bg-[#F1F5F9] flex flex-col items-center justify-center p-4 md:p-10 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
-        <div className="text-center mb-6 md:mb-10 animate-in fade-in zoom-in duration-700 select-none">
-          <div className="flex items-center justify-center gap-3 md:gap-4 mb-3 md:mb-5">
-            <ForteenLogo className="w-20 h-20 md:w-24 md:h-24 rounded-[1.75rem] overflow-hidden shadow-xl shadow-brand-900/20" />
-            <h1 className="text-5xl md:text-7xl font-black text-brand-900 tracking-tighter">포틴AI</h1>
+      <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md w-full bg-white border border-slate-100 rounded-3xl p-8">
+          <div className="flex items-center gap-3 mb-8"><ForteenLogo className="w-12 h-12" /><h1 className="font-black text-2xl">포틴AI</h1></div>
+          <div className="space-y-3">
+            <button onClick={() => setView('student-auth')} className="w-full bg-brand-900 text-white py-4 rounded-2xl font-black">학생 시작하기</button>
+            <button onClick={() => setView('parent-auth')} className="w-full border border-slate-200 py-4 rounded-2xl font-black">학부모 시작하기</button>
           </div>
-          <p className="text-slate-500 font-bold text-sm md:text-lg">청소년을 위한 가장 안전한 AI 성장의 공간</p>
-        </div>
-
-        <div className="mx-auto w-full max-w-sm md:max-w-4xl lg:max-w-5xl px-3 md:px-4 flex flex-col md:flex-row gap-4 md:gap-6 lg:gap-8">
-          <button onClick={() => setView('student-auth')} className="flex-1 group flex flex-col items-center justify-between p-8 md:p-10 lg:p-14 bg-brand-900 rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-brand-900/30 hover:-translate-y-2 transition-all text-center border border-slate-800 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-white/5 rounded-full -mr-12 -mt-12 md:-mr-16 md:-mt-16 group-hover:bg-white/10 transition-colors"></div>
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 rounded-2xl md:rounded-3xl flex items-center justify-center mb-5 md:mb-8 group-hover:scale-110 transition-transform overflow-hidden text-3xl md:text-4xl" aria-hidden>🧑‍🎓</div>
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-white mb-3 md:mb-5">학생 시작하기</h2>
-            <p className="text-slate-400 font-medium text-sm lg:text-lg leading-relaxed mb-6 md:mb-10 text-balance tracking-tight break-keep">부모님께 받은 코드를 준비하셨나요?<br />지금 멘토와 대화를 시작해보세요.</p>
-            <div className="mt-auto flex justify-center items-center gap-2 text-white font-black text-xs md:text-sm uppercase tracking-widest">Start Now <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
-          </button>
-
-          <button onClick={() => setView('parent-auth')} className="flex-1 group flex flex-col items-center justify-between p-8 md:p-10 lg:p-14 bg-white rounded-[2rem] md:rounded-[3rem] shadow-2xl hover:shadow-slate-200 hover:-translate-y-2 transition-all text-center border border-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-indigo-50/50 rounded-full -mr-12 -mt-12 md:-mr-16 md:-mt-16 group-hover:bg-indigo-50 transition-colors"></div>
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-indigo-50 rounded-2xl md:rounded-3xl flex items-center justify-center mb-5 md:mb-8 group-hover:scale-110 transition-transform overflow-hidden text-3xl md:text-4xl" aria-hidden>👩</div>
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 mb-3 md:mb-5">학부모 시작하기</h2>
-            <p className="text-slate-400 font-medium text-sm lg:text-lg leading-relaxed mb-6 md:mb-10 text-balance tracking-tight break-keep">자녀를 위해 안전 가이드를 설정하고<br />성장 리포트를 확인하세요.</p>
-            <div className="mt-auto flex justify-center items-center gap-2 text-indigo-600 font-black text-xs md:text-sm uppercase tracking-widest">Parent Portal <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg></div>
-          </button>
         </div>
       </div>
     );
   }
 
+  const role = view === 'parent-auth' ? UserRole.PARENT : UserRole.STUDENT;
+
   return (
-    <div className="min-h-[100dvh] bg-[#F1F5F9] flex items-center justify-center p-4 xl:p-10 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
-      <div className="max-w-lg w-full bg-white rounded-3xl md:rounded-[3rem] shadow-2xl p-6 md:p-14 relative overflow-hidden">
-        <button onClick={goBack} className="text-slate-400 hover:text-slate-800 mb-6 md:mb-10 flex items-center gap-2 font-black text-xs uppercase tracking-widest transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Back
-        </button>
+    <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50 px-4">
+      <div className="max-w-md w-full bg-white border border-slate-100 rounded-3xl p-8">
+        <button onClick={goBack} className="text-xs font-bold text-slate-500 mb-4">← 뒤로</button>
+        <h2 className="text-2xl font-black mb-2">{role === UserRole.PARENT ? 'Parent' : 'Student'} {isSignup ? 'Signup' : 'Login'}</h2>
+        {isOffline && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">네트워크 연결이 불안정합니다. 연결을 확인해 주세요.</div>}
 
-        <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tighter">
-          {view === 'parent-auth' ? 'Parent ' : 'Student '}
-          {isSignup ? 'Signup' : 'Login'}
-        </h2>
-        <p className="text-slate-400 text-xs md:text-sm font-bold mb-6 md:mb-10 text-balance">
-          {isSignup ? '새로운 포틴 AI 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
-          />
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
-          />
-
-          {view === 'parent-auth' && isSignup && (
-            <div className="pt-2 animate-in slide-in-from-bottom-2 fade-in">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Admin Registration Code</label>
-              <input type="text" required value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)}
-                className="w-full bg-indigo-50 border border-indigo-100 rounded-[1.5rem] px-7 py-5 text-sm font-black text-indigo-900 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder-indigo-300" placeholder="등록 코드 입력"
-              />
-              <p className="text-[10px] text-slate-400 mt-2 px-4">관리자로부터 발급받은 등록 코드가 필요합니다.</p>
-            </div>
-          )}
-
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="이메일" />
+          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="비밀번호" />
+          {view === 'parent-auth' && isSignup && <input type="text" required value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="관리자 등록 코드" />}
           {view === 'student-auth' && isSignup && (
-            <div className="pt-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Parent Invite Code</label>
-              <input type="text" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                className="w-full bg-brand-50 border border-brand-100 rounded-[1.5rem] px-7 py-5 text-xl font-black text-brand-900 tracking-[0.3em] focus:ring-4 focus:ring-brand-100 outline-none transition-all uppercase placeholder-brand-200" placeholder="A1B2C3"
-              />
-            </div>
+            <>
+              <input type="text" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="w-full border rounded-xl px-4 py-3" placeholder="초대 코드" />
+              <input type="text" required value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="닉네임" />
+              <input type="number" required value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="출생 연도" />
+              <label className="flex gap-2 text-xs font-bold text-slate-600"><input type="checkbox" checked={parentConsent} onChange={(e) => setParentConsent(e.target.checked)} />법정대리인(학부모) 동의 확인 (필수)</label>
+            </>
           )}
 
           {isSignup && (
-            <div className="space-y-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowTerms(true)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-colors border-slate-200 hover:border-slate-300"
-              >
-                <span className="text-xs font-bold text-slate-600">서비스 이용약관 전체 읽기 (필수)</span>
-                <span className={`text-[11px] font-black ${termsAccepted ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {termsAccepted ? '읽음 완료' : '미완료'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowPrivacy(true)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-colors border-slate-200 hover:border-slate-300"
-              >
-                <span className="text-xs font-bold text-slate-600">개인정보 처리방침 전체 읽기 (필수)</span>
-                <span className={`text-[11px] font-black ${privacyAccepted ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {privacyAccepted ? '읽음 완료' : '미완료'}
-                </span>
-              </button>
-
-              <p className="text-[10px] text-slate-400 px-2 mt-1">
-                * 스크롤하여 약관/방침 끝까지 읽은 뒤에만 동의 처리가 됩니다.
-              </p>
-              <p className="text-[10px] text-slate-400 px-2">
-                * 만 14세 미만 가입 시 법정대리인의 동의가 필요합니다.
-              </p>
+            <div className="space-y-2">
+              <button type="button" onClick={() => setShowTerms(true)} className="w-full border rounded-xl px-4 py-3 text-xs font-bold">서비스 이용약관 전체 읽기 (필수)</button>
+              <button type="button" onClick={() => setShowPrivacy(true)} className="w-full border rounded-xl px-4 py-3 text-xs font-bold">개인정보 처리방침 전체 읽기 (필수)</button>
             </div>
           )}
 
-          <button type="submit" disabled={loading || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
-            {loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" disabled={loading || isOffline} onClick={() => onSocialLogin('apple', role)} className="rounded-xl border py-3 text-xs font-black disabled:opacity-50">Apple 로그인</button>
+            <button type="button" disabled={loading || isOffline} onClick={() => onSocialLogin('google', role)} className="rounded-xl border py-3 text-xs font-black disabled:opacity-50">Google 로그인</button>
+          </div>
+
+          <button type="submit" disabled={loading || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white py-4 rounded-2xl font-black disabled:bg-slate-300">{loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}</button>
         </form>
 
-        <div className="mt-6 md:mt-10 text-center">
-          <button onClick={() => { setIsSignup(!isSignup); setTermsAccepted(false); setPrivacyAccepted(false); }} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
-            {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
-          </button>
-        </div>
+        <button onClick={() => { setIsSignup(!isSignup); setTermsAccepted(false); setPrivacyAccepted(false); }} className="w-full mt-4 text-xs underline text-slate-500">
+          {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
+        </button>
       </div>
 
-      <TermsModal
-        isOpen={showTerms}
-        onClose={() => setShowTerms(false)}
-        onConfirm={() => setTermsAccepted(true)}
-        title="서비스 이용약관"
-        content={termsContent}
-        requireScrollToConfirm
-      />
-      <TermsModal
-        isOpen={showPrivacy}
-        onClose={() => setShowPrivacy(false)}
-        onConfirm={() => setPrivacyAccepted(true)}
-        title="개인정보 처리방침"
-        content={privacyContent}
-        requireScrollToConfirm
-      />
+      <TermsModal isOpen={showTerms} onClose={() => setShowTerms(false)} onConfirm={() => setTermsAccepted(true)} title="서비스 이용약관" content={termsContent} requireScrollToConfirm />
+      <TermsModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} onConfirm={() => setPrivacyAccepted(true)} title="개인정보 처리방침" content={privacyContent} requireScrollToConfirm />
     </div>
   );
 };

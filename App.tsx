@@ -5,10 +5,6 @@ import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
-const getSignupName = (email: string) => {
-  const emailPrefix = email.split('@')[0]?.trim();
-  return emailPrefix || 'User';
-};
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -59,7 +55,29 @@ function App() {
         return;
       }
 
-      console.error('users profile lookup error:', lastError);
+      const { data: { session } } = await supabase.auth.getSession();
+      const metadata = session?.user?.user_metadata || {};
+      const fallbackRole = metadata.role === UserRole.PARENT ? UserRole.PARENT : UserRole.STUDENT;
+      const fallbackNickname = metadata.nickname || metadata.name || fallbackEmail.split('@')[0] || 'User';
+      const { data: inserted, error: insertError } = await supabase
+        .from('users')
+        .upsert({
+          id: userId,
+          email: fallbackEmail,
+          role: fallbackRole,
+          nickname: fallbackNickname,
+          name: fallbackNickname,
+          birth_year: metadata.birth_year ? Number(metadata.birth_year) : null,
+        })
+        .select('*')
+        .single();
+
+      if (!insertError && inserted) {
+        setUser(inserted as User);
+        return;
+      }
+
+      console.error('users profile lookup error:', lastError || insertError);
       if (fallbackEmail) {
         alert('프로필 생성이 아직 완료되지 않았습니다. 잠시 후 다시 로그인해주세요.');
       }
@@ -70,7 +88,14 @@ function App() {
     }
   };
 
-  const handleAuth = async (email: string, password: string, role: UserRole, code?: string, isSignup?: boolean) => {
+  const handleAuth = async (
+    email: string,
+    password: string,
+    role: UserRole,
+    code?: string,
+    isSignup?: boolean,
+    metadata?: { nickname?: string; birthYear?: string; parentalConsent?: boolean },
+  ) => {
     if (!isSupabaseConfigured) {
       // Mock Auth logic
       const { MockDb } = await import('./services/mockDb');
@@ -163,7 +188,8 @@ function App() {
         }
 
         const normalizedInviteCode = role === UserRole.STUDENT ? code?.trim().toUpperCase() : undefined;
-        const signupName = getSignupName(email);
+        const signupNickname = metadata?.nickname?.trim() || email.split('@')[0]?.trim() || 'User';
+        const parsedBirthYear = metadata?.birthYear ? Number(metadata.birthYear) : null;
 
         // Default 31 days trial
         const expiresAt = new Date();
@@ -175,7 +201,9 @@ function App() {
           options: {
             data: {
               role,
-              name: signupName,
+              nickname: signupNickname,
+              name: signupNickname,
+              ...(parsedBirthYear ? { birth_year: parsedBirthYear } : {}),
               subscription_expires_at: expiresAt.toISOString(), // Save to user metadata for easy access trigger
               ...(role === UserRole.STUDENT
                 ? {
@@ -224,6 +252,56 @@ function App() {
     }
   };
 
+
+  const handleSocialLogin = async (provider: 'apple' | 'google', role: UserRole) => {
+    try {
+      setAuthLoading(true);
+      const redirectTo = `${window.location.origin}`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo,
+          queryParams: { role },
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      alert(err.message || '소셜 로그인에 실패했습니다.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirm('정말로 탈퇴하시겠습니까? 모든 데이터가 복구 불가능하게 삭제됩니다.')) return;
+
+    try {
+      setAuthLoading(true);
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      const response = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '회원 탈퇴 처리에 실패했습니다.');
+      }
+
+      await supabase.auth.signOut();
+      setUser(null);
+      alert('회원 탈퇴가 완료되었습니다.');
+    } catch (err: any) {
+      alert(err.message || '회원 탈퇴 중 오류가 발생했습니다.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -247,11 +325,11 @@ function App() {
   }
 
   if (!user) {
-    return <Auth onLogin={handleAuth} loading={authLoading} />;
+    return <Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} />;
   }
 
   return user.role === UserRole.STUDENT
-    ? <StudentChat user={user} onLogout={handleLogout} />
+    ? <StudentChat user={user} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} />
     : <ParentDashboard user={user} onLogout={handleLogout} />;
 }
 
