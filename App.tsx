@@ -5,7 +5,6 @@ import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 import SocialOnboarding from './components/SocialOnboarding';
-import { SOCIAL_PARENT_REGISTRATION_CODE } from './constants';
 
 interface OnboardingState {
   userId: string;
@@ -207,8 +206,23 @@ function App() {
         if (updateAuthError) throw updateAuthError;
       } else {
         const normalizedCode = String(payload?.registrationCode || '').trim();
-        if (normalizedCode !== SOCIAL_PARENT_REGISTRATION_CODE) {
-          throw new Error('초대 코드가 올바르지 않습니다.');
+        if (!normalizedCode) {
+          throw new Error('초대 코드를 입력해주세요.');
+        }
+
+        const verifyResponse = await fetch('/api/verify-parent-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            registrationCode: normalizedCode,
+          }),
+        });
+
+        const verifyResult = await verifyResponse.json().catch(() => null);
+        if (!verifyResponse.ok || !verifyResult?.success) {
+          throw new Error(verifyResult?.error || '초대 코드 인증에 실패했습니다.');
         }
 
         const { error: updateAuthError } = await supabase.auth.updateUser({

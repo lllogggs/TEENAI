@@ -71,7 +71,7 @@ const SocialOnboarding: React.FC<SocialOnboardingProps> = ({ role, email, loadin
               </label>
             </>
           ) : (
-            <input type="text" value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="초대 코드 (현재 TEST2024)" />
+            <input type="text" value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} className="w-full border rounded-xl px-4 py-3" placeholder="초대 코드 입력" />
           )}
 
           <button type="submit" disabled={loading} className="w-full bg-brand-900 text-white py-4 rounded-2xl font-black disabled:bg-slate-300">
