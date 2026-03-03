@@ -4,12 +4,21 @@ import Auth from './components/Auth';
 import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
+import SocialOnboarding from './components/SocialOnboarding';
+import { SOCIAL_PARENT_REGISTRATION_CODE } from './constants';
+
+interface OnboardingState {
+  userId: string;
+  email: string;
+  role: UserRole;
+}
 
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -20,7 +29,7 @@ function App() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await ensureProfileLoaded(session.user.id, session.user.email || '');
+        await ensureProfileLoaded(session.user.id, session.user.email || '', session.user);
       } else {
         setLoading(false);
       }
@@ -29,7 +38,7 @@ function App() {
     checkSession();
   }, []);
 
-  const ensureProfileLoaded = async (userId: string, fallbackEmail: string) => {
+  const ensureProfileLoaded = async (userId: string, fallbackEmail: string, authUserArg?: any) => {
     try {
       let profile: any = null;
       let lastError: any = null;
@@ -51,6 +60,18 @@ function App() {
       }
 
       if (profile) {
+        const authUser = authUserArg || (await supabase.auth.getUser()).data.user;
+        if (await needsOnboarding(profile, authUser)) {
+          setOnboardingState({
+            userId,
+            email: profile.email || fallbackEmail,
+            role: profile.role,
+          });
+          setUser(null);
+          return;
+        }
+
+        setOnboardingState(null);
         setUser(profile as User);
         return;
       }
@@ -73,6 +94,7 @@ function App() {
         .single();
 
       if (!insertError && inserted) {
+        setOnboardingState(null);
         setUser(inserted as User);
         return;
       }
@@ -85,6 +107,125 @@ function App() {
       console.error('Profile load error:', loadError);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const needsOnboarding = async (profile: any, authUser: any) => {
+    if (!profile?.id || !profile?.role) return false;
+
+    if (profile.role === UserRole.STUDENT) {
+      const { data: studentProfile } = await supabase
+        .from('student_profiles')
+        .select('parent_user_id, invite_code')
+        .eq('user_id', profile.id)
+        .maybeSingle();
+
+      const hasNickname = Boolean((profile.nickname || profile.name || '').trim());
+      const hasBirthYear = Boolean(profile.birth_year);
+      const hasParentLink = Boolean(studentProfile?.parent_user_id && studentProfile?.invite_code);
+      const hasParentalConsent = authUser?.user_metadata?.parental_consent === true;
+
+      return !hasNickname || !hasBirthYear || !hasParentLink || !hasParentalConsent;
+    }
+
+    if (profile.role === UserRole.PARENT) {
+      const provider = authUser?.app_metadata?.provider;
+      const isSocialProvider = provider === 'google' || provider === 'apple';
+      const hasValidatedCode = authUser?.user_metadata?.parent_registration_verified === true;
+      return isSocialProvider && !hasValidatedCode;
+    }
+
+    return false;
+  };
+
+  const handleOnboardingSubmit = async (payload: any) => {
+    if (!onboardingState) return;
+
+    try {
+      setAuthLoading(true);
+
+      if (onboardingState.role === UserRole.STUDENT) {
+        const { nickname, birthYear, parentInviteCode, parentalConsent } = payload;
+        const normalizedCode = String(parentInviteCode || '').trim().toUpperCase();
+
+        const { data: parents } = await supabase
+          .from('users')
+          .select('id')
+          .eq('my_invite_code', normalizedCode)
+          .eq('role', UserRole.PARENT)
+          .limit(1);
+
+        if (!parents || parents.length === 0) {
+          throw new Error('유효하지 않은 자녀-학부모 코드입니다.');
+        }
+
+        const parentId = parents[0].id;
+
+        const { count, error: countError } = await supabase
+          .from('student_profiles')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('parent_user_id', parentId)
+          .neq('user_id', onboardingState.userId);
+
+        if (countError) throw countError;
+        if ((count || 0) >= 3) {
+          throw new Error('해당 부모님 계정의 학생 수가 최대(3명)에 도달했습니다.');
+        }
+
+        const parsedBirthYear = Number(birthYear);
+        const resolvedNickname = String(nickname || '').trim();
+
+        const { error: updateUserError } = await supabase
+          .from('users')
+          .update({
+            nickname: resolvedNickname,
+            name: resolvedNickname,
+            birth_year: parsedBirthYear,
+          })
+          .eq('id', onboardingState.userId);
+
+        if (updateUserError) throw updateUserError;
+
+        const { error: studentProfileError } = await supabase
+          .from('student_profiles')
+          .upsert({
+            user_id: onboardingState.userId,
+            invite_code: normalizedCode,
+            parent_user_id: parentId,
+          });
+
+        if (studentProfileError) throw studentProfileError;
+
+        const { error: updateAuthError } = await supabase.auth.updateUser({
+          data: {
+            nickname: resolvedNickname,
+            name: resolvedNickname,
+            birth_year: parsedBirthYear,
+            parental_consent: Boolean(parentalConsent),
+          },
+        });
+        if (updateAuthError) throw updateAuthError;
+      } else {
+        const normalizedCode = String(payload?.registrationCode || '').trim();
+        if (normalizedCode !== SOCIAL_PARENT_REGISTRATION_CODE) {
+          throw new Error('초대 코드가 올바르지 않습니다.');
+        }
+
+        const { error: updateAuthError } = await supabase.auth.updateUser({
+          data: {
+            parent_registration_verified: true,
+          },
+        });
+
+        if (updateAuthError) throw updateAuthError;
+      }
+
+      const { data: userData } = await supabase.auth.getUser();
+      await ensureProfileLoaded(onboardingState.userId, onboardingState.email, userData.user);
+    } catch (err: any) {
+      alert(err.message || '추가 정보 저장에 실패했습니다.');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -204,6 +345,7 @@ function App() {
               nickname: signupNickname,
               name: signupNickname,
               ...(parsedBirthYear ? { birth_year: parsedBirthYear } : {}),
+              ...(metadata?.parentalConsent ? { parental_consent: true } : {}),
               subscription_expires_at: expiresAt.toISOString(), // Save to user metadata for easy access trigger
               ...(role === UserRole.STUDENT
                 ? {
@@ -242,7 +384,7 @@ function App() {
         if (error) throw error;
 
         if (data.user) {
-          await ensureProfileLoaded(data.user.id, data.user.email || email);
+          await ensureProfileLoaded(data.user.id, data.user.email || email, data.user);
         }
       }
     } catch (err: any) {
@@ -306,6 +448,7 @@ function App() {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
+    setOnboardingState(null);
     setUser(null);
   };
 
@@ -325,6 +468,18 @@ function App() {
   }
 
   if (!user) {
+    if (onboardingState) {
+      return (
+        <SocialOnboarding
+          role={onboardingState.role}
+          email={onboardingState.email}
+          loading={authLoading}
+          onSubmit={handleOnboardingSubmit}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
     return <Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} />;
   }
 
