@@ -33,15 +33,41 @@ function App() {
         if (isAuthCallbackPath()) {
           window.history.replaceState({}, '', '/');
         }
-      } else {
+        return;
+      }
+
+      if (isAuthCallbackPath()) {
+        const maxAttempts = 10;
+        for (let i = 0; i < maxAttempts; i += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          const { data: { session: retriedSession } } = await supabase.auth.getSession();
+          if (retriedSession?.user) {
+            await ensureProfileLoaded(retriedSession.user.id, retriedSession.user.email || '', retriedSession.user);
+            window.history.replaceState({}, '', '/');
+            return;
+          }
+        }
+
+        window.history.replaceState({}, '', '/');
+      }
+
+      setLoading(false);
+    };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        await ensureProfileLoaded(session.user.id, session.user.email || '', session.user);
         if (isAuthCallbackPath()) {
           window.history.replaceState({}, '', '/');
         }
-        setLoading(false);
       }
-    };
+    });
 
     checkSession();
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
   }, []);
 
   const ensureProfileLoaded = async (userId: string, fallbackEmail: string, authUserArg?: any) => {
