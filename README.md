@@ -31,6 +31,24 @@ Supabase SQL Editor에서 아래 순서대로 실행하세요.
 > 참고: `supabase_schema.sql`은 더 이상 실행 대상이 아니며, 과거 내용을 migration으로 이관한 안내 파일입니다.
 
 
+
+## Supabase OAuth (Google/Apple) 필수 설정
+
+구글/애플 소셜 로그인이 `localhost`로 튀거나 로그인 후 돌아오지 않으면 아래를 확인하세요.
+
+1. Supabase Dashboard → **Authentication → URL Configuration**
+   - **Site URL**: 실제 서비스 URL (예: `https://forteenai.com`)
+   - **Redirect URLs**에 아래를 모두 추가
+     - `https://forteenai.com/auth/callback`
+     - `https://www.forteenai.com/auth/callback`
+     - 로컬 개발 시: `http://localhost:5173/auth/callback`
+2. Supabase Dashboard → **Authentication → Providers → Google(또는 Apple)** 활성화
+3. Google Cloud Console OAuth Client의 **Authorized redirect URI**에 Supabase 콜백 등록
+   - `https://<YOUR_SUPABASE_PROJECT_REF>.supabase.co/auth/v1/callback`
+4. 필요 시 프론트 환경변수에 강제 콜백 URL 지정
+   - `VITE_OAUTH_REDIRECT_URL=https://forteenai.com`
+   - 앱은 자동으로 `/auth/callback`을 붙여 사용
+
 ## Mobile App (웹 쌍둥이 버전)
 
 동일한 UI/기능을 앱으로 제공하려면 `mobile-app`(Expo + WebView)을 사용하세요.
