@@ -13,6 +13,31 @@ interface OnboardingState {
   role: UserRole;
 }
 
+const PENDING_SOCIAL_ROLE_KEY = 'teenai_pending_social_role';
+
+const getPendingSocialRole = (): UserRole | null => {
+  if (typeof window === 'undefined') return null;
+  const value = window.localStorage.getItem(PENDING_SOCIAL_ROLE_KEY);
+  if (value === UserRole.PARENT) return UserRole.PARENT;
+  if (value === UserRole.STUDENT) return UserRole.STUDENT;
+  return null;
+};
+
+const setPendingSocialRole = (role: UserRole) => {
+  if (typeof window === 'undefined') return;
+  if (role === UserRole.PARENT) {
+    window.localStorage.setItem(PENDING_SOCIAL_ROLE_KEY, role);
+    return;
+  }
+
+  window.localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+};
+
+const clearPendingSocialRole = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+};
+
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -110,7 +135,12 @@ function App() {
 
       const { data: { session } } = await supabase.auth.getSession();
       const metadata = session?.user?.user_metadata || {};
-      const fallbackRole = metadata.role === UserRole.PARENT ? UserRole.PARENT : UserRole.STUDENT;
+      const pendingSocialRole = getPendingSocialRole();
+      const fallbackRole = metadata.role === UserRole.PARENT
+        ? UserRole.PARENT
+        : pendingSocialRole === UserRole.PARENT
+          ? UserRole.PARENT
+          : UserRole.STUDENT;
       const fallbackNickname = metadata.nickname || metadata.name || fallbackEmail.split('@')[0] || 'User';
       const { data: inserted, error: insertError } = await supabase
         .from('users')
@@ -126,6 +156,18 @@ function App() {
         .single();
 
       if (!insertError && inserted) {
+        const authUser = authUserArg || session?.user || (await supabase.auth.getUser()).data.user;
+        if (await needsOnboarding(inserted, authUser)) {
+          setOnboardingState({
+            userId,
+            email: inserted.email || fallbackEmail,
+            role: inserted.role,
+          });
+          setUser(null);
+          return;
+        }
+
+        clearPendingSocialRole();
         setOnboardingState(null);
         setUser(inserted as User);
         return;
@@ -146,18 +188,7 @@ function App() {
     if (!profile?.id || !profile?.role) return false;
 
     if (profile.role === UserRole.STUDENT) {
-      const { data: studentProfile } = await supabase
-        .from('student_profiles')
-        .select('parent_user_id, invite_code')
-        .eq('user_id', profile.id)
-        .maybeSingle();
-
-      const hasNickname = Boolean((profile.nickname || profile.name || '').trim());
-      const hasBirthYear = Boolean(profile.birth_year);
-      const hasParentLink = Boolean(studentProfile?.parent_user_id && studentProfile?.invite_code);
-      const hasParentalConsent = authUser?.user_metadata?.parental_consent === true;
-
-      return !hasNickname || !hasBirthYear || !hasParentLink || !hasParentalConsent;
+      return false;
     }
 
     if (profile.role === UserRole.PARENT) {
@@ -265,6 +296,7 @@ function App() {
         });
 
         if (updateAuthError) throw updateAuthError;
+        clearPendingSocialRole();
       }
 
       const { data: userData } = await supabase.auth.getUser();
@@ -445,6 +477,7 @@ function App() {
   const handleSocialLogin = async (provider: 'apple' | 'google', role: UserRole) => {
     try {
       setAuthLoading(true);
+      setPendingSocialRole(role);
       const redirectTo = getOAuthRedirectUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,

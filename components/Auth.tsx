@@ -31,6 +31,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
 
 
   const hasAcceptedRequiredPolicies = useMemo(() => termsAccepted && privacyAccepted, [termsAccepted, privacyAccepted]);
+  const canUseSocialSignup = !isSignup || hasAcceptedRequiredPolicies;
 
   useEffect(() => {
     const focusHandler = (event: FocusEvent) => {
@@ -224,7 +225,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                disabled={loading}
+                disabled={loading || !canUseSocialSignup}
                 onClick={() => onSocialLogin('apple', view === 'parent-auth' ? UserRole.PARENT : UserRole.STUDENT)}
                 className="w-full border border-slate-200 bg-white text-slate-700 font-black py-3 rounded-xl hover:border-slate-300 transition-colors disabled:opacity-50"
               >
@@ -232,7 +233,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
               </button>
               <button
                 type="button"
-                disabled={loading}
+                disabled={loading || !canUseSocialSignup}
                 onClick={() => onSocialLogin('google', view === 'parent-auth' ? UserRole.PARENT : UserRole.STUDENT)}
                 className="w-full border border-slate-200 bg-white text-slate-700 font-black py-3 rounded-xl hover:border-slate-300 transition-colors disabled:opacity-50"
               >
