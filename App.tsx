@@ -5,6 +5,7 @@ import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 import SocialOnboarding from './components/SocialOnboarding';
+import { getOAuthRedirectUrl, isAuthCallbackPath } from './utils/oauth';
 
 interface OnboardingState {
   userId: string;
@@ -29,7 +30,13 @@ function App() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         await ensureProfileLoaded(session.user.id, session.user.email || '', session.user);
+        if (isAuthCallbackPath()) {
+          window.history.replaceState({}, '', '/');
+        }
       } else {
+        if (isAuthCallbackPath()) {
+          window.history.replaceState({}, '', '/');
+        }
         setLoading(false);
       }
     };
@@ -412,7 +419,7 @@ function App() {
   const handleSocialLogin = async (provider: 'apple' | 'google', role: UserRole) => {
     try {
       setAuthLoading(true);
-      const redirectTo = `${window.location.origin}`;
+      const redirectTo = getOAuthRedirectUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
