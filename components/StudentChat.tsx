@@ -711,14 +711,23 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
           <div className="px-5 md:px-10 py-2 md:py-3 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
             {/* Container for buttons to stick top-left inside the content area */}
-            <div className="fixed left-4 top-[calc(env(safe-area-inset-top,0px)+5.15rem)] md:top-[calc(env(safe-area-inset-top,0px)+5.9rem)] z-40 flex items-center gap-3 pointer-events-auto">
+            <div className="fixed left-4 top-[calc(env(safe-area-inset-top,0px)+5.15rem)] md:top-[calc(env(safe-area-inset-top,0px)+5.9rem)] z-40 pointer-events-auto">
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 px-2 py-1.5 shadow-sm backdrop-blur-sm">
               {/* Mobile Sidebar Toggle (Back) */}
-              <button onClick={() => setShowMobileChat(false)} className="flex lg:hidden w-10 h-10 items-center justify-center rounded-xl bg-white text-slate-700 border border-slate-200 shadow-md shadow-slate-300/30 hover:bg-brand-50 hover:text-brand-800 hover:border-brand-200 transition-colors shrink-0">
+              <button
+                onClick={() => setShowMobileChat(false)}
+                aria-label="대화 목록 열기"
+                className="flex lg:hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
               </button>
 
               {/* PC Sidebar Toggle */}
-              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-white text-slate-700 border border-slate-200 shadow-md shadow-slate-300/30 hover:bg-brand-50 hover:text-brand-800 hover:border-brand-200 transition-colors shrink-0">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                aria-label={isSidebarOpen ? '대화 목록 숨기기' : '대화 목록 열기'}
+                className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+              >
                 {isSidebarOpen ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
                 ) : (
@@ -727,9 +736,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </button>
 
               {/* PC New Chat Button */}
-              <button onClick={handleNewSession} className="hidden lg:block text-brand-900 bg-brand-50 border border-brand-100 px-4 py-2 rounded-xl hover:bg-brand-100 font-black text-sm md:text-base tracking-tighter transition-colors whitespace-nowrap shadow-sm">
+              <button
+                onClick={handleNewSession}
+                aria-label="새 대화 시작하기"
+                className="hidden lg:flex h-9 items-center rounded-xl border border-brand-100 bg-brand-50 px-3.5 text-sm font-black tracking-tighter text-brand-900 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 whitespace-nowrap"
+              >
                 + 새 대화
               </button>
+              </div>
             </div>
 
             <div className="w-[1px] h-4 bg-slate-200 lg:hidden mx-1"></div>
