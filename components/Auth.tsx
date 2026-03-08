@@ -6,10 +6,11 @@ import { ForteenLogo } from './Icons';
 
 interface AuthProps {
   onLogin: (email: string, password: string, role: UserRole, inviteCode?: string, isSignup?: boolean) => Promise<void>;
+  onSocialLogin: (role: UserRole) => Promise<void>;
   loading: boolean;
 }
 
-const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
+const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
   const [view, setView] = useState<'selection' | 'parent-auth' | 'student-auth'>('selection');
   const [isSignup, setIsSignup] = useState(false);
 
@@ -87,6 +88,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
     setTermsAccepted(false);
     setPrivacyAccepted(false);
   };
+
+  const activeRole = view === 'parent-auth' ? UserRole.PARENT : UserRole.STUDENT;
 
   const termsContent = (
     <div className="space-y-3">
@@ -216,6 +219,26 @@ const Auth: React.FC<AuthProps> = ({ onLogin, loading }) => {
 
           <button type="submit" disabled={loading || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
             {loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}
+          </button>
+
+          <div className="relative pt-1">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onSocialLogin(activeRole)}
+            disabled={loading}
+            className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-3.5 md:py-4 font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
+            <span className="text-sm md:text-base">Google로 계속하기</span>
           </button>
         </form>
 

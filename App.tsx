@@ -5,9 +5,19 @@ import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
+const PENDING_SOCIAL_ROLE_KEY = 'forteenai_pending_social_role';
+
 const getSignupName = (email: string) => {
   const emailPrefix = email.split('@')[0]?.trim();
   return emailPrefix || 'User';
+};
+
+const getOAuthRedirectUrl = () => {
+  if (typeof window === 'undefined') return 'http://localhost:5173/auth/callback';
+  if (window.location.hostname === 'forteenai.com' || window.location.hostname === 'www.forteenai.com') {
+    return 'https://forteenai.com/auth/callback';
+  }
+  return 'http://localhost:5173/auth/callback';
 };
 
 function App() {
@@ -22,18 +32,34 @@ function App() {
         return;
       }
 
+      const isAuthCallback = typeof window !== 'undefined' && window.location.pathname === '/auth/callback';
+      if (isAuthCallback) {
+        const query = new URLSearchParams(window.location.search);
+        const code = query.get('code');
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('OAuth callback exchange error:', error);
+          }
+        }
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await ensureProfileLoaded(session.user.id, session.user.email || '');
+        await ensureProfileLoaded(session.user.id, session.user.email || '', isAuthCallback);
       } else {
         setLoading(false);
+      }
+
+      if (isAuthCallback && typeof window !== 'undefined') {
+        window.history.replaceState({}, document.title, '/');
       }
     };
 
     checkSession();
   }, []);
 
-  const ensureProfileLoaded = async (userId: string, fallbackEmail: string) => {
+  const ensureProfileLoaded = async (userId: string, fallbackEmail: string, fromSocialCallback = false) => {
     try {
       let profile: any = null;
       let lastError: any = null;
@@ -55,8 +81,50 @@ function App() {
       }
 
       if (profile) {
+        if (fromSocialCallback) {
+          const pendingRole = localStorage.getItem(PENDING_SOCIAL_ROLE_KEY);
+          if (pendingRole && pendingRole !== profile.role) {
+            alert(`기존 계정의 역할(${profile.role})이 우선 적용됩니다.`);
+          }
+          localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+        }
         setUser(profile as User);
         return;
+      }
+
+      if (fromSocialCallback) {
+        const pendingRole = localStorage.getItem(PENDING_SOCIAL_ROLE_KEY) as UserRole | null;
+        const socialRole = pendingRole === UserRole.PARENT || pendingRole === UserRole.STUDENT
+          ? pendingRole
+          : UserRole.STUDENT;
+        const socialName = getSignupName(fallbackEmail);
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 31);
+
+        const { data: insertedProfile, error: insertError } = await supabase
+          .from('users')
+          .upsert({
+            id: userId,
+            email: fallbackEmail,
+            role: socialRole,
+            name: socialName,
+            subscription_expires_at: expiresAt.toISOString(),
+          }, { onConflict: 'id' })
+          .select('*')
+          .single();
+
+        localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+
+        if (insertError) {
+          console.error('social users upsert error:', insertError);
+          throw insertError;
+        }
+
+        if (insertedProfile) {
+          setUser(insertedProfile as User);
+          return;
+        }
       }
 
       console.error('users profile lookup error:', lastError);
@@ -67,6 +135,36 @@ function App() {
       console.error('Profile load error:', loadError);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (role: UserRole) => {
+    if (!isSupabaseConfigured) {
+      alert('소셜 로그인은 Supabase 연결 환경에서만 사용 가능합니다.');
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      localStorage.setItem(PENDING_SOCIAL_ROLE_KEY, role);
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: getOAuthRedirectUrl(),
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (error) {
+        localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+        throw error;
+      }
+    } catch (err: any) {
+      alert(err.message || 'Google 로그인 중 오류가 발생했습니다.');
+      setAuthLoading(false);
     }
   };
 
@@ -247,7 +345,7 @@ function App() {
   }
 
   if (!user) {
-    return <Auth onLogin={handleAuth} loading={authLoading} />;
+    return <Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} />;
   }
 
   return user.role === UserRole.STUDENT
