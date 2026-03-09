@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import { serverSupabaseEnv, serverSupabaseEnvHints } from './_lib/supabase-env';
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl = serverSupabaseEnv.url;
+const serviceRoleKey = serverSupabaseEnv.serviceRoleKey;
 
 const getSignupName = (email: string) => {
   const emailPrefix = email.split('@')[0]?.trim();
@@ -15,7 +16,7 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!supabaseUrl || !serviceRoleKey) {
-    res.status(500).json({ error: 'Server env for admin signup is missing.' });
+    res.status(500).json({ error: `Server configuration missing. Required: ${serverSupabaseEnvHints.url}, ${serverSupabaseEnvHints.serviceRoleKey}` });
     return;
   }
 

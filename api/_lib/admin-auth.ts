@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
+import { serverSupabaseEnv, serverSupabaseEnvHints } from './supabase-env';
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl = serverSupabaseEnv.url;
+const anonKey = serverSupabaseEnv.anonKey;
+const serviceRoleKey = serverSupabaseEnv.serviceRoleKey;
 
 const ADMIN_EMAIL_WHITELIST = new Set(['hishersours7@gmail.com']);
 
@@ -16,7 +17,7 @@ const getBearerToken = (req: any): string | null => {
 
 export const requireAdminUser = async (req: any, res: any) => {
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    res.status(500).json({ error: 'Admin API env missing.' });
+    res.status(500).json({ error: `Admin API env missing. Required: ${serverSupabaseEnvHints.url}, ${serverSupabaseEnvHints.anonKey}, ${serverSupabaseEnvHints.serviceRoleKey}` });
     return null;
   }
 
