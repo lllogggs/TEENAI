@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { User } from '../types';
 import { supabase } from '../utils/supabase';
 
@@ -14,10 +14,20 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [maxUses, setMaxUses] = useState(1);
   const [expiresAt, setExpiresAt] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadDetail, setLoadDetail] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createdCode, setCreatedCode] = useState('');
+  const [copyStatus, setCopyStatus] = useState('');
 
   const authedFetch = async (url: string, options: RequestInit = {}) => {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
+
+    if (!token) {
+      throw new Error('로그인 세션을 찾지 못했습니다. 다시 로그인해주세요.');
+    }
+
     return fetch(url, {
       ...options,
       headers: {
@@ -30,43 +40,85 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
   const load = async () => {
     setLoadError(null);
+    setLoadDetail(null);
 
-    const [overviewRes, codeRes] = await Promise.all([
-      authedFetch('/api/admin/overview'),
-      authedFetch('/api/admin/invite-codes'),
-    ]);
+    try {
+      const [overviewRes, codeRes] = await Promise.all([
+        authedFetch('/api/admin/overview'),
+        authedFetch('/api/admin/invite-codes'),
+      ]);
 
-    const ov = await overviewRes.json().catch(() => ({}));
-    const codePayload = await codeRes.json().catch(() => ({}));
+      const ov = await overviewRes.json().catch(() => ({}));
+      const codePayload = await codeRes.json().catch(() => ({}));
 
-    if (!overviewRes.ok) {
-      const detail = ov?.queryErrors ? ` (${JSON.stringify(ov.queryErrors)})` : '';
-      setLoadError(ov?.error ? `${ov.error}${detail}` : '대시보드 통계를 불러오지 못했습니다.');
+      if (!overviewRes.ok) {
+        const detail = ov?.queryErrors ? ` (${JSON.stringify(ov.queryErrors)})` : '';
+        setLoadError(ov?.error ? `${ov.error}${detail}` : '대시보드 통계를 불러오지 못했습니다.');
+        setOverview(null);
+      } else {
+        setOverview(ov);
+        if (ov?.hasPartialFailure) {
+          setLoadDetail('일부 통계 테이블 조회에 실패해 기본값(0)으로 표시된 카드가 있습니다. 아래 데이터 소스/로그를 확인해주세요.');
+        }
+      }
+
+      if (!codeRes.ok) {
+        setLoadError((prev) => prev || codePayload?.error || '초대코드 목록을 불러오지 못했습니다.');
+        setCodes([]);
+      } else {
+        setCodes(codePayload.items || []);
+      }
+    } catch (error: any) {
+      setLoadError(error?.message || '대시보드 로딩 실패');
       setOverview(null);
-    } else {
-      setOverview(ov);
-    }
-
-    if (!codeRes.ok) {
-      setLoadError((prev) => prev || codePayload?.error || '초대코드 목록을 불러오지 못했습니다.');
       setCodes([]);
-    } else {
-      setCodes(codePayload.items || []);
     }
   };
 
   useEffect(() => { load(); }, []);
 
   const createCode = async () => {
-    await authedFetch('/api/admin/invite-codes', {
-      method: 'POST',
-      body: JSON.stringify({ memo, maxUses, expiresAt: expiresAt || null }),
-    });
-    setMemo('');
-    setMaxUses(1);
-    setExpiresAt('');
-    await load();
+    setCreateLoading(true);
+    setCreateError(null);
+    setCreatedCode('');
+    setCopyStatus('');
+
+    try {
+      const response = await authedFetch('/api/admin/invite-codes', {
+        method: 'POST',
+        body: JSON.stringify({ memo, maxUses, expiresAt: expiresAt || null }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '초대코드 발급에 실패했습니다.');
+      }
+
+      setCreatedCode(String(payload?.code || ''));
+      setMemo('');
+      setMaxUses(1);
+      setExpiresAt('');
+      await load();
+    } catch (error: any) {
+      setCreateError(error?.message || '초대코드 발급에 실패했습니다.');
+    } finally {
+      setCreateLoading(false);
+    }
   };
+
+  const copyCreatedCode = async () => {
+    if (!createdCode) return;
+
+    try {
+      await navigator.clipboard.writeText(createdCode);
+      setCopyStatus('복사됨');
+      window.setTimeout(() => setCopyStatus(''), 1500);
+    } catch {
+      setCopyStatus('복사 실패');
+    }
+  };
+
+  const canIssue = useMemo(() => Number.isFinite(maxUses) && maxUses > 0 && !createLoading, [maxUses, createLoading]);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -80,6 +132,14 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <p className="font-bold">대시보드 데이터를 불러오는 중 오류가 발생했습니다.</p>
             <p className="mt-1 break-all">{loadError}</p>
+            <button onClick={load} className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-black text-red-700">다시 불러오기</button>
+          </div>
+        )}
+
+        {loadDetail && !loadError && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-bold">부분 조회 경고</p>
+            <p className="mt-1">{loadDetail}</p>
           </div>
         )}
 
@@ -116,12 +176,21 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
         <div className="bg-white rounded-2xl p-4 border border-slate-100">
           <h2 className="font-black mb-3">초대코드 발급</h2>
+          <p className="text-xs text-slate-500 mb-3">메모(선택), 사용 가능 횟수, 만료 일시를 설정하고 발급을 누르세요. 발급된 코드는 아래에서 즉시 복사할 수 있습니다.</p>
           <div className="grid md:grid-cols-4 gap-2">
             <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" className="border rounded-xl px-3 py-2" />
             <input type="number" value={maxUses} min={1} onChange={(e) => setMaxUses(Number(e.target.value) || 1)} placeholder="사용횟수" className="border rounded-xl px-3 py-2" />
             <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="border rounded-xl px-3 py-2" />
-            <button onClick={createCode} className="rounded-xl bg-brand-900 text-white font-bold">발급</button>
+            <button onClick={createCode} disabled={!canIssue} className="rounded-xl bg-brand-900 text-white font-bold disabled:opacity-60">{createLoading ? '발급 중...' : '발급'}</button>
           </div>
+          {createError && <p className="mt-2 text-xs font-bold text-rose-600">{createError}</p>}
+          {createdCode && (
+            <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-black tracking-widest text-brand-900">{createdCode}</p>
+              <button onClick={copyCreatedCode} className="rounded-lg border border-brand-200 bg-white px-2 py-1 text-xs font-black text-brand-900">복사</button>
+            </div>
+          )}
+          {copyStatus && <p className="mt-1 text-xs text-slate-500">{copyStatus}</p>}
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-slate-100 overflow-x-auto">
