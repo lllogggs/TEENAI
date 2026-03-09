@@ -182,6 +182,37 @@ function App() {
         }
       }
 
+      const { data: userInfo } = await supabase.auth.getUser();
+      const metadata = userInfo.user?.user_metadata || {};
+      const metadataRole = metadata.role === UserRole.PARENT || metadata.role === UserRole.STUDENT
+        ? metadata.role
+        : UserRole.STUDENT;
+      const metadataName = typeof metadata.name === 'string' && metadata.name.trim()
+        ? metadata.name.trim()
+        : getSignupName(fallbackEmail || userInfo.user?.email || '');
+      const metadataEmail = userInfo.user?.email || fallbackEmail;
+
+      if (userInfo.user && metadataEmail) {
+        const { data: repairedProfile, error: repairError } = await supabase
+          .from('users')
+          .upsert({
+            id: userId,
+            email: metadataEmail,
+            role: metadataRole,
+            name: metadataName,
+            subscription_expires_at: metadata.subscription_expires_at || null,
+          }, { onConflict: 'id' })
+          .select('*')
+          .single();
+
+        if (!repairError && repairedProfile) {
+          setUser(repairedProfile as User);
+          return;
+        }
+
+        console.error('users profile repair upsert error:', repairError);
+      }
+
       console.error('users profile lookup error:', lastError);
       if (fallbackEmail) {
         alert('프로필 생성이 아직 완료되지 않았습니다. 잠시 후 다시 로그인해주세요.');
