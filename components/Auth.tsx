@@ -6,7 +6,7 @@ import { ForteenLogo } from './Icons';
 
 interface AuthProps {
   onLogin: (email: string, password: string, role: UserRole, inviteCode?: string, isSignup?: boolean) => Promise<void>;
-  onSocialLogin: (role: UserRole) => Promise<void>;
+  onSocialLogin: (provider: 'google' | 'apple', role: UserRole, isSignup: boolean) => Promise<void>;
   loading: boolean;
 }
 
@@ -232,7 +232,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
 
           <button
             type="button"
-            onClick={() => onSocialLogin(activeRole)}
+            onClick={() => onSocialLogin('google', activeRole, isSignup)}
             disabled={loading}
             className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-3.5 md:py-4 font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}

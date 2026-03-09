@@ -6,13 +6,15 @@ import ParentDashboard from './components/ParentDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
 const PENDING_SOCIAL_ROLE_KEY = 'forteenai_pending_social_role';
+const PENDING_SOCIAL_SIGNUP_KEY = 'forteenai_pending_social_signup';
 
 const getSignupName = (email: string) => {
   const emailPrefix = email.split('@')[0]?.trim();
   return emailPrefix || 'User';
 };
 
-const getOAuthRedirectUrl = () => {
+const getOAuthRedirectUrl = (isNativeWebView: boolean) => {
+  if (isNativeWebView) return 'forteenai://auth/callback';
   if (typeof window === 'undefined') return 'http://localhost:5173/auth/callback';
   if (window.location.hostname === 'forteenai.com' || window.location.hostname === 'www.forteenai.com') {
     return 'https://forteenai.com/auth/callback';
@@ -44,6 +46,14 @@ function App() {
         }
       }
 
+      if (isAuthCallback) {
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const accessToken = hash.get('access_token');
+        const refreshToken = hash.get('refresh_token');
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        }
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         await ensureProfileLoaded(session.user.id, session.user.email || '', isAuthCallback);
@@ -57,6 +67,30 @@ function App() {
     };
 
     checkSession();
+  }, []);
+
+  useEffect(() => {
+    const onMessage = async (event: MessageEvent) => {
+      try {
+        const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (raw?.type !== 'social_oauth_result') return;
+        const accessToken = raw?.accessToken;
+        const refreshToken = raw?.refreshToken;
+        if (!accessToken || !refreshToken) return;
+        const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (error) throw error;
+        if (data.user) {
+          await ensureProfileLoaded(data.user.id, data.user.email || '', true);
+        }
+      } catch (err) {
+        console.error('social_oauth_result parse/set session error', err);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   const ensureProfileLoaded = async (userId: string, fallbackEmail: string, fromSocialCallback = false) => {
@@ -83,10 +117,20 @@ function App() {
       if (profile) {
         if (fromSocialCallback) {
           const pendingRole = localStorage.getItem(PENDING_SOCIAL_ROLE_KEY);
+          const pendingSignup = localStorage.getItem(PENDING_SOCIAL_SIGNUP_KEY) === 'true';
           if (pendingRole && pendingRole !== profile.role) {
             alert(`기존 계정의 역할(${profile.role})이 우선 적용됩니다.`);
           }
+          if (pendingSignup && profile.role === UserRole.STUDENT) {
+            const entered = window.prompt('권한 사용자 확인을 위해 초대코드를 입력해주세요.');
+            const normalizedCode = entered?.trim().toUpperCase();
+            if (!normalizedCode) throw new Error('초대 코드가 필요합니다.');
+            const { data: parents } = await supabase.from('users').select('id').eq('my_invite_code', normalizedCode).eq('role', UserRole.PARENT).limit(1);
+            if (!parents?.length) throw new Error('유효하지 않은 초대 코드입니다.');
+            await supabase.from('student_profiles').upsert({ user_id: profile.id, invite_code: normalizedCode, parent_user_id: parents[0].id });
+          }
           localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+          localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
         }
         setUser(profile as User);
         return;
@@ -138,7 +182,7 @@ function App() {
     }
   };
 
-  const handleSocialLogin = async (role: UserRole) => {
+  const handleSocialLogin = async (provider: 'google' | 'apple', role: UserRole, isSignup: boolean) => {
     if (!isSupabaseConfigured) {
       alert('소셜 로그인은 Supabase 연결 환경에서만 사용 가능합니다.');
       return;
@@ -147,23 +191,34 @@ function App() {
     try {
       setAuthLoading(true);
       localStorage.setItem(PENDING_SOCIAL_ROLE_KEY, role);
+      localStorage.setItem(PENDING_SOCIAL_SIGNUP_KEY, String(Boolean(isSignup)));
+      const isNativeWebView = typeof window !== 'undefined' && Boolean((window as any).ReactNativeWebView);
 
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
         options: {
-          redirectTo: getOAuthRedirectUrl(),
-          queryParams: {
-            prompt: 'select_account',
-          },
+          redirectTo: getOAuthRedirectUrl(isNativeWebView),
+          skipBrowserRedirect: isNativeWebView,
+          queryParams: { prompt: 'select_account' },
         },
       });
 
-      if (error) {
-        localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
-        throw error;
+      if (error) throw error;
+
+      if (isNativeWebView && data?.url) {
+        (window as any).ReactNativeWebView?.postMessage(JSON.stringify({
+          type: 'oauth_start',
+          provider,
+          url: data.url,
+        }));
+        return;
       }
+
+      setAuthLoading(false);
     } catch (err: any) {
-      alert(err.message || 'Google 로그인 중 오류가 발생했습니다.');
+      localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+      localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
+      alert(err.message || '소셜 로그인 중 오류가 발생했습니다.');
       setAuthLoading(false);
     }
   };
