@@ -48,6 +48,22 @@ export default async function handler(req: any, res: any) {
   const codeUsedAt = new Date().toISOString();
 
   try {
+    const { data: codeRow } = await adminClient
+      .from('admin_codes')
+      .select('code, expires_at')
+      .eq('code', registrationCode)
+      .maybeSingle();
+
+    if (!codeRow) {
+      res.status(400).json({ error: '유효하지 않은 등록 코드입니다.' });
+      return;
+    }
+
+    if (codeRow.expires_at && new Date(codeRow.expires_at).getTime() < Date.now()) {
+      res.status(400).json({ error: '만료된 등록 코드입니다.' });
+      return;
+    }
+
     const { data: claimedCode, error: claimError } = await adminClient.rpc('claim_admin_code_use', {
       p_code: registrationCode,
       p_used_at: codeUsedAt,
@@ -63,6 +79,11 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ error: '유효하지 않거나 사용 가능한 횟수를 초과한 등록 코드입니다.' });
       return;
     }
+
+    await adminClient.from('admin_codes').update({
+      auth_provider: 'email',
+      used_by_email: email,
+    }).eq('code', registrationCode);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 31);

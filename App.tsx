@@ -3,10 +3,12 @@ import { User, UserRole } from './types';
 import Auth from './components/Auth';
 import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
+import AdminDashboard from './components/AdminDashboard';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
 const PENDING_SOCIAL_ROLE_KEY = 'forteenai_pending_social_role';
 const PENDING_SOCIAL_SIGNUP_KEY = 'forteenai_pending_social_signup';
+const PENDING_SOCIAL_INVITE_REQUIRED_KEY = 'forteenai_pending_social_invite_required';
 
 const getSignupName = (email: string) => {
   const emailPrefix = email.split('@')[0]?.trim();
@@ -26,6 +28,8 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [pendingSocialUser, setPendingSocialUser] = useState<{ id: string; email: string; role: UserRole } | null>(null);
+  const [socialInviteCode, setSocialInviteCode] = useState('');
 
   useEffect(() => {
     const checkSession = async () => {
@@ -122,12 +126,10 @@ function App() {
             alert(`기존 계정의 역할(${profile.role})이 우선 적용됩니다.`);
           }
           if (pendingSignup && profile.role === UserRole.STUDENT) {
-            const entered = window.prompt('권한 사용자 확인을 위해 초대코드를 입력해주세요.');
-            const normalizedCode = entered?.trim().toUpperCase();
-            if (!normalizedCode) throw new Error('초대 코드가 필요합니다.');
-            const { data: parents } = await supabase.from('users').select('id').eq('my_invite_code', normalizedCode).eq('role', UserRole.PARENT).limit(1);
-            if (!parents?.length) throw new Error('유효하지 않은 초대 코드입니다.');
-            await supabase.from('student_profiles').upsert({ user_id: profile.id, invite_code: normalizedCode, parent_user_id: parents[0].id });
+            setPendingSocialUser({ id: profile.id, email: profile.email, role: profile.role as UserRole });
+            localStorage.setItem(PENDING_SOCIAL_INVITE_REQUIRED_KEY, 'true');
+            setLoading(false);
+            return;
           }
           localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
           localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
@@ -146,6 +148,8 @@ function App() {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 31);
 
+        const pendingSignup = localStorage.getItem(PENDING_SOCIAL_SIGNUP_KEY) === 'true';
+
         const { data: insertedProfile, error: insertError } = await supabase
           .from('users')
           .upsert({
@@ -159,6 +163,7 @@ function App() {
           .single();
 
         localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
+        localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
 
         if (insertError) {
           console.error('social users upsert error:', insertError);
@@ -166,6 +171,12 @@ function App() {
         }
 
         if (insertedProfile) {
+          if (pendingSignup && insertedProfile.role === UserRole.STUDENT) {
+            setPendingSocialUser({ id: insertedProfile.id, email: insertedProfile.email, role: insertedProfile.role as UserRole });
+            localStorage.setItem(PENDING_SOCIAL_INVITE_REQUIRED_KEY, 'true');
+            setLoading(false);
+            return;
+          }
           setUser(insertedProfile as User);
           return;
         }
@@ -180,6 +191,45 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+
+  const completeSocialInviteVerification = async () => {
+    if (!pendingSocialUser) return;
+    const normalizedCode = socialInviteCode.trim().toUpperCase();
+    if (normalizedCode.length < 6) {
+      alert('초대 코드를 입력해주세요.');
+      return;
+    }
+
+    const { data: parents } = await supabase
+      .from('users')
+      .select('id')
+      .eq('my_invite_code', normalizedCode)
+      .eq('role', UserRole.PARENT)
+      .limit(1);
+
+    if (!parents?.length) {
+      alert('유효하지 않은 초대 코드입니다.');
+      return;
+    }
+
+    const { error } = await supabase.from('student_profiles').upsert({
+      user_id: pendingSocialUser.id,
+      invite_code: normalizedCode,
+      parent_user_id: parents[0].id,
+    });
+
+    if (error) {
+      alert(error.message || '초대 코드 검증 중 오류가 발생했습니다.');
+      return;
+    }
+
+    localStorage.removeItem(PENDING_SOCIAL_INVITE_REQUIRED_KEY);
+    localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
+    setPendingSocialUser(null);
+    setSocialInviteCode('');
+    await ensureProfileLoaded(pendingSocialUser.id, pendingSocialUser.email);
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple', role: UserRole, isSignup: boolean) => {
@@ -399,8 +449,33 @@ function App() {
     );
   }
 
+
+  if (pendingSocialUser) {
+    return (
+      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-6">
+          <h2 className="text-2xl font-black text-slate-900">초대코드 입력</h2>
+          <p className="text-sm text-slate-500 mt-2">소셜 인증이 완료되었습니다. 권한 확인을 위해 초대코드를 입력해주세요.</p>
+          <input
+            value={socialInviteCode}
+            onChange={(e) => setSocialInviteCode(e.target.value.toUpperCase())}
+            className="mt-5 w-full bg-brand-50 border border-brand-100 rounded-2xl px-5 py-4 text-center tracking-[0.25em] font-black text-brand-900"
+            placeholder="A1B2C3"
+          />
+          <button onClick={completeSocialInviteVerification} className="mt-4 w-full bg-brand-900 text-white font-black py-4 rounded-2xl">검증 후 시작하기</button>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return <Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} />;
+  }
+
+  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
+  if (isAdminPath) {
+    return <AdminDashboard user={user} onLogout={handleLogout} />;
   }
 
   return user.role === UserRole.STUDENT
