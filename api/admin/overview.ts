@@ -1,5 +1,17 @@
 import { requireAdminUser } from '../_lib/admin-auth';
 
+const DATA_SOURCES = {
+  totalUsers: 'public.users (count id)',
+  todayUsers: 'public.users (count id where created_at >= today)',
+  totalChats: 'public.messages (count id)',
+  todayChats: 'public.messages (count id where created_at >= today)',
+  usage: 'public.ai_usage_events (sum input_tokens/output_tokens/estimated_cost_usd)',
+  todayUsage: 'public.ai_usage_events (sum tokens/cost where created_at >= today)',
+  abuseFlagsWeekly: 'public.ai_usage_events (count id where abuse_flag=true and created_at >= 7 days ago)',
+  overUseUsers: 'public.ai_usage_events (weekly token sum by user_id > 200000)',
+  recentLogs: 'public.system_logs (latest 20 rows)',
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -36,6 +48,27 @@ export default async function handler(req: any, res: any) {
     adminClient.from('system_logs').select('id, level, message, created_at').order('created_at', { ascending: false }).limit(20),
   ]);
 
+  const queryErrors = [
+    ['totalUsers', totalUsers.error],
+    ['todayUsers', todayUsers.error],
+    ['totalChats', totalChats.error],
+    ['todayChats', todayChats.error],
+    ['usageRows', usageRows.error],
+    ['todayUsageRows', todayUsageRows.error],
+    ['weeklyUsageRows', weeklyUsageRows.error],
+    ['abuseRows', abuseRows.error],
+    ['logs', logs.error],
+  ].filter(([, error]) => Boolean(error));
+
+  if (queryErrors.length > 0) {
+    res.status(500).json({
+      error: 'Admin overview query failed.',
+      sources: DATA_SOURCES,
+      queryErrors: queryErrors.map(([name, error]) => ({ name, error })),
+    });
+    return;
+  }
+
   const reduceUsage = (rows: any[] | null | undefined) => (rows || []).reduce((acc, row) => {
     acc.input += Number(row.input_tokens || 0);
     acc.output += Number(row.output_tokens || 0);
@@ -64,5 +97,6 @@ export default async function handler(req: any, res: any) {
     overUseUsers,
     abuseFlagsWeekly: abuseRows.count || 0,
     recentLogs: logs.data || [],
+    sources: DATA_SOURCES,
   });
 }
