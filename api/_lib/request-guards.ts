@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { serverSupabaseEnv, serverSupabaseEnvHints } from './supabase-env';
 
 type RateLimitEntry = {
   count: number;
@@ -7,8 +8,8 @@ type RateLimitEntry = {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = serverSupabaseEnv.url;
+const SUPABASE_ANON_KEY = serverSupabaseEnv.anonKey;
 
 const getBearerToken = (req: any): string | null => {
   const header = req.headers?.authorization || req.headers?.Authorization;
@@ -28,7 +29,7 @@ const getClientIp = (req: any): string => {
 
 export const requireSupabaseUser = async (req: any, res: any): Promise<{ userId: string; ip: string } | null> => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    res.status(500).json({ error: 'Supabase client env is missing.' });
+    res.status(500).json({ error: `Supabase client env is missing. Required: ${serverSupabaseEnvHints.url}, ${serverSupabaseEnvHints.anonKey}` });
     return null;
   }
 

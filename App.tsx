@@ -4,6 +4,7 @@ import Auth from './components/Auth';
 import StudentChat from './components/StudentChat';
 import ParentDashboard from './components/ParentDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import AdminAuth from './components/AdminAuth';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
 
 const PENDING_SOCIAL_ROLE_KEY = 'forteenai_pending_social_role';
@@ -458,6 +459,22 @@ function App() {
     }
   };
 
+
+  const handleAdminLogin = async (email: string, password: string) => {
+    try {
+      setAuthLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.user) throw new Error('로그인에 실패했습니다.');
+
+      await ensureProfileLoaded(data.user.id, data.user.email || email);
+    } catch (err: any) {
+      alert(err.message || '관리자 로그인 중 오류가 발생했습니다.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -499,13 +516,29 @@ function App() {
     );
   }
 
+  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
   if (!user) {
+    if (isAdminPath) {
+      return <AdminAuth loading={authLoading} onLogin={handleAdminLogin} />;
+    }
+
     return <Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} />;
   }
 
-  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
-
   if (isAdminPath) {
+    if (user.role !== UserRole.ADMIN) {
+      return (
+        <div className="min-h-screen bg-[#F4F7FC] flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl border border-rose-100 bg-white p-6 shadow-xl">
+            <h1 className="text-2xl font-black text-slate-900">접근 권한이 없습니다</h1>
+            <p className="mt-2 text-sm text-slate-500">관리자 계정으로 로그인한 사용자만 운영 대시보드에 접근할 수 있습니다.</p>
+            <button onClick={handleLogout} className="mt-5 w-full rounded-xl bg-slate-900 py-3 text-sm font-black text-white">다시 로그인</button>
+          </div>
+        </div>
+      );
+    }
+
     return <AdminDashboard user={user} onLogout={handleLogout} />;
   }
 
