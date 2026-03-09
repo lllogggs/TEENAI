@@ -58,16 +58,9 @@ export default async function handler(req: any, res: any) {
     ['weeklyUsageRows', weeklyUsageRows.error],
     ['abuseRows', abuseRows.error],
     ['logs', logs.error],
-  ].filter(([, error]) => Boolean(error));
-
-  if (queryErrors.length > 0) {
-    res.status(500).json({
-      error: 'Admin overview query failed.',
-      sources: DATA_SOURCES,
-      queryErrors: queryErrors.map(([name, error]) => ({ name, error })),
-    });
-    return;
-  }
+  ]
+    .filter(([, error]) => Boolean(error))
+    .map(([name, error]) => ({ name, error }));
 
   const reduceUsage = (rows: any[] | null | undefined) => (rows || []).reduce((acc, row) => {
     acc.input += Number(row.input_tokens || 0);
@@ -98,5 +91,7 @@ export default async function handler(req: any, res: any) {
     abuseFlagsWeekly: abuseRows.count || 0,
     recentLogs: logs.data || [],
     sources: DATA_SOURCES,
+    queryErrors,
+    hasPartialFailure: queryErrors.length > 0,
   });
 }
