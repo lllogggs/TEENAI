@@ -18,6 +18,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [registrationCode, setRegistrationCode] = useState('');
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -85,6 +86,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
     setInviteCode('');
     setRegistrationCode('');
     setIsSignup(false);
+    setShowEmailPassword(false);
     setTermsAccepted(false);
     setPrivacyAccepted(false);
   };
@@ -158,12 +160,32 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
-          />
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
-          />
+          <div className="rounded-2xl border border-slate-100 p-3 bg-slate-50">
+            <div className="flex gap-2">
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!validateEmail(email)) {
+                    alert('올바른 이메일 주소를 입력해주세요.');
+                    return;
+                  }
+                  setShowEmailPassword(true);
+                }}
+                className="px-4 rounded-xl bg-white border border-slate-200 text-xs font-black text-slate-700"
+              >
+                이메일로 {isSignup ? '가입' : '로그인'}
+              </button>
+            </div>
+          </div>
+
+          {showEmailPassword && (
+            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
+            />
+          )}
 
           {view === 'parent-auth' && isSignup && (
             <div className="pt-2 animate-in slide-in-from-bottom-2 fade-in">
@@ -217,7 +239,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
             </div>
           )}
 
-          <button type="submit" disabled={loading || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
+          <button type="submit" disabled={loading || !showEmailPassword || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
             {loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}
           </button>
 
@@ -240,10 +262,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
             <span className="text-sm md:text-base">Google로 계속하기</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => onSocialLogin('apple', activeRole, isSignup)}
+            disabled={loading}
+            className="w-full mt-2 inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-black py-3.5 md:py-4 font-bold text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-60 disabled:cursor-not-allowed"
+            aria-label={activeRole === UserRole.PARENT ? 'Apple로 학부모 로그인 또는 가입' : 'Apple로 학생 로그인 또는 가입'}
+          >
+            <span className="text-sm md:text-base">Apple로 계속하기</span>
+          </button>
         </form>
 
         <div className="mt-6 md:mt-10 text-center">
-          <button onClick={() => { setIsSignup(!isSignup); setTermsAccepted(false); setPrivacyAccepted(false); }} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
+          <button onClick={() => { setIsSignup(!isSignup); setShowEmailPassword(false); setTermsAccepted(false); setPrivacyAccepted(false); }} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
             {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
           </button>
         </div>

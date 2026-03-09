@@ -1,4 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
+
+import { createClient } from '@supabase/supabase-js';
 import { enforceRateLimit, requireSupabaseUser, validateOptionalBase64DataUrl, validateTextLength } from './_lib/request-guards';
 
 const getApiKey = () => process.env.GEMINI_API_KEY || '';
@@ -6,6 +8,11 @@ const getApiKey = () => process.env.GEMINI_API_KEY || '';
 const countChars = (text: string) => text.replace(/\s+/g, '').length;
 
 const shouldAllowLongAnswer = (text: string) => /자세히|설명|원리|예시|정리|분석/.test(text);
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+const estimateTokenCount = (text: string) => Math.max(Math.ceil(text.length / 4), 1);
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -110,7 +117,42 @@ export default async function handler(req: any, res: any) {
     }
 
     const result = await chat.sendMessage({ message: userParts });
-    res.status(200).json({ text: result.text || '' });
+    const responseText = result.text || '';
+
+    if (supabaseUrl && serviceRoleKey) {
+      const inputTokens = estimateTokenCount(userMessage + JSON.stringify(normalizedHistory || []));
+      const outputTokens = estimateTokenCount(responseText);
+      const totalTokens = inputTokens + outputTokens;
+      const estimatedCost = (inputTokens / 1_000_000) * 0.1 + (outputTokens / 1_000_000) * 0.4;
+      const abuseFlag = totalTokens > 12000;
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+      await adminClient.from('ai_usage_events').insert({
+        user_id: authContext.userId,
+        endpoint: 'chat',
+        model: 'gemini-2.5-flash',
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        estimated_cost_usd: estimatedCost,
+        abuse_flag: abuseFlag,
+        metadata: {
+          hasImage: Boolean(imageData),
+          hasAudio: Boolean(audioData),
+          historyCount: normalizedHistory.length,
+        },
+      });
+
+      if (abuseFlag) {
+        await adminClient.from('system_logs').insert({
+          level: 'warn',
+          message: 'Potential token overuse detected',
+          user_id: authContext.userId,
+          context: { inputTokens, outputTokens },
+        });
+      }
+    }
+
+    res.status(200).json({ text: responseText });
   } catch (error) {
     console.error('Gemini chat error:', {
       error,

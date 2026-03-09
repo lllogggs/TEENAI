@@ -1,6 +1,7 @@
 export enum UserRole {
   STUDENT = 'student',
-  PARENT = 'parent'
+  PARENT = 'parent',
+  ADMIN = 'admin'
 }
 
 export enum ToneLevel {
