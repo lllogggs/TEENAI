@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import { serverSupabaseEnv, serverSupabaseEnvHints } from './_lib/supabase-env';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = serverSupabaseEnv.url;
+const supabaseAnonKey = serverSupabaseEnv.anonKey;
 
 const getBearerToken = (req: any): string | null => {
   const header = req.headers?.authorization || req.headers?.Authorization;
@@ -27,7 +28,7 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    res.status(500).json({ error: 'Supabase client env is missing.' });
+    res.status(500).json({ error: `Supabase client env is missing. Required: ${serverSupabaseEnvHints.url}, ${serverSupabaseEnvHints.anonKey}` });
     return;
   }
 
