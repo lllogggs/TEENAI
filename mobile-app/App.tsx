@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import * as Linking from 'expo-linking';
 import {
   ActivityIndicator,
   BackHandler,
@@ -11,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Linking as NativeLinking,
 } from 'react-native';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
@@ -36,6 +38,22 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+
+  const sendOAuthResultToWeb = useCallback((url: string) => {
+    try {
+      const parsed = new URL(url);
+      const query = new URLSearchParams(parsed.search);
+      const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+      const accessToken = query.get('access_token') || hash.get('access_token');
+      const refreshToken = query.get('refresh_token') || hash.get('refresh_token');
+      if (!accessToken || !refreshToken) return;
+
+      const payload = JSON.stringify({ type: 'social_oauth_result', accessToken, refreshToken });
+      webViewRef.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`);
+    } catch {
+      // noop
+    }
+  }, []);
 
   const onNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
@@ -91,6 +109,16 @@ export default function App() {
 
     return () => subscription.remove();
   }, [canGoBack]);
+
+
+
+  React.useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => sendOAuthResultToWeb(url));
+    Linking.getInitialURL().then((url) => {
+      if (url) sendOAuthResultToWeb(url);
+    }).catch(() => undefined);
+    return () => sub.remove();
+  }, [sendOAuthResultToWeb]);
 
   if (!webUrl || webUrl.includes('YOUR-WEB-APP-URL')) {
     return (
@@ -152,6 +180,17 @@ export default function App() {
           onError={() => {
             setHasLoadError(true);
             setIsLoading(false);
+          }}
+
+          onMessage={(event) => {
+            try {
+              const payload = JSON.parse(event.nativeEvent.data);
+              if (payload?.type === 'oauth_start' && payload?.url) {
+                NativeLinking.openURL(payload.url);
+              }
+            } catch {
+              // noop
+            }
           }}
           onShouldStartLoadWithRequest={({ url }) => handleShouldStartLoad(url)}
         />
