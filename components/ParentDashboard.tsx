@@ -20,6 +20,7 @@ interface StudentAccount {
 }
 
 type MentorTone = 'kind' | 'rational' | 'friendly';
+type InviteCodeStatus = 'idle' | 'loading' | 'ready' | 'limit' | 'error';
 
 interface NormalizedSettings {
   guardrails: {
@@ -139,9 +140,14 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [inviteCodeStatus, setInviteCodeStatus] = useState<InviteCodeStatus>('idle');
+  const [copyStatus, setCopyStatus] = useState('');
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [aiInstructionDraft, setAiInstructionDraft] = useState('');
+  const [studentsError, setStudentsError] = useState('');
+  const [sessionsError, setSessionsError] = useState('');
+  const [messagesError, setMessagesError] = useState('');
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -196,32 +202,43 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     }
   }, [user, onLogout]);
 
-  useEffect(() => {
-    const fetchInviteCode = async () => {
-      // Check student count limit first
-      const { count, error: countError } = await supabase
-        .from('student_profiles')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('parent_user_id', user.id);
+  const fetchInviteCode = async () => {
+    setInviteCodeStatus('loading');
+    setCopyStatus('');
 
-      if (countError) {
-        console.error('Failed to count students:', countError);
-        return;
-      }
+    // Check student count limit first
+    const { count, error: countError } = await supabase
+      .from('student_profiles')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('parent_user_id', user.id);
 
-      if ((count || 0) >= 3) {
-        setInviteCode('LIMIT_REACHED');
-        return;
-      }
+    if (countError) {
+      console.error('[ParentDashboard] student_profiles count error:', countError);
+      setInviteCodeStatus('error');
+      return;
+    }
 
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('my_invite_code, role')
-        .eq('id', user.id)
-        .single();
+    if ((count || 0) >= 3) {
+      setInviteCode('');
+      setInviteCodeStatus('limit');
+      return;
+    }
 
-      let resolvedCode = userRow?.role === 'parent' ? userRow?.my_invite_code || '' : '';
-      if (!resolvedCode) {
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('my_invite_code, role')
+      .eq('id', user.id)
+      .single();
+
+    if (userError) {
+      console.error('[ParentDashboard] users(my_invite_code) fetch error:', userError);
+      setInviteCodeStatus('error');
+      return;
+    }
+
+    let resolvedCode = userRow?.role === 'parent' ? userRow?.my_invite_code || '' : '';
+    if (!resolvedCode) {
+      try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
         const response = await fetch('/api/ensure-invite-code', {
@@ -235,22 +252,35 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         if (response.ok) {
           const payload = await response.json();
           resolvedCode = payload.code || '';
+        } else {
+          const payload = await response.json().catch(() => ({}));
+          console.error('[ParentDashboard] /api/ensure-invite-code failed:', payload?.error || response.statusText);
         }
+      } catch (ensureError) {
+        console.error('[ParentDashboard] /api/ensure-invite-code request error:', ensureError);
       }
-      setInviteCode((resolvedCode || '').toUpperCase());
-    };
+    }
+
+    const normalizedCode = (resolvedCode || '').toUpperCase();
+    setInviteCode(normalizedCode);
+    setInviteCodeStatus(normalizedCode ? 'ready' : 'error');
+  };
+
+  useEffect(() => {
     fetchInviteCode();
   }, [user.id]);
 
   useEffect(() => {
     const fetchStudents = async () => {
+      setStudentsError('');
       const { data: profiles, error: profileError } = await supabase
         .from('student_profiles')
         .select('user_id, settings, parent_user_id')
         .eq('parent_user_id', user.id);
 
       if (profileError) {
-        console.error('student_profiles fetch error:', profileError);
+        console.error('[ParentDashboard] student_profiles fetch error:', profileError);
+        setStudentsError('학생 연결 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
         setLoading(false);
         return;
       }
@@ -264,14 +294,20 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       setConnectedStudents(mappedProfiles);
       const studentIds = mappedProfiles.map((profile) => profile.user_id);
       if (!studentIds.length) {
+        setStudentAccounts({});
+        setSelectedStudentId('');
         setLoading(false);
         return;
       }
 
-      const { data: usersData } = await supabase
+      const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('id, name, email')
         .in('id', studentIds);
+
+      if (usersError) {
+        console.error('[ParentDashboard] users(student account) fetch error:', usersError);
+      }
 
       const accountMap = (usersData || []).reduce<Record<string, StudentAccount>>((acc, account) => {
         acc[account.id] = { name: account.name, email: account.email };
@@ -295,6 +331,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     }
 
     const fetchSessions = async () => {
+      setSessionsError('');
       const { data, error } = await supabase
         .from('chat_sessions')
         .select('*')
@@ -302,17 +339,20 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         .order('started_at', { ascending: false });
 
       if (error) {
-        console.error('Fetch sessions error:', error);
+        console.error('[ParentDashboard] chat_sessions fetch error:', error);
+        setSessionsError('대화 목록을 불러오지 못했습니다.');
+        setSessions([]);
       } else {
         setSessions((data as ChatSession[]) || []);
         setSelectedSessionId((prev) => (prev && (data || []).some((session) => session.id === prev) ? prev : (data || [])[0]?.id || ''));
+        setOpenedSessionId((prev) => (prev && (data || []).some((session) => session.id === prev) ? prev : ''));
       }
     };
 
     fetchSessions(); // Initial fetch
 
     const channel = supabase
-      .channel('public:chat_sessions')
+      .channel(`public:chat_sessions:parent:${user.id}:student:${selectedStudentId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chat_sessions', filter: `student_id=eq.${selectedStudentId}` },
@@ -325,20 +365,29 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedStudentId]);
+  }, [selectedStudentId, user.id]);
 
   useEffect(() => {
     const fetchMessages = async () => {
       if (!openedSessionId) {
         setSessionMessages([]);
+        setMessagesError('');
         return;
       }
 
-      const { data } = await supabase
+      setMessagesError('');
+      const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('session_id', openedSessionId)
         .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[ParentDashboard] messages fetch error:', error);
+        setMessagesError('메시지를 불러오지 못했습니다.');
+        setSessionMessages([]);
+        return;
+      }
 
       setSessionMessages((data || []) as MessageRow[]);
     };
@@ -352,7 +401,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     setIsNameEditing(false);
     setNameDraft('');
     setAiInstructionDraft('');
-  }, [selectedStudentId]);
+  }, [selectedStudentId, user.id]);
 
   // Duplicate logic removed.
   // The riskCounts and filteredSessions are already defined above.
@@ -373,7 +422,8 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       .eq('user_id', selectedStudentId);
 
     if (error) {
-      console.error('student_profiles update error:', error);
+      console.error('[ParentDashboard] student_profiles update error:', error);
+      setSaveStatus(`저장 실패: ${error.message}`);
       return;
     }
 
@@ -427,8 +477,16 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   };
 
   const copyInviteCode = async () => {
-    if (!inviteCode) return;
-    await navigator.clipboard.writeText(inviteCode);
+    if (!inviteCode || inviteCodeStatus !== 'ready') return;
+
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      setCopyStatus('복사됨');
+      window.setTimeout(() => setCopyStatus(''), 1500);
+    } catch (copyError) {
+      console.error('[ParentDashboard] invite code copy failed:', copyError);
+      setCopyStatus('복사 실패');
+    }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
@@ -454,6 +512,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">
+              {studentsError && <p className="text-sm text-rose-500 mb-3">{studentsError}</p>}
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-400 to-brand-600"></div>
               <div className="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-brand-100">
                 <span className="text-4xl text-brand-900">👨‍👩‍👧‍👦</span>
@@ -483,8 +542,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               </div>
 
               <div className="bg-brand-50/50 rounded-3xl p-6 md:p-10 border border-brand-100/50">
-                {inviteCode === 'LIMIT_REACHED' ? (
+                {inviteCodeStatus === 'limit' ? (
                   <p className="text-red-500 font-bold">더 이상 학생을 추가할 수 없습니다.</p>
+                ) : inviteCodeStatus === 'loading' ? (
+                  <div className="text-brand-900 font-black animate-pulse">초대 코드 발급 중...</div>
+                ) : inviteCodeStatus === 'error' ? (
+                  <div className="space-y-2">
+                    <p className="text-rose-500 font-bold">초대 코드 조회에 실패했습니다.</p>
+                    <button onClick={fetchInviteCode} className="text-xs font-black px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 bg-white hover:bg-rose-50">다시 시도</button>
+                  </div>
                 ) : !inviteCode ? (
                   <div className="text-brand-900 font-black animate-pulse">초대 코드 발급 중...</div>
                 ) : (
@@ -493,6 +559,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     <div className="flex flex-col md:flex-row items-center gap-4 bg-white border border-slate-200 pl-8 pr-3 py-3 rounded-2xl shadow-sm">
                       <span className="text-3xl md:text-4xl font-black tracking-[0.25em] text-slate-800">{inviteCode}</span>
                       <button onClick={copyInviteCode} className="w-full md:w-auto bg-brand-900 text-white px-6 py-3 font-black rounded-xl shadow-lg shadow-brand-900/20 hover:bg-black hover:-translate-y-0.5 transition-all text-sm">복사하기</button>
+                    {copyStatus && <p className="text-xs text-slate-500">{copyStatus}</p>}
                     </div>
                   </div>
                 )}
@@ -532,7 +599,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                     );
                   })}
                 </div>
-                {inviteCode !== 'LIMIT_REACHED' && (
+                {inviteCodeStatus !== 'limit' && (
                   <div className="flex items-center justify-between md:justify-end gap-2 px-3 py-2 lg:py-1.5 bg-brand-50 rounded-xl border border-brand-100 shrink-0">
                     <span className="text-xs font-bold text-brand-900">학생 인증코드: <span className="font-black tracking-widest ml-1">{inviteCode || '...'}</span></span>
                     <button onClick={copyInviteCode} disabled={!inviteCode} className="text-[10px] bg-white border border-brand-200 px-2 py-0.5 rounded shadow-sm hover:bg-brand-100 font-bold transition-colors disabled:opacity-50">복사</button>
@@ -604,6 +671,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               <article className="premium-card p-3.5 md:p-4 lg:p-5 lg:col-span-3">
                 <h2 className="font-black text-base lg:text-lg mb-2 lg:mb-3">2) 대화 목록</h2>
                 <div className="space-y-2 min-h-[204px] md:min-h-[236px]">
+                  {sessionsError && <p className="text-sm text-rose-500">{sessionsError}</p>}
                   {filteredSessions.length === 0 && <p className="text-sm text-slate-400">조건에 맞는 대화가 없습니다.</p>}
                   {filteredSessions.map((session) => {
                     const risk = normalizeRiskLevel(session.risk_level);
@@ -674,7 +742,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                       className="w-full min-h-32 lg:min-h-[220px] rounded-2xl border border-slate-200 p-3 lg:p-4 text-sm"
                     />
                     <button onClick={addAiInstruction} className="mt-3 px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-bold">리스트에 추가</button>
-                    {saveStatus && <p className="text-xs text-emerald-600 mt-2 font-bold">{saveStatus}</p>}
+                    {saveStatus && <p className={`text-xs mt-2 font-bold ${saveStatus.startsWith('저장 실패') ? 'text-rose-500' : 'text-emerald-600'}`}>{saveStatus}</p>}
                   </div>
                   <div className="space-y-2 h-[210px] lg:h-[268px] overflow-y-auto custom-scrollbar pr-1">
                     {aiInstructionList.length === 0 && <p className="text-sm text-slate-400">아직 등록된 지시사항이 없습니다.</p>}
@@ -746,6 +814,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
               <button onClick={() => setOpenedSessionId('')} className="text-sm font-black text-slate-500 hover:text-slate-900">닫기</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-3 custom-scrollbar bg-slate-50/40">
+              {messagesError && <p className="text-sm text-rose-500">{messagesError}</p>}
               {sessionMessages.length === 0 && <p className="text-sm text-slate-400">메시지가 없습니다.</p>}
               {sessionMessages.map((message) => (
                 <div key={message.id} className={`max-w-[88%] p-3 rounded-2xl text-sm ${message.role === 'user' ? 'bg-brand-900 text-white ml-auto' : 'bg-white border border-slate-100 text-slate-800 mr-auto'}`}>
