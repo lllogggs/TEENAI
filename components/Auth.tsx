@@ -16,6 +16,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [registrationCode, setRegistrationCode] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<'none' | 'email'>('none');
@@ -47,6 +48,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
   const resetAuthState = () => {
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
     setInviteCode('');
     setRegistrationCode('');
     setSelectedMethod('none');
@@ -107,6 +109,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
     }
     if (password.length < 6) {
       alert('비밀번호는 6자리 이상이어야 합니다.');
+      return;
+    }
+
+    if (isSignup && password !== confirmPassword) {
+      alert('비밀번호 확인이 일치하지 않습니다.');
       return;
     }
 
@@ -208,6 +215,30 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
               이메일로 계속
             </button>
 
+            {selectedMethod !== 'email' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onSocialLogin('google', activeRole, isSignup)}
+                  disabled={loading}
+                  className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
+                >
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
+                  <span className="text-base">Google로 계속하기</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSocialLogin('apple', activeRole, isSignup)}
+                  disabled={loading}
+                  className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  aria-label={activeRole === UserRole.PARENT ? 'Apple로 학부모 로그인 또는 가입' : 'Apple로 학생 로그인 또는 가입'}
+                >
+                  <span className="text-base">Apple로 계속하기</span>
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => onSocialLogin('google', activeRole, isSignup)}
@@ -240,6 +271,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
                 <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
                   className="w-full border-t border-slate-200 px-4 py-3.5 text-base font-semibold text-slate-900 focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
                 />
+
+                {isSignup && (
+                  <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full border-t border-slate-200 px-4 py-3.5 text-base font-semibold text-slate-900 focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 확인"
+                  />
+                )}
               </div>
 
               {isSignup && signupStage === 'code' && view === 'parent-auth' && (
@@ -274,12 +311,36 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
                   onClick={() => {
                     setSelectedMethod('none');
                     setSignupStage('form');
+                    setConfirmPassword('');
                     setTermsAccepted(false);
                     setPrivacyAccepted(false);
                   }}
                   className="text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter"
                 >
                   다른 방법 사용하기
+                </button>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => onSocialLogin('google', activeRole, isSignup)}
+                  disabled={loading}
+                  className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
+                >
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
+                  <span className="text-base">Google로 계속하기</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSocialLogin('apple', activeRole, isSignup)}
+                  disabled={loading}
+                  className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  aria-label={activeRole === UserRole.PARENT ? 'Apple로 학부모 로그인 또는 가입' : 'Apple로 학생 로그인 또는 가입'}
+                >
+                  <span className="text-base">Apple로 계속하기</span>
                 </button>
               </div>
             </>
