@@ -224,7 +224,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
                   className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
                 >
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
                   <span className="text-base">Google로 계속하기</span>
                 </button>
 
@@ -239,26 +238,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
                 </button>
               </>
             )}
-            <button
-              type="button"
-              onClick={() => onSocialLogin('google', activeRole, isSignup)}
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
-              aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
-            >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
-              <span className="text-base">Google로 계속하기</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSocialLogin('apple', activeRole, isSignup)}
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-black py-4 text-base font-black text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-60 disabled:cursor-not-allowed"
-              aria-label={activeRole === UserRole.PARENT ? 'Apple로 학부모 로그인 또는 가입' : 'Apple로 학생 로그인 또는 가입'}
-            >
-              <span className="text-base">Apple로 계속하기</span>
-            </button>
           </div>
 
           {selectedMethod === 'email' && (
@@ -329,7 +308,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
                   className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
                 >
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
                   <span className="text-base">Google로 계속하기</span>
                 </button>
 
