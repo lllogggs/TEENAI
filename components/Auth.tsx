@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserRole } from '../types';
 import TermsModal from './TermsModal';
 import { ForteenLogo } from './Icons';
@@ -18,20 +18,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [registrationCode, setRegistrationCode] = useState('');
-  const [showEmailPassword, setShowEmailPassword] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<'none' | 'email'>('none');
+  const [signupStage, setSignupStage] = useState<'form' | 'code'>('form');
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
-  const validateEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-
-
-  const hasAcceptedRequiredPolicies = useMemo(() => termsAccepted && privacyAccepted, [termsAccepted, privacyAccepted]);
+  const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const hasAcceptedRequiredPolicies = termsAccepted && privacyAccepted;
 
   useEffect(() => {
     const focusHandler = (event: FocusEvent) => {
@@ -48,50 +44,89 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
     return () => window.removeEventListener('focusin', focusHandler);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateEmail(email)) { alert("올바른 이메일 주소를 입력해주세요."); return; }
-    if (password.length < 6) { alert("비밀번호는 6자리 이상이어야 합니다."); return; }
-
-    if (isSignup) {
-      if (!hasAcceptedRequiredPolicies) {
-        alert("이용약관 및 개인정보처리방침에 동의해주세요.");
-        return;
-      }
-
-      if (view === 'parent-auth') {
-        if (!registrationCode) {
-          alert("관리자 등록 코드가 필요합니다.");
-          return;
-        }
-      }
-
-      if (view === 'student-auth' && inviteCode.length < 6) {
-        alert("올바른 초대 코드를 입력해주세요.");
-        return;
-      }
-    }
-
-    if (view === 'parent-auth') {
-      await onLogin(email, password, UserRole.PARENT, isSignup ? registrationCode : undefined, isSignup);
-    } else {
-      await onLogin(email, password, UserRole.STUDENT, inviteCode, isSignup);
-    }
-  };
-
-  const goBack = () => {
-    setView('selection');
+  const resetAuthState = () => {
     setEmail('');
     setPassword('');
     setInviteCode('');
     setRegistrationCode('');
-    setIsSignup(false);
-    setShowEmailPassword(false);
+    setSelectedMethod('none');
+    setSignupStage('form');
     setTermsAccepted(false);
     setPrivacyAccepted(false);
   };
 
+  const goBack = () => {
+    setView('selection');
+    setIsSignup(false);
+    resetAuthState();
+  };
+
   const activeRole = view === 'parent-auth' ? UserRole.PARENT : UserRole.STUDENT;
+
+  const startConsentFlow = () => {
+    if (!termsAccepted) {
+      setShowTerms(true);
+      return;
+    }
+    if (!privacyAccepted) {
+      setShowPrivacy(true);
+      return;
+    }
+    setSignupStage('code');
+  };
+
+  const executeSignup = async () => {
+    if (view === 'parent-auth') {
+      if (!registrationCode.trim()) {
+        alert('관리자 등록 코드가 필요합니다.');
+        return;
+      }
+      await onLogin(email, password, UserRole.PARENT, registrationCode.trim(), true);
+      return;
+    }
+
+    const normalizedInviteCode = inviteCode.trim().toUpperCase();
+    if (normalizedInviteCode.length < 6) {
+      alert('올바른 초대 코드를 입력해주세요.');
+      return;
+    }
+    await onLogin(email, password, UserRole.STUDENT, normalizedInviteCode, true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (selectedMethod !== 'email') {
+      alert('인증 방법을 먼저 선택해주세요.');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      alert('올바른 이메일 주소를 입력해주세요.');
+      return;
+    }
+    if (password.length < 6) {
+      alert('비밀번호는 6자리 이상이어야 합니다.');
+      return;
+    }
+
+    if (!isSignup) {
+      await onLogin(email, password, activeRole, undefined, false);
+      return;
+    }
+
+    if (signupStage === 'form') {
+      startConsentFlow();
+      return;
+    }
+
+    if (!hasAcceptedRequiredPolicies) {
+      startConsentFlow();
+      return;
+    }
+
+    await executeSignup();
+  };
 
   const termsContent = (
     <div className="space-y-3">
@@ -147,7 +182,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
   return (
     <div className="min-h-[100dvh] bg-[#F1F5F9] flex items-center justify-center p-4 xl:p-10 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
       <div className="max-w-lg w-full bg-white rounded-3xl md:rounded-[3rem] shadow-2xl p-6 md:p-14 relative overflow-hidden">
-        <button onClick={goBack} className="text-slate-400 hover:text-slate-800 mb-6 md:mb-10 flex items-center gap-2 font-black text-xs uppercase tracking-widest transition-colors">
+        <button onClick={goBack} className="text-slate-400 hover:text-slate-800 mb-6 md:mb-10 flex items-center gap-2 font-black tracking-wider uppercase text-base md:text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 rounded-lg px-1 py-0.5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Back
         </button>
 
@@ -155,127 +190,104 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
           {view === 'parent-auth' ? 'Parent ' : 'Student '}
           {isSignup ? 'Signup' : 'Login'}
         </h2>
-        <p className="text-slate-400 text-xs md:text-sm font-bold mb-6 md:mb-10 text-balance">
+        <p className="text-slate-400 text-xs md:text-sm font-bold mb-6 md:mb-8 text-balance">
           {isSignup ? '새로운 포틴 AI 계정을 생성합니다.' : '계정에 로그인하여 계속합니다.'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
-          <div className="rounded-2xl border border-slate-100 p-3 bg-slate-50">
-            <div className="flex gap-2">
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (!validateEmail(email)) {
-                    alert('올바른 이메일 주소를 입력해주세요.');
-                    return;
-                  }
-                  setShowEmailPassword(true);
-                }}
-                className="px-4 rounded-xl bg-white border border-slate-200 text-xs font-black text-slate-700"
-              >
-                이메일로 {isSignup ? '가입' : '로그인'}
-              </button>
-            </div>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setSelectedMethod('email')}
+              className={`w-full rounded-2xl border px-4 py-4 text-base font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 ${
+                selectedMethod === 'email'
+                  ? 'border-brand-300 bg-brand-50 text-brand-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              이메일로 계속
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSocialLogin('google', activeRole, isSignup)}
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-4 text-base font-black text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
+            >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
+              <span className="text-base">Google로 계속하기</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSocialLogin('apple', activeRole, isSignup)}
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-black py-4 text-base font-black text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label={activeRole === UserRole.PARENT ? 'Apple로 학부모 로그인 또는 가입' : 'Apple로 학생 로그인 또는 가입'}
+            >
+              <span className="text-base">Apple로 계속하기</span>
+            </button>
           </div>
 
-          {showEmailPassword && (
-            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] px-5 py-4 md:px-7 md:py-5 text-sm font-bold focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
-            />
-          )}
+          {selectedMethod === 'email' && (
+            <>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3.5 text-base font-semibold text-slate-900 focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="이메일 주소"
+                />
 
-          {view === 'parent-auth' && isSignup && (
-            <div className="pt-2 animate-in slide-in-from-bottom-2 fade-in">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Admin Registration Code</label>
-              <input type="text" required value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)}
-                className="w-full bg-indigo-50 border border-indigo-100 rounded-[1.5rem] px-7 py-5 text-sm font-black text-indigo-900 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder-indigo-300" placeholder="등록 코드 입력"
-              />
-              <p className="text-[10px] text-slate-400 mt-2 px-4">관리자로부터 발급받은 등록 코드가 필요합니다.</p>
-            </div>
-          )}
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border-t border-slate-200 px-4 py-3.5 text-base font-semibold text-slate-900 focus:ring-4 focus:ring-brand-100 outline-none transition-all placeholder-slate-300" placeholder="비밀번호 (6자리 이상)"
+                />
+              </div>
 
-          {view === 'student-auth' && isSignup && (
-            <div className="pt-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Parent Invite Code</label>
-              <input type="text" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                className="w-full bg-brand-50 border border-brand-100 rounded-[1.5rem] px-7 py-5 text-xl font-black text-brand-900 tracking-[0.3em] focus:ring-4 focus:ring-brand-100 outline-none transition-all uppercase placeholder-brand-200" placeholder="A1B2C3"
-              />
-            </div>
-          )}
+              {isSignup && signupStage === 'code' && view === 'parent-auth' && (
+                <div className="pt-1 animate-in slide-in-from-bottom-2 fade-in">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">관리자 등록 코드</label>
+                  <input type="text" required value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)}
+                    className="w-full bg-indigo-50 border border-indigo-100 rounded-[1.5rem] px-7 py-5 text-sm font-black text-indigo-900 focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder-indigo-300" placeholder="등록 코드 입력"
+                  />
+                </div>
+              )}
 
-          {isSignup && (
-            <div className="space-y-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowTerms(true)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-colors border-slate-200 hover:border-slate-300"
-              >
-                <span className="text-xs font-bold text-slate-600">서비스 이용약관 전체 읽기 (필수)</span>
-                <span className={`text-[11px] font-black ${termsAccepted ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {termsAccepted ? '읽음 완료' : '미완료'}
-                </span>
+              {isSignup && signupStage === 'code' && view === 'student-auth' && (
+                <div className="pt-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">부모 초대 코드</label>
+                  <input type="text" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    className="w-full bg-brand-50 border border-brand-100 rounded-[1.5rem] px-7 py-5 text-xl font-black text-brand-900 tracking-[0.3em] focus:ring-4 focus:ring-brand-100 outline-none transition-all uppercase placeholder-brand-200" placeholder="A1B2C3"
+                  />
+                </div>
+              )}
+
+              {isSignup && signupStage === 'form' && (
+                <p className="text-[11px] text-slate-400 px-1">가입을 누르면 약관 및 개인정보 동의가 진행됩니다.</p>
+              )}
+
+              <button type="submit" disabled={loading} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-2 text-base md:text-lg">
+                {loading ? 'Processing...' : isSignup ? (signupStage === 'form' ? '가입하고 시작하기' : '코드 입력 후 시작하기') : '로그인'}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowPrivacy(true)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-colors border-slate-200 hover:border-slate-300"
-              >
-                <span className="text-xs font-bold text-slate-600">개인정보 처리방침 전체 읽기 (필수)</span>
-                <span className={`text-[11px] font-black ${privacyAccepted ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {privacyAccepted ? '읽음 완료' : '미완료'}
-                </span>
-              </button>
-
-              <p className="text-[10px] text-slate-400 px-2 mt-1">
-                * 스크롤하여 약관/방침 끝까지 읽은 뒤에만 동의 처리가 됩니다.
-              </p>
-              <p className="text-[10px] text-slate-400 px-2">
-                * 만 14세 미만 가입 시 법정대리인의 동의가 필요합니다.
-              </p>
-            </div>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMethod('none');
+                    setSignupStage('form');
+                    setTermsAccepted(false);
+                    setPrivacyAccepted(false);
+                  }}
+                  className="text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter"
+                >
+                  다른 방법 사용하기
+                </button>
+              </div>
+            </>
           )}
-
-          <button type="submit" disabled={loading || !showEmailPassword || (isSignup && !hasAcceptedRequiredPolicies)} className="w-full bg-brand-900 text-white font-black py-4 md:py-6 rounded-2xl md:rounded-[1.75rem] hover:bg-black transition-all shadow-xl shadow-brand-900/20 active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none mt-4 text-base md:text-lg">
-            {loading ? 'Processing...' : (isSignup ? '가입하고 시작하기' : '로그인')}
-          </button>
-
-          <div className="relative pt-1">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">or</span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onSocialLogin('google', activeRole, isSignup)}
-            disabled={loading}
-            className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white py-3.5 md:py-4 font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:opacity-60 disabled:cursor-not-allowed"
-            aria-label={activeRole === UserRole.PARENT ? 'Google로 학부모 로그인 또는 가입' : 'Google로 학생 로그인 또는 가입'}
-          >
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-black text-slate-600">G</span>
-            <span className="text-sm md:text-base">Google로 계속하기</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSocialLogin('apple', activeRole, isSignup)}
-            disabled={loading}
-            className="w-full mt-2 inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-black py-3.5 md:py-4 font-bold text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-60 disabled:cursor-not-allowed"
-            aria-label={activeRole === UserRole.PARENT ? 'Apple로 학부모 로그인 또는 가입' : 'Apple로 학생 로그인 또는 가입'}
-          >
-            <span className="text-sm md:text-base">Apple로 계속하기</span>
-          </button>
         </form>
 
         <div className="mt-6 md:mt-10 text-center">
-          <button onClick={() => { setIsSignup(!isSignup); setShowEmailPassword(false); setTermsAccepted(false); setPrivacyAccepted(false); }} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
+          <button onClick={() => { setIsSignup(!isSignup); resetAuthState(); }} className="text-[11px] md:text-xs font-black text-slate-400 hover:text-brand-600 underline underline-offset-4 tracking-tighter">
             {isSignup ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
           </button>
         </div>
@@ -284,7 +296,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
       <TermsModal
         isOpen={showTerms}
         onClose={() => setShowTerms(false)}
-        onConfirm={() => setTermsAccepted(true)}
+        onConfirm={() => {
+          setTermsAccepted(true);
+          setShowTerms(false);
+          if (!privacyAccepted) {
+            setShowPrivacy(true);
+            return;
+          }
+          setSignupStage('code');
+        }}
         title="서비스 이용약관"
         content={termsContent}
         requireScrollToConfirm
@@ -292,7 +312,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onSocialLogin, loading }) => {
       <TermsModal
         isOpen={showPrivacy}
         onClose={() => setShowPrivacy(false)}
-        onConfirm={() => setPrivacyAccepted(true)}
+        onConfirm={() => {
+          setPrivacyAccepted(true);
+          setShowPrivacy(false);
+          setSignupStage('code');
+        }}
         title="개인정보 처리방침"
         content={privacyContent}
         requireScrollToConfirm
