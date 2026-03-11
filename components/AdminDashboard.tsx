@@ -178,10 +178,22 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
           <h2 className="font-black mb-3">초대코드 발급</h2>
           <p className="text-xs text-slate-500 mb-3">메모(선택), 사용 가능 횟수, 만료 일시를 설정하고 발급을 누르세요. 발급된 코드는 아래에서 즉시 복사할 수 있습니다.</p>
           <div className="grid md:grid-cols-4 gap-2">
-            <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" className="border rounded-xl px-3 py-2" />
-            <input type="number" value={maxUses} min={1} onChange={(e) => setMaxUses(Number(e.target.value) || 1)} placeholder="사용횟수" className="border rounded-xl px-3 py-2" />
-            <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="border rounded-xl px-3 py-2" />
-            <button onClick={createCode} disabled={!canIssue} className="rounded-xl bg-brand-900 text-white font-bold disabled:opacity-60">{createLoading ? '발급 중...' : '발급'}</button>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-500">메모(선택)</label>
+              <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" className="border rounded-xl px-3 py-2" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-500">사용 가능 횟수</label>
+              <input type="number" value={maxUses} min={1} onChange={(e) => setMaxUses(Number(e.target.value) || 1)} placeholder="사용횟수" className="border rounded-xl px-3 py-2" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-500">만료 일시</label>
+              <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="border rounded-xl px-3 py-2" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-transparent select-none">발급</span>
+              <button onClick={createCode} disabled={!canIssue} className="rounded-xl bg-brand-900 text-white font-bold disabled:opacity-60 py-2">{createLoading ? '발급 중...' : '발급'}</button>
+            </div>
           </div>
           {createError && <p className="mt-2 text-xs font-bold text-rose-600">{createError}</p>}
           {createdCode && (
