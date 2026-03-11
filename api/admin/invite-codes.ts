@@ -1,4 +1,4 @@
-import { requireAdminUser } from '../_lib/admin-auth';
+import { requireAdminUser } from '../_lib/admin-auth.js';
 import { randomBytes } from 'crypto';
 
 const randomCode = () => randomBytes(6).toString('base64url').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();

@@ -1,4 +1,4 @@
-import { requireAdminUser } from '../_lib/admin-auth';
+import { requireAdminUser } from '../_lib/admin-auth.js';
 
 const DATA_SOURCES = {
   totalUsers: 'public.users (count id)',
