@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards';
+import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

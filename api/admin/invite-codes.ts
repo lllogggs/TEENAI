@@ -1,6 +1,7 @@
-import { requireAdminUser } from '../_lib/admin-auth';
+import { requireAdminUser } from '../_lib/admin-auth.js';
+import { randomBytes } from 'crypto';
 
-const randomCode = () => Math.random().toString(36).slice(2, 10).toUpperCase();
+const randomCode = () => randomBytes(6).toString('base64url').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
 
 export default async function handler(req: any, res: any) {
   const auth = await requireAdminUser(req, res);
@@ -28,23 +29,31 @@ export default async function handler(req: any, res: any) {
     const memo = String(req.body?.memo || '').trim();
     const maxUses = Number(req.body?.maxUses || 1);
     const expiresAt = req.body?.expiresAt ? new Date(req.body.expiresAt).toISOString() : null;
-    const code = String(req.body?.code || randomCode()).toUpperCase();
+    const requestedCode = req.body?.code ? String(req.body.code).toUpperCase() : null;
 
-    const { error } = await adminClient.from('admin_codes').insert({
-      code,
-      memo: memo || null,
-      max_uses: Number.isFinite(maxUses) && maxUses > 0 ? maxUses : 1,
-      expires_at: expiresAt,
-      used_by_user_id: userId,
-      used_by_email: email,
-    });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const code = requestedCode || randomCode();
+      const { error } = await adminClient.from('admin_codes').insert({
+        code,
+        memo: memo || null,
+        max_uses: Number.isFinite(maxUses) && maxUses > 0 ? maxUses : 1,
+        expires_at: expiresAt,
+        used_by_user_id: userId,
+        used_by_email: email,
+      });
 
-    if (error) {
-      res.status(500).json({ error: error.message });
-      return;
+      if (!error) {
+        res.status(200).json({ success: true, code });
+        return;
+      }
+
+      if (requestedCode || error.code !== '23505') {
+        res.status(500).json({ error: error.message });
+        return;
+      }
     }
 
-    res.status(200).json({ success: true, code });
+    res.status(500).json({ error: 'Failed to issue unique invite code. Please retry.' });
     return;
   }
 

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { serverSupabaseEnv, serverSupabaseEnvHints } from './supabase-env';
+import { serverSupabaseEnv, serverSupabaseEnvHints } from './supabase-env.js';
 
 type RateLimitEntry = {
   count: number;

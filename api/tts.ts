@@ -1,5 +1,5 @@
 import textToSpeech from '@google-cloud/text-to-speech';
-import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards';
+import { enforceRateLimit, requireSupabaseUser, validateTextLength } from './_lib/request-guards.js';
 
 let credentials;
 try {
