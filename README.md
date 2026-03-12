@@ -17,6 +17,31 @@
 3. Run app:
    `npm run dev`
 
+
+## 캡처 화면이 안내화면으로 나오는 경우(중요)
+
+자동 캡처에서 아래 두 값이 비어 있거나 placeholder면 실제 앱 대신 `Supabase 연결 필요` 화면이 찍힙니다.
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+배포/캡처 전에 아래 체크를 먼저 실행하세요.
+
+```bash
+node scripts/validate-env.mjs
+```
+
+환경변수가 없어도 화면 캡처/리뷰를 진행해야 할 때는 아래 방법 중 하나로 데모 모드를 켜세요.
+
+- URL에 `?demo=1` 추가 (예: `http://localhost:3000/?demo=1`)
+- 안내 화면의 **"데모 모드로 계속하기 (캡처 가능)"** 버튼 클릭
+
+로컬에서 빌드 검증만 잠시 하고 싶다면(의도적으로 env 없이) 아래처럼 우회할 수 있습니다.
+
+```bash
+SKIP_ENV_VALIDATION=1 npm run build
+```
+
 ## Supabase DB SQL (필수)
 
 Supabase SQL Editor에서 아래 순서대로 실행하세요.
