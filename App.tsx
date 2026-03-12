@@ -16,6 +16,28 @@ const getSignupName = (email: string) => {
   return emailPrefix || 'User';
 };
 
+
+const requiredSupabaseEnvVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+const DEMO_MODE_STORAGE_KEY = 'forteenai_demo_mode';
+
+const getMissingSupabaseEnvVars = () => requiredSupabaseEnvVars.filter((key) => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const value = env[key];
+  return !value || String(value).includes('placeholder');
+});
+
+
+const shouldEnableDemoMode = () => {
+  if (typeof window === 'undefined') return false;
+
+  const query = new URLSearchParams(window.location.search);
+  const byQuery = query.get('demo') === '1';
+  const byStorage = window.localStorage.getItem(DEMO_MODE_STORAGE_KEY) === 'true';
+  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+  return byQuery || byStorage || isLocal;
+};
+
 const getOAuthRedirectUrl = (isNativeWebView: boolean) => {
   if (isNativeWebView) return 'forteenai://auth/callback';
   if (typeof window === 'undefined') return 'http://localhost:5173/auth/callback';
@@ -31,6 +53,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [pendingSocialUser, setPendingSocialUser] = useState<{ id: string; email: string; role: UserRole } | null>(null);
   const [socialInviteCode, setSocialInviteCode] = useState('');
+  const [isDemoMode, setIsDemoMode] = useState(() => !isSupabaseConfigured && shouldEnableDemoMode());
 
   useEffect(() => {
     const checkSession = async () => {
@@ -486,12 +509,34 @@ function App() {
     return <div className="h-screen flex items-center justify-center">로딩 중...</div>;
   }
 
-  if (!isSupabaseConfigured) {
+  if (!isSupabaseConfigured && !isDemoMode) {
+    const missingVars = getMissingSupabaseEnvVars();
+
+    const startDemoMode = () => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(DEMO_MODE_STORAGE_KEY, 'true');
+      }
+      setIsDemoMode(true);
+    };
+
     return (
-      <div className="h-screen flex items-center justify-center p-8 text-center">
-        <div>
-          <h1 className="text-2xl font-bold mb-4">Supabase 연결 필요</h1>
-          <p className="text-slate-500">VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 Vercel 환경 변수로 설정해주세요.</p>
+      <div className="h-screen flex items-center justify-center p-8 text-center bg-slate-100">
+        <div className="max-w-xl bg-white rounded-3xl shadow-md border border-slate-200 p-8">
+          <h1 className="text-2xl font-bold mb-3 text-slate-900">Supabase 연결 필요</h1>
+          <p className="text-slate-600">운영 배포는 아래 환경 변수를 설정해야 합니다. 다만 화면 점검/캡처는 데모 모드로 바로 진행할 수 있어요.</p>
+          <p className="mt-3 font-mono text-sm text-slate-700">VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY</p>
+          <div className="mt-5 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-left">
+            <p className="text-sm font-semibold text-amber-800">현재 누락/placeholder로 감지된 값</p>
+            <p className="mt-1 text-sm text-amber-700 font-mono">{missingVars.length ? missingVars.join(', ') : '값은 존재하지만 연결 확인 실패'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={startDemoMode}
+            className="mt-5 w-full rounded-2xl bg-brand-900 text-white py-3 font-black"
+          >
+            데모 모드로 계속하기 (캡처 가능)
+          </button>
+          <p className="mt-3 text-xs text-slate-500">팁: URL 뒤에 <span className="font-mono">?demo=1</span>을 붙이면 자동으로 데모 모드가 켜집니다.</p>
         </div>
       </div>
     );
@@ -518,12 +563,18 @@ function App() {
 
   const isAdminPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
 
+  const demoModeBadge = (!isSupabaseConfigured && isDemoMode) ? (
+    <div className="fixed bottom-4 right-4 z-50 rounded-full bg-amber-100 border border-amber-300 px-4 py-2 text-xs font-bold text-amber-800 shadow">
+      데모 모드 실행 중 (mock 데이터)
+    </div>
+  ) : null;
+
   if (!user) {
     if (isAdminPath) {
-      return <AdminAuth loading={authLoading} onLogin={handleAdminLogin} />;
+      return <>{demoModeBadge}<AdminAuth loading={authLoading} onLogin={handleAdminLogin} /></>;
     }
 
-    return <Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} />;
+    return <>{demoModeBadge}<Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} /></>;
   }
 
   if (isAdminPath) {
@@ -539,12 +590,12 @@ function App() {
       );
     }
 
-    return <AdminDashboard user={user} onLogout={handleLogout} />;
+    return <>{demoModeBadge}<AdminDashboard user={user} onLogout={handleLogout} /></>;
   }
 
   return user.role === UserRole.STUDENT
-    ? <StudentChat user={user} onLogout={handleLogout} />
-    : <ParentDashboard user={user} onLogout={handleLogout} />;
+    ? <>{demoModeBadge}<StudentChat user={user} onLogout={handleLogout} /></>
+    : <>{demoModeBadge}<ParentDashboard user={user} onLogout={handleLogout} /></>;
 }
 
 export default App;
