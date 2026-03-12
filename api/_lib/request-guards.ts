@@ -57,6 +57,20 @@ export const requireSupabaseUser = async (req: any, res: any): Promise<{ userId:
     return null;
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('role, subscription_expires_at')
+    .eq('id', data.user.id)
+    .maybeSingle();
+
+  if (!profileError && profile && profile.role !== 'admin' && profile.subscription_expires_at) {
+    const expiresAt = new Date(profile.subscription_expires_at).getTime();
+    if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+      res.status(403).json({ error: '서비스 이용 기간이 만료되었습니다. 관리자에게 문의하세요.' });
+      return null;
+    }
+  }
+
   return { userId: data.user.id, ip: getClientIp(req) };
 };
 
