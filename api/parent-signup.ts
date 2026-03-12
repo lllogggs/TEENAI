@@ -51,12 +51,17 @@ export default async function handler(req: any, res: any) {
   try {
     const { data: codeRow } = await adminClient
       .from('admin_codes')
-      .select('code, expires_at')
+      .select('code, expires_at, subscription_days, is_active')
       .eq('code', registrationCode)
       .maybeSingle();
 
     if (!codeRow) {
       res.status(400).json({ error: '유효하지 않은 등록 코드입니다.' });
+      return;
+    }
+
+    if (codeRow.is_active === false) {
+      res.status(400).json({ error: '정지된 등록 코드입니다.' });
       return;
     }
 
@@ -86,8 +91,9 @@ export default async function handler(req: any, res: any) {
       used_by_email: email,
     }).eq('code', registrationCode);
 
+    const subscriptionDays = Number(codeRow.subscription_days || 31);
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 31);
+    expiresAt.setDate(expiresAt.getDate() + (Number.isFinite(subscriptionDays) && subscriptionDays > 0 ? subscriptionDays : 31));
     const signupName = getSignupName(email);
 
     const { data: createdUser, error: createUserError } = await adminClient.auth.admin.createUser({

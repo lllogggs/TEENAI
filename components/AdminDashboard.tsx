@@ -11,14 +11,18 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [overview, setOverview] = useState<any>(null);
   const [codes, setCodes] = useState<any[]>([]);
   const [memo, setMemo] = useState('');
+  const [codeInput, setCodeInput] = useState('');
   const [maxUses, setMaxUses] = useState(1);
-  const [expiresAt, setExpiresAt] = useState('');
+  const [subscriptionDays, setSubscriptionDays] = useState(31);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadDetail, setLoadDetail] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
   const [createdCode, setCreatedCode] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
+  const [editingRows, setEditingRows] = useState<Record<string, { memo: string; maxUses: number; subscriptionDays: number; isActive: boolean }>>({});
+  const [saveLoadingCode, setSaveLoadingCode] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   const authedFetch = async (url: string, options: RequestInit = {}) => {
     const { data } = await supabase.auth.getSession();
@@ -65,8 +69,16 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
       if (!codeRes.ok) {
         setLoadError((prev) => prev || codePayload?.error || '초대코드 목록을 불러오지 못했습니다.');
         setCodes([]);
+        setEditingRows({});
       } else {
-        setCodes(codePayload.items || []);
+        const items = codePayload.items || [];
+        setCodes(items);
+        setEditingRows(Object.fromEntries(items.map((row: any) => [row.code, {
+          memo: row.memo || '',
+          maxUses: Number(row.max_uses || 1),
+          subscriptionDays: Number(row.subscription_days || 31),
+          isActive: row.is_active !== false,
+        }])));
       }
     } catch (error: any) {
       setLoadError(error?.message || '대시보드 로딩 실패');
@@ -77,6 +89,11 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
   useEffect(() => { load(); }, []);
 
+  const generateRandomCode = () => {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return Array.from({ length: 8 }, () => charset[Math.floor(Math.random() * charset.length)]).join('');
+  };
+
   const createCode = async () => {
     setCreateLoading(true);
     setCreateError(null);
@@ -86,7 +103,7 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     try {
       const response = await authedFetch('/api/admin/invite-codes', {
         method: 'POST',
-        body: JSON.stringify({ memo, maxUses, expiresAt: expiresAt || null }),
+        body: JSON.stringify({ memo, code: codeInput.trim() || null, maxUses, subscriptionDays }),
       });
 
       const payload = await response.json().catch(() => ({}));
@@ -96,8 +113,9 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
       setCreatedCode(String(payload?.code || ''));
       setMemo('');
+      setCodeInput('');
       setMaxUses(1);
-      setExpiresAt('');
+      setSubscriptionDays(31);
       await load();
     } catch (error: any) {
       setCreateError(error?.message || '초대코드 발급에 실패했습니다.');
@@ -118,7 +136,49 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     }
   };
 
-  const canIssue = useMemo(() => Number.isFinite(maxUses) && maxUses > 0 && !createLoading, [maxUses, createLoading]);
+  const normalizedCodeInput = codeInput.trim().toUpperCase();
+  const isCustomCodeValid = !normalizedCodeInput || /^[A-Z0-9]{4,32}$/.test(normalizedCodeInput);
+  const canIssue = useMemo(
+    () => Number.isFinite(maxUses) && maxUses > 0 && Number.isFinite(subscriptionDays) && subscriptionDays > 0 && isCustomCodeValid && !createLoading,
+    [isCustomCodeValid, maxUses, subscriptionDays, createLoading],
+  );
+
+  const updateEditingRow = (code: string, patch: Partial<{ memo: string; maxUses: number; subscriptionDays: number; isActive: boolean }>) => {
+    setEditingRows((prev) => ({
+      ...prev,
+      [code]: {
+        ...(prev[code] || { memo: '', maxUses: 1, subscriptionDays: 31, isActive: true }),
+        ...patch,
+      },
+    }));
+  };
+
+  const saveCode = async (code: string) => {
+    const row = editingRows[code];
+    if (!row) return;
+
+    setSaveError('');
+    setSaveLoadingCode(code);
+    try {
+      const response = await authedFetch('/api/admin/invite-codes', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          code,
+          memo: row.memo,
+          maxUses: row.maxUses,
+          subscriptionDays: row.subscriptionDays,
+          isActive: row.isActive,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || '코드 수정에 실패했습니다.');
+      await load();
+    } catch (error: any) {
+      setSaveError(error?.message || '코드 수정에 실패했습니다.');
+    } finally {
+      setSaveLoadingCode('');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -176,25 +236,44 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
         <div className="bg-white rounded-2xl p-4 border border-slate-100">
           <h2 className="font-black mb-3">초대코드 발급</h2>
-          <p className="text-xs text-slate-500 mb-3">메모(선택), 사용 가능 횟수, 만료 일시를 설정하고 발급을 누르세요. 발급된 코드는 아래에서 즉시 복사할 수 있습니다.</p>
-          <div className="grid md:grid-cols-4 gap-2">
+          <p className="text-xs text-slate-500 mb-3">메모(선택), 코드(직접 입력 또는 랜덤), 사용 가능 횟수, 가입 후 사용 가능일수를 설정하고 발급을 누르세요. 발급된 코드는 아래에서 즉시 복사할 수 있습니다.</p>
+          <div className="grid md:grid-cols-5 gap-2">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-500">메모(선택)</label>
               <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" className="border rounded-xl px-3 py-2" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-500">초대코드(선택)</label>
+              <div className="flex gap-1">
+                <input
+                  value={codeInput}
+                  onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                  placeholder="비워두면 자동 생성"
+                  className="border rounded-xl px-3 py-2 w-full"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCodeInput(generateRandomCode())}
+                  className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 whitespace-nowrap"
+                >
+                  랜덤
+                </button>
+              </div>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-500">사용 가능 횟수</label>
               <input type="number" value={maxUses} min={1} onChange={(e) => setMaxUses(Number(e.target.value) || 1)} placeholder="사용횟수" className="border rounded-xl px-3 py-2" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500">만료 일시</label>
-              <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="border rounded-xl px-3 py-2" />
+              <label className="text-xs font-bold text-slate-500">가입 후 사용 가능일수</label>
+              <input type="number" value={subscriptionDays} min={1} max={3650} onChange={(e) => setSubscriptionDays(Number(e.target.value) || 31)} className="border rounded-xl px-3 py-2" />
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-xs font-bold text-transparent select-none">발급</span>
               <button onClick={createCode} disabled={!canIssue} className="rounded-xl bg-brand-900 text-white font-bold disabled:opacity-60 py-2">{createLoading ? '발급 중...' : '발급'}</button>
             </div>
           </div>
+          {!isCustomCodeValid && <p className="mt-2 text-xs font-bold text-rose-600">초대코드는 영문 대문자/숫자만 가능하며 4~32자여야 합니다.</p>}
           {createError && <p className="mt-2 text-xs font-bold text-rose-600">{createError}</p>}
           {createdCode && (
             <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 flex items-center justify-between gap-2">
@@ -206,15 +285,39 @@ const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-slate-100 overflow-x-auto">
-          <h2 className="font-black mb-3">초대코드 조회/사용 여부</h2>
+          <h2 className="font-black mb-3">초대코드 조회/수정</h2>
           <table className="min-w-full text-sm">
-            <thead><tr className="text-left text-slate-500"><th>코드</th><th>메모</th><th>사용</th><th>만료</th><th>최근사용</th><th>가입방식</th></tr></thead>
+            <thead><tr className="text-left text-slate-500"><th>코드</th><th>메모</th><th>사용</th><th>사용 가능 횟수</th><th>사용 가능일수</th><th>상태</th><th>최근사용</th><th>가입방식</th><th>저장</th></tr></thead>
             <tbody>
-              {codes.map((row) => (
-                <tr key={row.code} className="border-t"><td className="py-2 font-bold">{row.code}</td><td>{row.memo || '-'}</td><td>{row.use_count}/{row.max_uses || '∞'}</td><td>{row.expires_at ? new Date(row.expires_at).toLocaleString() : '-'}</td><td>{row.used_at ? new Date(row.used_at).toLocaleString() : '-'}</td><td>{row.auth_provider || '-'}</td></tr>
-              ))}
+              {codes.map((row) => {
+                const edit = editingRows[row.code] || { memo: row.memo || '', maxUses: Number(row.max_uses || 1), subscriptionDays: Number(row.subscription_days || 31), isActive: row.is_active !== false };
+                return (
+                <tr key={row.code} className="border-t">
+                  <td className="py-2 font-bold">{row.code}</td>
+                  <td><input value={edit.memo} onChange={(e) => updateEditingRow(row.code, { memo: e.target.value })} className="border rounded-lg px-2 py-1 w-40" /></td>
+                  <td>{row.use_count}/{row.max_uses || '∞'}</td>
+                  <td><input type="number" min={1} value={edit.maxUses} onChange={(e) => updateEditingRow(row.code, { maxUses: Number(e.target.value) || 1 })} className="border rounded-lg px-2 py-1 w-24" /></td>
+                  <td><input type="number" min={1} max={3650} value={edit.subscriptionDays} onChange={(e) => updateEditingRow(row.code, { subscriptionDays: Number(e.target.value) || 31 })} className="border rounded-lg px-2 py-1 w-24" /></td>
+                  <td>
+                    <button
+                      onClick={() => updateEditingRow(row.code, { isActive: !edit.isActive })}
+                      className={`rounded-lg px-2 py-1 text-xs font-black ${edit.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'}`}
+                    >
+                      {edit.isActive ? '활성' : '정지'}
+                    </button>
+                  </td>
+                  <td>{row.used_at ? new Date(row.used_at).toLocaleString() : '-'}</td>
+                  <td>{row.auth_provider || '-'}</td>
+                  <td>
+                    <button onClick={() => saveCode(row.code)} disabled={saveLoadingCode === row.code} className="rounded-lg border bg-white px-2 py-1 text-xs font-black">
+                      {saveLoadingCode === row.code ? '저장 중...' : '저장'}
+                    </button>
+                  </td>
+                </tr>
+              );})}
             </tbody>
           </table>
+          {saveError && <p className="mt-2 text-xs font-bold text-rose-600">{saveError}</p>}
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-100">
           <h2 className="font-black mb-3">최근 에러/운영 로그</h2>
