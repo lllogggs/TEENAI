@@ -21,6 +21,19 @@ const generateRandomCode = (length = 6): string => {
   return result;
 };
 
+const isInviteCodeMissing = (value: unknown): boolean => typeof value !== 'string' || value.trim().length === 0;
+
+const normalizeInviteCode = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toUpperCase();
+};
+
+const isUniqueViolation = (error: any): boolean => {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  return code === '23505' || message.includes('duplicate key') || message.includes('unique');
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -58,11 +71,13 @@ export default async function handler(req: any, res: any) {
 
   const userId = authData.user.id;
 
-  const { data: profile, error: profileError } = await supabase
+  const readCurrentProfile = async () => supabase
     .from('users')
     .select('role, my_invite_code')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
+
+  const { data: profile, error: profileError } = await readCurrentProfile();
 
   if (profileError || !profile) {
     res.status(404).json({ error: 'User profile not found.' });
@@ -74,37 +89,43 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  if (profile.my_invite_code) {
-    res.status(200).json({ code: String(profile.my_invite_code).toUpperCase() });
+  const existingCode = normalizeInviteCode(profile.my_invite_code);
+  if (existingCode) {
+    res.status(200).json({ code: existingCode });
     return;
   }
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     const nextCode = generateRandomCode();
 
-    const { data: updatedRow } = await supabase
+    const { data: updatedRow, error: updateError } = await supabase
       .from('users')
       .update({ my_invite_code: nextCode })
       .eq('id', userId)
       .eq('role', 'parent')
-      .is('my_invite_code', null)
+      .or('my_invite_code.is.null,my_invite_code.eq.')
       .select('my_invite_code')
-      .single();
+      .maybeSingle();
 
-    if (updatedRow?.my_invite_code) {
-      res.status(200).json({ code: String(updatedRow.my_invite_code).toUpperCase() });
+    const updatedCode = normalizeInviteCode(updatedRow?.my_invite_code);
+    if (updatedCode) {
+      res.status(200).json({ code: updatedCode });
       return;
     }
 
-    const { data: existingRow } = await supabase
-      .from('users')
-      .select('my_invite_code')
-      .eq('id', userId)
-      .single();
+    if (updateError && !isUniqueViolation(updateError)) {
+      console.error('[ensure-invite-code] update failed:', updateError);
+    }
 
-    if (existingRow?.my_invite_code) {
-      res.status(200).json({ code: String(existingRow.my_invite_code).toUpperCase() });
+    const { data: latestProfile, error: latestProfileError } = await readCurrentProfile();
+    const latestCode = normalizeInviteCode(latestProfile?.my_invite_code);
+    if (!latestProfileError && latestCode) {
+      res.status(200).json({ code: latestCode });
       return;
+    }
+
+    if (updateError && !isUniqueViolation(updateError)) {
+      break;
     }
   }
 
