@@ -83,6 +83,23 @@ const normalizeRiskLevel = (value: unknown): SessionRiskLevel => {
   return 'normal';
 };
 
+const generateInviteCodeCandidate = (length = 6): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+
+  for (let index = 0; index < length; index += 1) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return code;
+};
+
+const isUniqueViolation = (error: unknown): boolean => {
+  const code = String((error as { code?: string } | null)?.code || '');
+  const message = String((error as { message?: string } | null)?.message || '').toLowerCase();
+  return code === '23505' || message.includes('duplicate key') || message.includes('unique');
+};
+
 const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
   const guardrails = (settings?.guardrails as Record<string, unknown> | undefined) || {};
   const mentorTone = settings?.mentor_tone || settings?.mentor_style;
@@ -202,6 +219,44 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     }
   }, [user, onLogout]);
 
+  const ensureInviteCodeViaClient = async (): Promise<string> => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const candidate = generateInviteCodeCandidate();
+
+      const { data: updatedRow, error: updateError } = await supabase
+        .from('users')
+        .update({ my_invite_code: candidate })
+        .eq('id', user.id)
+        .eq('role', 'parent')
+        .or('my_invite_code.is.null,my_invite_code.eq.')
+        .select('my_invite_code')
+        .maybeSingle();
+
+      const updatedCode = (updatedRow?.my_invite_code || '').toUpperCase();
+      if (updatedCode) {
+        return updatedCode;
+      }
+
+      const { data: latestRow, error: latestError } = await supabase
+        .from('users')
+        .select('my_invite_code')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const latestCode = (latestRow?.my_invite_code || '').toUpperCase();
+      if (!latestError && latestCode) {
+        return latestCode;
+      }
+
+      if (updateError && !isUniqueViolation(updateError)) {
+        console.error('[ParentDashboard] client invite code update failed:', updateError);
+        break;
+      }
+    }
+
+    return '';
+  };
+
   const fetchInviteCode = async () => {
     setInviteCodeStatus('loading');
     setCopyStatus('');
@@ -237,6 +292,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     }
 
     let resolvedCode = userRow?.role === 'parent' ? userRow?.my_invite_code || '' : '';
+    if (!resolvedCode) {
+      resolvedCode = await ensureInviteCodeViaClient();
+    }
+
     if (!resolvedCode) {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
