@@ -1,5 +1,5 @@
 const requiredClientVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
-const requiredServerVars = ['GEMINI_API_KEY'];
+const requiredServerVars = ['GEMINI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
 
 const isPlaceholder = (value = '') => {
   const normalized = String(value).trim().toLowerCase();
@@ -27,6 +27,7 @@ const report = [
   '[env-check] Missing required environment variables for deploy/runtime.',
   missingClient.length ? `- Client: ${missingClient.join(', ')}` : '',
   missingServer.length ? `- Server: ${missingServer.join(', ')}` : '',
+  'Expected Vercel Production variables: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY.',
   'Set variables in Vercel Project Settings > Environment Variables.',
   'If you intentionally want to bypass this check in local build, set SKIP_ENV_VALIDATION=1.',
 ].filter(Boolean).join('\n');
