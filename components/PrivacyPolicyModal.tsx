@@ -81,6 +81,18 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
                             </div>
                         </section>
 
+                        {/* 새로 추가된 섹션: 자동 수집 정보 및 분석 도구 */}
+                        <section>
+                            <h3 className="text-[17px] font-black text-slate-800 mb-4 px-1">자동 수집되는 정보 및 서비스 분석</h3>
+                            <div className="bg-white p-6 md:p-8 rounded-[1.5rem] border border-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] space-y-5">
+                                <p className="font-bold text-[14px] text-slate-700">서비스 품질 향상과 사용자 경험 개선을 위해 다음과 같은 정보가 자동으로 수집될 수 있습니다.</p>
+                                <div className="space-y-3 text-[13px] md:text-sm text-slate-500 font-bold">
+                                    <div className="flex gap-3"><strong className="text-slate-700 shrink-0">자동 수집 항목:</strong> <span>IP 주소, 쿠키(Cookie), 접속 기록, 서비스 이용 기록(클릭, 스크롤 등 행태 정보), 기기 및 브라우저 정보</span></div>
+                                    <div className="flex gap-3"><strong className="text-slate-700 shrink-0">분석 도구 사용:</strong> <span>본 서비스는 웹사이트 트래픽 분석 및 사용성 개선을 위해 Google Analytics와 Microsoft Clarity를 사용합니다. 이 과정에서 상기 자동 수집 정보가 익명화되어 해당 제공사에 전송될 수 있습니다.</span></div>
+                                </div>
+                            </div>
+                        </section>
+
                         <section className="px-1">
                             <h3 className="text-[17px] font-black text-slate-800 mb-4">데이터의 활용 및 부모 모니터링</h3>
                             <p className="text-[13px] md:text-sm text-slate-500 leading-relaxed mb-5 font-bold">
