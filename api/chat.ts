@@ -35,7 +35,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { history, newMessage, parentStylePrompt, imageData, audioData } = req.body || {};
+    const { history, newMessage, parentStylePrompt, imageData, audioData, mode } = req.body || {};
     if (!validateTextLength(String(newMessage || ''), 2000)) {
       res.status(400).json({ error: 'newMessage is required and must be <= 2000 chars.' });
       return;
@@ -70,7 +70,11 @@ export default async function handler(req: any, res: any) {
       (imageData || audioData) ? '이미지가 첨부된 경우, 이미지 속 글자, 수식, 표 등을 정확히 인식(OCR)하고 학생이 이해하기 쉽게 단계별로 친절하게 설명하세요.' : '',
     ].filter(Boolean).join('\n');
 
-    const mergedInstruction = `${baseInstruction}\n\n[Parent Style Prompt]\n${String(parentStylePrompt || '')}`;
+    const studyModeInstruction = mode === '공부'
+      ? '\n\n[Smart Study Mode]\n현재 학생은 [스마트 학습 모드]를 사용 중입니다. 숙제나 문제 풀이 관련 질문이나 이미지가 주어지면 절대 정답이나 전체 풀이 과정을 한 번에 알려주지 마세요. 소크라테스 문답법처럼 학생이 스스로 생각하고 원리를 깨우칠 수 있도록 첫 번째 힌트만 제공하고, 다음 단계를 유도하는 질문으로 답변을 마무리하세요.'
+      : '';
+
+    const mergedInstruction = `${baseInstruction}\n\n[Parent Style Prompt]\n${String(parentStylePrompt || '')}${studyModeInstruction}`;
 
     const ai = new GoogleGenAI({ apiKey });
     const normalizedHistory = Array.isArray(history)
