@@ -171,60 +171,60 @@ const findLatestStudyImage = (chatMessages: ChatMessage[]) => {
 
 const MODE_CONFIG = {
   대화: {
-    heroBadge: '자유 대화',
-    heroTitle: '편하게 이야기를 시작해보세요',
-    heroDescription: '궁금한 것, 고민, 일상 이야기까지 편한 방식으로 물어보세요.',
-    helperText: '텍스트, 사진, 음성으로 자유롭게 대화할 수 있어요.',
+    heroBadge: '대화 모드',
+    heroTitle: '편하게 물어보세요',
+    heroDescription: '궁금한 걸 편하게 물어보세요.',
+    helperText: '텍스트·사진·음성으로 물어보세요.',
     loadingText: '답변을 준비하고 있어요...',
     placeholders: [
-      '오늘 있었던 일이나 고민을 편하게 말해보세요.',
-      '궁금한 인물이나 주제가 있으면 바로 물어보세요.',
-      '숙제 말고도 그냥 수다처럼 이야기해도 괜찮아요.',
+      '궁금한 걸 적어보세요.',
+      '사진과 함께 물어보세요.',
+      '고민을 짧게 적어보세요.',
     ],
     cards: [
       {
         key: 'text',
-        title: '텍스트로 바로 시작',
-        description: '지금 떠오른 생각이나 질문을 바로 적어보세요.',
+        title: '바로 입력',
+        description: '바로 적기',
       },
       {
         key: 'image',
-        title: '사진으로 질문하기',
-        description: '사진을 올리고 무엇이 궁금한지 같이 적어보세요.',
+        title: '사진 질문',
+        description: '사진 올리기',
       },
       {
         key: 'voice',
-        title: '말로 편하게 질문',
-        description: '마이크를 눌러 자연스럽게 말하면 텍스트로 적혀요.',
+        title: '음성 질문',
+        description: '말로 시작',
       },
     ],
   },
   공부: {
-    heroBadge: '스마트 학습 모드',
-    heroTitle: '문제를 함께 단계별로 풀어볼까요?',
-    heroDescription: '정답만 바로 주기보다 힌트와 질문으로 스스로 풀 수 있게 도와줘요.',
-    helperText: '문제 사진을 올리거나, 어디까지 풀었는지 적으면 그 지점부터 같이 생각해봐요.',
+    heroBadge: '공부 모드',
+    heroTitle: '막힌 부분부터 풀어요',
+    heroDescription: '막힌 부분부터 같이 풀어요.',
+    helperText: '문제 사진이나 막힌 부분을 보내세요.',
     loadingText: '힌트와 다음 질문을 정리하고 있어요...',
     placeholders: [
-      '어느 부분까지 풀었는지, 어디서 막혔는지 적어주세요.',
-      '문제 사진을 올리고 “이 부분이 이해 안 돼요”라고 적어도 좋아요.',
-      '정답 말고 힌트부터 받고 싶다면 그렇게 적어주세요.',
+      '막힌 부분을 적어보세요.',
+      '문제 사진을 올려보세요.',
+      '힌트가 필요한 곳을 적어보세요.',
     ],
     cards: [
       {
         key: 'image',
-        title: '문제 사진 올리기',
-        description: '수학, 영어, 과학 문제 사진을 올리면 같이 분석해요.',
+        title: '문제 사진',
+        description: '사진 올리기',
       },
       {
         key: 'text',
-        title: '막힌 부분 설명하기',
-        description: '어디까지 풀었고 어디서 헷갈렸는지 적어주세요.',
+        title: '막힌 부분',
+        description: '상황 적기',
       },
       {
         key: 'voice',
-        title: '말로 풀이 상황 설명',
-        description: '직접 말하면 풀이 상황을 정리해서 질문할 수 있어요.',
+        title: '음성 설명',
+        description: '말로 질문',
       },
     ],
   },
@@ -423,9 +423,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const modeConfig = MODE_CONFIG[chatMode];
   const [placeholderSeed] = useState(() => Math.floor(Math.random() * 1000));
   const activePlaceholder = useMemo(() => {
-    if (isMicRecording) return '음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다';
-    if (chatMode === '공부' && imageThumbnail) return '사진을 바탕으로 어디가 막혔는지 적어주세요.';
-    if (chatMode === '공부' && pinnedStudyImage) return '고정된 문제 사진을 보며 이어서 질문해보세요.';
+    if (isMicRecording) return '음성을 듣고 있어요...';
+    if (chatMode === '공부' && imageThumbnail) return '막힌 부분을 적어보세요.';
+    if (chatMode === '공부' && pinnedStudyImage) return '이어서 질문해보세요.';
     const placeholders = modeConfig.placeholders;
     return placeholders[placeholderSeed % placeholders.length];
   }, [chatMode, imageThumbnail, isMicRecording, modeConfig.placeholders, pinnedStudyImage, placeholderSeed]);
@@ -790,20 +790,17 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 <div key={session.id} className="relative group">
                   <button
                     onClick={() => openSession(session.id)}
-                    className={`w-full text-left rounded-2xl border p-3 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                    className={`w-full text-left rounded-2xl border px-3 py-2.5 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
+                      <p className="text-[11px] font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
                       {isActive && (
                         <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-brand-700 border border-brand-100">
                           진행 중
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
-                    <p className="mt-1 text-[11px] font-medium text-slate-400 line-clamp-1">
-                      {formatSessionTime(session.started_at)}에 시작한 대화예요.
-                    </p>
+                    <p className="mt-1.5 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
                   </button>
                   <button
                     onClick={async (e) => {
@@ -849,95 +846,71 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
-          <div className="px-5 md:px-10 pt-4 md:pt-5 pb-3 md:pb-4 bg-transparent shrink-0">
-            <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-[1.5rem] border border-slate-200/80 bg-white/80 px-3 py-2.5 shadow-sm backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                {/* Mobile Sidebar Toggle */}
-                <button
-                  onClick={() => setShowMobileChat(false)}
-                  aria-label="대화 목록 열기"
-                  className="flex lg:hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                </button>
+          <div className="px-4 md:px-10 pt-2 md:pt-3 pb-1.5 md:pb-2 bg-transparent shrink-0">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 text-slate-500">
+              <button
+                onClick={() => setShowMobileChat(false)}
+                aria-label="대화 목록 열기"
+                className="flex lg:hidden h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+              </button>
 
-                {/* PC Sidebar Toggle */}
+              <div className="hidden lg:flex items-center gap-2">
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                   aria-label={isSidebarOpen ? '대화 목록 숨기기' : '대화 목록 열기'}
-                  className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
                 >
                   {isSidebarOpen ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
                   ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                   )}
                 </button>
+                {activeSession?.title && (
+                  <p className="text-xs font-semibold text-slate-400 truncate">
+                    {activeSession.title}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
 
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 md:p-8 space-y-4 md:space-y-6 custom-scrollbar relative">
+            {errorNotice && <div className="text-sm text-red-600 font-bold">{errorNotice}</div>}
+
+            {messages.length === 0 ? (
+              <div className="flex flex-col max-w-2xl mx-auto w-full px-0 mt-0 md:mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="bg-white/85 backdrop-blur-md p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100/60 w-full text-center">
+                  <div className="mb-2 md:mb-3 flex justify-center">
                     <span className={`rounded-full px-2.5 py-1 text-[10px] md:text-[11px] font-black ${
                       chatMode === '공부' ? 'bg-brand-50 text-brand-800' : 'bg-slate-100 text-slate-700'
                     }`}>
                       {modeConfig.heroBadge}
                     </span>
-                    {activeSession?.title && (
-                      <span className="hidden md:inline text-xs font-semibold text-slate-400 truncate">
-                        {activeSession.title}
-                      </span>
-                    )}
                   </div>
-                  <p className="mt-1 text-sm md:text-[15px] font-black text-slate-800 truncate">
-                    {activeSession?.title || (chatMode === '공부' ? '새 학습 대화를 시작해보세요' : '새 대화를 시작해보세요')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-500">
-                {chatMode === '공부'
-                  ? '정답보다 힌트와 질문 중심으로 도와줘요.'
-                  : '일상 고민부터 궁금한 질문까지 자유롭게 대화해요.'}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar relative">
-            {errorNotice && <div className="text-sm text-red-600 font-bold">{errorNotice}</div>}
-
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center max-w-2xl mx-auto px-1 mt-2 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="bg-white/80 backdrop-blur-md p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-100/50 w-full text-center">
-                  <div className="mb-4 md:mb-5 flex justify-center">
-                    <span className={`rounded-full px-3 py-1.5 text-[11px] md:text-xs font-black ${
-                      chatMode === '공부' ? 'bg-brand-50 text-brand-800' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {modeConfig.heroBadge}
-                    </span>
+                  <div className="mb-2 md:mb-3 mx-auto hidden md:flex items-center justify-center">
+                    <RandomAnimalIcon className="w-16 h-16 md:w-20 md:h-20 drop-shadow-lg" />
                   </div>
-                  <div className="mb-4 md:mb-8 mx-auto flex items-center justify-center">
-                    <RandomAnimalIcon className="w-24 h-24 md:w-36 md:h-36 drop-shadow-xl hover:scale-105 transition-transform duration-300" />
-                  </div>
-                  <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">{modeConfig.heroTitle}</h2>
-                  <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
+                  <h2 className="text-lg md:text-xl font-black text-slate-800 mb-1 tracking-tight text-balance">{modeConfig.heroTitle}</h2>
+                  <p className="text-slate-500 font-bold mb-3 md:mb-4 text-xs md:text-sm leading-relaxed text-balance">
                     {modeConfig.heroDescription}
                   </p>
-                  <div className={`mb-6 rounded-2xl border px-4 py-3 text-left ${
+                  <div className={`mb-0 md:mb-4 rounded-xl border px-3 py-2.5 text-left ${
                     chatMode === '공부' ? 'border-brand-100 bg-brand-50/70 text-brand-900' : 'border-slate-200 bg-slate-50 text-slate-700'
                   }`}>
-                    <p className="text-[11px] md:text-xs font-black tracking-[0.16em] uppercase">
-                      {chatMode === '공부' ? '학습 안내' : '시작 가이드'}
-                    </p>
-                    <p className="mt-1 text-xs md:text-sm font-bold leading-relaxed">
+                    <p className="text-xs md:text-sm font-bold leading-relaxed">
                       {modeConfig.helperText}
                     </p>
                     {chatMode === '공부' && (
-                      <p className="mt-2 text-[11px] md:text-xs font-semibold text-brand-700">
+                      <p className="mt-1 hidden md:block text-[11px] md:text-xs font-semibold text-brand-700">
                         문제 사진을 올리면 풀이를 마칠 때까지 화면 상단에 고정해서 이어서 설명해줘요.
                       </p>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-5 text-left text-slate-700">
+                  <div className="hidden md:grid grid-cols-3 gap-3 text-left text-slate-700">
                     {modeConfig.cards.map((card) => {
                       const Icon = card.key === 'text' ? TextIcon : card.key === 'image' ? ImageIcon : VoiceIcon;
                       return (
@@ -945,14 +918,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                           key={card.key}
                           type="button"
                           onClick={() => handleModeCardAction(card.key)}
-                          className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0"
+                          className="bg-slate-50 rounded-2xl p-3 border border-slate-100/50 flex flex-col items-center text-center group hover:-translate-y-1 transition-transform gap-2"
                         >
-                          <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
-                            <Icon className="w-6 h-6 md:w-8 md:h-8" />
+                          <div className="group-hover:scale-110 transition-transform bg-white p-2 rounded-lg shadow-sm shrink-0 text-slate-700">
+                            <Icon className="w-5 h-5" />
                           </div>
                           <div>
-                            <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">{card.title}</h3>
-                            <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed">
+                            <h3 className="font-black text-slate-800 text-sm mb-0.5">{card.title}</h3>
+                            <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
                               {card.description}
                             </p>
                           </div>
@@ -1026,7 +999,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             )}
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 px-5 md:px-10 pb-[calc(env(safe-area-inset-bottom,0px)+0.5px)] md:pb-[2.5px] lg:pb-[3.5px] pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
+          <div className="sticky bottom-0 left-0 right-0 px-4 md:px-10 pb-[calc(env(safe-area-inset-bottom,0px)+0.5px)] md:pb-[2.5px] lg:pb-[3.5px] pt-2 md:pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
             {imageThumbnail && (
               <div className="max-w-4xl mx-auto mb-2 relative inline-block">
                 <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
@@ -1034,8 +1007,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             )}
 
-            <div className="max-w-4xl mx-auto mb-2 md:mb-3 flex flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-2 px-1 md:px-0">
+            <div className="max-w-4xl mx-auto mb-1.5 md:mb-2 flex flex-col gap-1.5">
+              <div className="flex flex-wrap items-center gap-2 px-0">
                 <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm shrink-0">
                 {([
                   { value: '대화', label: '대화 모드' },
@@ -1047,7 +1020,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                       key={modeOption.value}
                       type="button"
                       onClick={() => setChatMode(modeOption.value)}
-                      className={`rounded-full px-3 md:px-4 py-1.5 md:py-2 text-[11px] md:text-xs font-bold tracking-tight transition-colors whitespace-nowrap ${
+                      className={`rounded-full px-3 md:px-4 py-1.5 text-[11px] md:text-xs font-bold tracking-tight transition-colors whitespace-nowrap ${
                         isActive
                           ? 'bg-brand-900 text-white shadow-sm'
                           : 'text-slate-600 hover:bg-slate-100'
@@ -1059,7 +1032,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   );
                 })}
                 </div>
-                <div className={`rounded-full px-3 py-1.5 text-[11px] md:text-xs font-bold ${
+                <div className={`hidden md:block rounded-full px-3 py-1.5 text-[11px] md:text-xs font-bold ${
                   chatMode === '공부' ? 'bg-brand-50 text-brand-800' : 'bg-white text-slate-500 border border-slate-200'
                 }`}>
                   {chatMode === '공부'
@@ -1119,9 +1092,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className="max-w-4xl mx-auto mt-2.5 md:mt-3 text-center px-4 pb-3 md:pb-6">
+            <div className="max-w-4xl mx-auto mt-2 md:mt-2.5 text-center px-2 pb-2 md:pb-5">
               <p className="text-[10px] md:text-[11px] text-slate-400 font-medium tracking-tight">
-                포틴AI는 인물 등에 관한 정보 제공 시 실수를 할 수 있습니다.{' '}
+                답변은 확인이 필요할 수 있어요.{' '}
                 <button
                   onClick={() => setIsPrivacyModalOpen(true)}
                   className="underline hover:text-slate-500 transition-colors"
