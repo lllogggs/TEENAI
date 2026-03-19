@@ -133,6 +133,23 @@ const formatSessionTime = (iso: string) => {
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+const extractImageFromMessage = (text: string) => {
+  const match = text.match(/\[IMAGE\](.*?)\[\/IMAGE\]/);
+  return match?.[1] || null;
+};
+
+const findLatestStudyImage = (chatMessages: ChatMessage[]) => {
+  for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
+    const message = chatMessages[i];
+    if (message.role !== 'user') continue;
+
+    const embeddedImage = extractImageFromMessage(message.text);
+    if (embeddedImage) return embeddedImage;
+  }
+
+  return null;
+};
+
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const RandomAnimalIcon = useMemo(() => {
     const randomIndex = Math.floor(Math.random() * AnimalIcons.length);
@@ -142,6 +159,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [input, setInput] = useState('');
+  const [chatMode, setChatMode] = useState<'대화' | '공부'>('대화');
   const [loading, setLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState('');
@@ -162,6 +180,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   // Multimodal states
   const [imageThumbnail, setImageThumbnail] = useState<string | null>(null);
+  const [lockedStudyImage, setLockedStudyImage] = useState<string | null>(null);
   const [isMicRecording, setIsMicRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -202,6 +221,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         const base64 = canvas.toDataURL('image/jpeg', 0.8);
         setImageThumbnail(base64);
+        if (chatMode === '공부') {
+          setLockedStudyImage(base64);
+        }
       };
       img.src = event.target?.result as string;
     };
@@ -322,6 +344,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   }, [user, onLogout]);
 
   const activeSession = useMemo(() => sessions.find((session) => session.id === currentSessionId) || null, [sessions, currentSessionId]);
+  const pinnedStudyImage = useMemo(() => {
+    if (imageThumbnail) return imageThumbnail;
+    if (chatMode !== '공부') return null;
+    return lockedStudyImage;
+  }, [chatMode, imageThumbnail, lockedStudyImage]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -360,14 +387,18 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (error) {
       console.error('messages fetch error:', error);
       setMessages([]);
+      setLockedStudyImage(null);
       return;
     }
 
-    setMessages((data || []).map((item) => ({
+    const nextMessages = (data || []).map((item) => ({
       role: item.role,
       text: item.content,
       timestamp: new Date(item.created_at).getTime(),
-    })));
+    })) as ChatMessage[];
+
+    setMessages(nextMessages);
+    setLockedStudyImage(findLatestStudyImage(nextMessages));
   };
 
   useEffect(() => {
@@ -519,6 +550,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
     setInput('');
     setImageThumbnail(null);
+    if (chatMode === '공부' && currentImage) {
+      setLockedStudyImage(currentImage);
+    }
     setLoading(true);
     setMessages((prev) => [...prev, userMsg]);
 
@@ -564,6 +598,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         method: 'POST',
         headers,
         body: JSON.stringify({
+          mode: chatMode,
           newMessage: userText,
           history: nextHistory,
           parentStylePrompt,
@@ -603,6 +638,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     settingsCacheRef.current = null;
     setCurrentSessionId(null);
     setMessages([]);
+    setLockedStudyImage(null);
     setShowMobileChat(true);
   };
 
@@ -796,6 +832,38 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             ) : (
               <div className="pb-24 md:pb-28 max-w-4xl mx-auto w-full">
+                {chatMode === '공부' && pinnedStudyImage && (
+                  <div className="sticky top-0 z-10 pb-4">
+                    <div className="rounded-[1.75rem] border border-brand-100 bg-white/95 p-3 md:p-4 shadow-md shadow-slate-200/40 backdrop-blur-sm">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] md:text-xs font-black tracking-[0.18em] text-brand-700 uppercase">Smart Study</p>
+                          <p className="text-xs md:text-sm font-bold text-slate-600">추가 질문을 해도 문제풀이를 끝낼 때까지 이 사진을 위에 고정해 둘게요.</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] md:text-[11px] font-black text-brand-800">
+                            문제 사진
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setLockedStudyImage(null)}
+                            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] md:text-[11px] font-black text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                          >
+                            문제풀이 끝내기
+                          </button>
+                        </div>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                        <img
+                          src={pinnedStudyImage}
+                          alt="Pinned study problem"
+                          className="max-h-56 md:max-h-72 w-full object-contain bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                     <div
@@ -833,6 +901,30 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             {/* Visual Action Bar (Camera, Voice Modes) */}
             <div className="max-w-4xl mx-auto flex items-center justify-between mb-2 md:mb-3 px-1 md:px-2 gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm shrink-0">
+                {([
+                  { value: '대화', label: '대화 모드' },
+                  { value: '공부', label: '스마트 학습 모드' },
+                ] as const).map((modeOption) => {
+                  const isActive = chatMode === modeOption.value;
+                  return (
+                    <button
+                      key={modeOption.value}
+                      type="button"
+                      onClick={() => setChatMode(modeOption.value)}
+                      className={`rounded-full px-3 md:px-4 py-1.5 md:py-2 text-[11px] md:text-xs font-bold tracking-tight transition-colors whitespace-nowrap ${
+                        isActive
+                          ? 'bg-brand-900 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      {modeOption.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="flex gap-1.5 md:gap-2 shrink-0">
                 <button
                   onClick={() => fileInputRef.current?.click()}
