@@ -133,6 +133,25 @@ const formatSessionTime = (iso: string) => {
   return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+const formatSessionRelative = (iso: string) => {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.max(Math.floor(diffMs / 60000), 0);
+
+  if (diffMinutes < 1) return '방금 전';
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return '어제';
+  if (diffDays < 7) return `${diffDays}일 전`;
+
+  return formatSessionTime(iso);
+};
+
 const extractImageFromMessage = (text: string) => {
   const match = text.match(/\[IMAGE\](.*?)\[\/IMAGE\]/);
   return match?.[1] || null;
@@ -149,6 +168,67 @@ const findLatestStudyImage = (chatMessages: ChatMessage[]) => {
 
   return null;
 };
+
+const MODE_CONFIG = {
+  대화: {
+    heroBadge: '자유 대화',
+    heroTitle: '편하게 이야기를 시작해보세요',
+    heroDescription: '궁금한 것, 고민, 일상 이야기까지 편한 방식으로 물어보세요.',
+    helperText: '텍스트, 사진, 음성으로 자유롭게 대화할 수 있어요.',
+    loadingText: '답변을 준비하고 있어요...',
+    placeholders: [
+      '오늘 있었던 일이나 고민을 편하게 말해보세요.',
+      '궁금한 인물이나 주제가 있으면 바로 물어보세요.',
+      '숙제 말고도 그냥 수다처럼 이야기해도 괜찮아요.',
+    ],
+    cards: [
+      {
+        key: 'text',
+        title: '텍스트로 바로 시작',
+        description: '지금 떠오른 생각이나 질문을 바로 적어보세요.',
+      },
+      {
+        key: 'image',
+        title: '사진으로 질문하기',
+        description: '사진을 올리고 무엇이 궁금한지 같이 적어보세요.',
+      },
+      {
+        key: 'voice',
+        title: '말로 편하게 질문',
+        description: '마이크를 눌러 자연스럽게 말하면 텍스트로 적혀요.',
+      },
+    ],
+  },
+  공부: {
+    heroBadge: '스마트 학습 모드',
+    heroTitle: '문제를 함께 단계별로 풀어볼까요?',
+    heroDescription: '정답만 바로 주기보다 힌트와 질문으로 스스로 풀 수 있게 도와줘요.',
+    helperText: '문제 사진을 올리거나, 어디까지 풀었는지 적으면 그 지점부터 같이 생각해봐요.',
+    loadingText: '힌트와 다음 질문을 정리하고 있어요...',
+    placeholders: [
+      '어느 부분까지 풀었는지, 어디서 막혔는지 적어주세요.',
+      '문제 사진을 올리고 “이 부분이 이해 안 돼요”라고 적어도 좋아요.',
+      '정답 말고 힌트부터 받고 싶다면 그렇게 적어주세요.',
+    ],
+    cards: [
+      {
+        key: 'image',
+        title: '문제 사진 올리기',
+        description: '수학, 영어, 과학 문제 사진을 올리면 같이 분석해요.',
+      },
+      {
+        key: 'text',
+        title: '막힌 부분 설명하기',
+        description: '어디까지 풀었고 어디서 헷갈렸는지 적어주세요.',
+      },
+      {
+        key: 'voice',
+        title: '말로 풀이 상황 설명',
+        description: '직접 말하면 풀이 상황을 정리해서 질문할 수 있어요.',
+      },
+    ],
+  },
+} as const;
 
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const RandomAnimalIcon = useMemo(() => {
@@ -186,15 +266,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const speechRecognitionRef = useRef<any>(null);
   const isIntentionalStopRef = useRef<boolean>(true);
-
-  const CHAT_PLACEHOLDERS = [
-    "요즘 가장 고민되는 게 뭐야? 편하게 말해줘.",
-    "오늘 하루 중 제일 재밌었던 일은?",
-    "궁금한 거나 물어보고 싶은 거 다 얘기해 봐!",
-    "지금 기분이 어때? 무슨 생각이 들어?",
-    "숙제나 공부하다 막히는 부분이 있으면 도와줄게."
-  ];
-  const [randomPlaceholder] = useState(() => CHAT_PLACEHOLDERS[Math.floor(Math.random() * CHAT_PLACEHOLDERS.length)]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -349,6 +420,15 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (chatMode !== '공부') return null;
     return lockedStudyImage;
   }, [chatMode, imageThumbnail, lockedStudyImage]);
+  const modeConfig = MODE_CONFIG[chatMode];
+  const [placeholderSeed] = useState(() => Math.floor(Math.random() * 1000));
+  const activePlaceholder = useMemo(() => {
+    if (isMicRecording) return '음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다';
+    if (chatMode === '공부' && imageThumbnail) return '사진을 바탕으로 어디가 막혔는지 적어주세요.';
+    if (chatMode === '공부' && pinnedStudyImage) return '고정된 문제 사진을 보며 이어서 질문해보세요.';
+    const placeholders = modeConfig.placeholders;
+    return placeholders[placeholderSeed % placeholders.length];
+  }, [chatMode, imageThumbnail, isMicRecording, modeConfig.placeholders, pinnedStudyImage, placeholderSeed]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -642,6 +722,23 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setShowMobileChat(true);
   };
 
+  const focusInput = () => {
+    const inputField = document.querySelector<HTMLInputElement>('input[placeholder]');
+    inputField?.focus();
+  };
+
+  const handleModeCardAction = (actionKey: 'text' | 'image' | 'voice') => {
+    if (actionKey === 'text') {
+      focusInput();
+      return;
+    }
+    if (actionKey === 'image') {
+      fileInputRef.current?.click();
+      return;
+    }
+    toggleMicRecord();
+  };
+
   const renderMessageContent = (text: string) => {
     const imgRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
     const match = text.match(imgRegex);
@@ -673,12 +770,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             <h1 className="text-2xl md:text-2xl font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
             <div className="flex items-center gap-1.5 mt-0.5 select-none">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <p className="text-[9px] md:text-[10px] text-emerald-600 font-black uppercase tracking-widest whitespace-nowrap">LIVE MENTORING</p>
+              <p className="text-[9px] md:text-[10px] text-emerald-600 font-black tracking-[0.24em] whitespace-nowrap">실시간 멘토링</p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
-          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 font-bold text-[10px] md:text-xs uppercase tracking-tighter transition-colors ml-1 md:ml-2">Logout</button>
+          <button onClick={onLogout} className="text-slate-500 hover:text-red-500 font-bold text-[11px] md:text-xs tracking-tight transition-colors ml-1 md:ml-2">로그아웃</button>
         </div>
       </header>
 
@@ -693,13 +790,20 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 <div key={session.id} className="relative group">
                   <button
                     onClick={() => openSession(session.id)}
-                    className={`w-full text-left rounded-2xl border p-3 transition-all pr-8 ${isActive ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                    className={`w-full text-left rounded-2xl border p-3 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-slate-500">{formatSessionTime(session.started_at)}</p>
-                      {/* Risk badge removed for student view */}
+                      <p className="text-xs font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
+                      {isActive && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-brand-700 border border-brand-100">
+                          진행 중
+                        </span>
+                      )}
                     </div>
                     <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-400 line-clamp-1">
+                      {formatSessionTime(session.started_at)}에 시작한 대화예요.
+                    </p>
                   </button>
                   <button
                     onClick={async (e) => {
@@ -722,7 +826,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                         }
                       }
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-red-500 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
                     title="대화 삭제"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -745,44 +849,56 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
-          <div className="px-5 md:px-10 py-2 md:py-3 border-b border-transparent bg-transparent flex items-center justify-between relative z-30 shrink-0 pointer-events-none">
-            {/* Container for buttons to stick top-left inside the content area */}
-            <div className="fixed left-4 top-[calc(env(safe-area-inset-top,0px)+5.15rem)] md:top-[calc(env(safe-area-inset-top,0px)+5.9rem)] z-40 pointer-events-auto">
-              <div className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 px-2 py-1.5 shadow-sm backdrop-blur-sm">
-              {/* Mobile Sidebar Toggle (Back) */}
-              <button
-                onClick={() => setShowMobileChat(false)}
-                aria-label="대화 목록 열기"
-                className="flex lg:hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-              </button>
-
-              {/* PC Sidebar Toggle */}
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                aria-label={isSidebarOpen ? '대화 목록 숨기기' : '대화 목록 열기'}
-                className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
-              >
-                {isSidebarOpen ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
-                ) : (
+          <div className="px-5 md:px-10 pt-4 md:pt-5 pb-3 md:pb-4 bg-transparent shrink-0">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-[1.5rem] border border-slate-200/80 bg-white/80 px-3 py-2.5 shadow-sm backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                {/* Mobile Sidebar Toggle */}
+                <button
+                  onClick={() => setShowMobileChat(false)}
+                  aria-label="대화 목록 열기"
+                  className="flex lg:hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                )}
-              </button>
+                </button>
 
-              {/* PC New Chat Button */}
-              <button
-                onClick={handleNewSession}
-                aria-label="새 대화 시작하기"
-                className="hidden lg:flex h-9 items-center rounded-xl border border-brand-100 bg-brand-50 px-3.5 text-sm font-black tracking-tighter text-brand-900 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 whitespace-nowrap"
-              >
-                + 새 대화
-              </button>
+                {/* PC Sidebar Toggle */}
+                <button
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  aria-label={isSidebarOpen ? '대화 목록 숨기기' : '대화 목록 열기'}
+                  className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                >
+                  {isSidebarOpen ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                  )}
+                </button>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] md:text-[11px] font-black ${
+                      chatMode === '공부' ? 'bg-brand-50 text-brand-800' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {modeConfig.heroBadge}
+                    </span>
+                    {activeSession?.title && (
+                      <span className="hidden md:inline text-xs font-semibold text-slate-400 truncate">
+                        {activeSession.title}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm md:text-[15px] font-black text-slate-800 truncate">
+                    {activeSession?.title || (chatMode === '공부' ? '새 학습 대화를 시작해보세요' : '새 대화를 시작해보세요')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-500">
+                {chatMode === '공부'
+                  ? '정답보다 힌트와 질문 중심으로 도와줘요.'
+                  : '일상 고민부터 궁금한 질문까지 자유롭게 대화해요.'}
               </div>
             </div>
-
-            <div className="w-[1px] h-4 bg-slate-200 lg:hidden mx-1"></div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar relative">
@@ -791,42 +907,58 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center max-w-2xl mx-auto px-1 mt-2 md:mt-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="bg-white/80 backdrop-blur-md p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm border border-slate-100/50 w-full text-center">
+                  <div className="mb-4 md:mb-5 flex justify-center">
+                    <span className={`rounded-full px-3 py-1.5 text-[11px] md:text-xs font-black ${
+                      chatMode === '공부' ? 'bg-brand-50 text-brand-800' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {modeConfig.heroBadge}
+                    </span>
+                  </div>
                   <div className="mb-4 md:mb-8 mx-auto flex items-center justify-center">
                     <RandomAnimalIcon className="w-24 h-24 md:w-36 md:h-36 drop-shadow-xl hover:scale-105 transition-transform duration-300" />
                   </div>
-                  <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">무엇이든 물어보세요</h2>
+                  <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 tracking-tight text-balance">{modeConfig.heroTitle}</h2>
                   <p className="text-slate-500 font-bold mb-6 md:mb-8 text-xs md:text-sm leading-relaxed text-balance">
-                    글, 사진, 음성 중 편한 방법으로 대화를 시작하세요.
+                    {modeConfig.heroDescription}
                   </p>
+                  <div className={`mb-6 rounded-2xl border px-4 py-3 text-left ${
+                    chatMode === '공부' ? 'border-brand-100 bg-brand-50/70 text-brand-900' : 'border-slate-200 bg-slate-50 text-slate-700'
+                  }`}>
+                    <p className="text-[11px] md:text-xs font-black tracking-[0.16em] uppercase">
+                      {chatMode === '공부' ? '학습 안내' : '시작 가이드'}
+                    </p>
+                    <p className="mt-1 text-xs md:text-sm font-bold leading-relaxed">
+                      {modeConfig.helperText}
+                    </p>
+                    {chatMode === '공부' && (
+                      <p className="mt-2 text-[11px] md:text-xs font-semibold text-brand-700">
+                        문제 사진을 올리면 풀이를 마칠 때까지 화면 상단에 고정해서 이어서 설명해줘요.
+                      </p>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-5 text-left text-slate-700">
-                    <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
-                      <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
-                        <TextIcon className="w-6 h-6 md:w-8 md:h-8" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">텍스트 대화</h3>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">하단 입력창에 궁금한 점을 적어서 보내주세요.</p>
-                      </div>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
-                      <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
-                        <ImageIcon className="w-6 h-6 md:w-8 md:h-8" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">이미지 분석</h3>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">배우고 싶은 문제를 사진으로 찍어 올리세요.</p>
-                      </div>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0">
-                      <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
-                        <VoiceIcon className="w-6 h-6 md:w-8 md:h-8" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">음성 입력</h3>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed line-clamp-1 md:line-clamp-none">마이크 버튼을 눌러 편하게 말로 질문하세요.</p>
-                      </div>
-                    </div>
+                    {modeConfig.cards.map((card) => {
+                      const Icon = card.key === 'text' ? TextIcon : card.key === 'image' ? ImageIcon : VoiceIcon;
+                      return (
+                        <button
+                          key={card.key}
+                          type="button"
+                          onClick={() => handleModeCardAction(card.key)}
+                          className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-5 border border-slate-100/50 flex flex-row md:flex-col items-center md:items-center text-left md:text-center group hover:-translate-y-1 transition-transform gap-3 md:gap-0"
+                        >
+                          <div className="md:mb-3 block group-hover:scale-110 transition-transform bg-white md:bg-transparent p-2 md:p-0 rounded-lg shadow-sm md:shadow-none shrink-0 text-slate-700">
+                            <Icon className="w-6 h-6 md:w-8 md:h-8" />
+                          </div>
+                          <div>
+                            <h3 className="font-black text-slate-800 text-[13px] md:text-sm mb-0.5 md:mb-1">{card.title}</h3>
+                            <p className="text-[10px] md:text-xs text-slate-500 font-bold leading-relaxed">
+                              {card.description}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -837,8 +969,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <div className="rounded-[1.75rem] border border-brand-100 bg-white/95 p-3 md:p-4 shadow-md shadow-slate-200/40 backdrop-blur-sm">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-[11px] md:text-xs font-black tracking-[0.18em] text-brand-700 uppercase">Smart Study</p>
+                          <p className="text-[11px] md:text-xs font-black tracking-[0.18em] text-brand-700">스마트 학습 모드</p>
                           <p className="text-xs md:text-sm font-bold text-slate-600">추가 질문을 해도 문제풀이를 끝낼 때까지 이 사진을 위에 고정해 둘게요.</p>
+                          <p className="mt-1 text-[11px] md:text-xs font-semibold text-slate-500">
+                            새 문제 사진을 올리면 현재 고정 사진이 그 사진으로 바뀌어요.
+                          </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] md:text-[11px] font-black text-brand-800">
@@ -883,7 +1018,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                       <div className="w-1.5 h-1.5 bg-brand-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                       <div className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-black">답변 생성 중...</span>
+                    <span className="text-[11px] text-slate-400 font-black">{modeConfig.loadingText}</span>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -899,9 +1034,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             )}
 
-            {/* Visual Action Bar (Camera, Voice Modes) */}
-            <div className="max-w-4xl mx-auto flex items-center justify-between mb-2 md:mb-3 px-1 md:px-2 gap-2 overflow-x-auto no-scrollbar">
-              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm shrink-0">
+            <div className="max-w-4xl mx-auto mb-2 md:mb-3 flex flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 md:px-0">
+                <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm shrink-0">
                 {([
                   { value: '대화', label: '대화 모드' },
                   { value: '공부', label: '스마트 학습 모드' },
@@ -923,14 +1058,26 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     </button>
                   );
                 })}
+                </div>
+                <div className={`rounded-full px-3 py-1.5 text-[11px] md:text-xs font-bold ${
+                  chatMode === '공부' ? 'bg-brand-50 text-brand-800' : 'bg-white text-slate-500 border border-slate-200'
+                }`}>
+                  {chatMode === '공부'
+                    ? '힌트 중심으로 차근차근 설명해요'
+                    : '질문, 고민, 사진 설명까지 자유롭게'}
+                </div>
               </div>
+            </div>
 
-              <div className="flex gap-1.5 md:gap-2 shrink-0">
+            <div className="max-w-4xl mx-auto flex items-center gap-2">
+              <div className="flex-1 flex flex-row items-center gap-2 md:gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-3 md:pl-4 pr-2 rounded-[2rem] md:rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border border-slate-200 bg-white text-slate-700 font-bold text-[11px] md:text-xs tracking-tight hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap"
+                  className="flex h-10 w-10 md:h-11 md:w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800"
+                  aria-label={chatMode === '공부' ? '문제 사진 올리기' : '이미지 첨부'}
+                  title={chatMode === '공부' ? '문제 사진 올리기' : '이미지 첨부'}
                 >
-                  <ImageIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-slate-600" /> <span className="pt-[1px]">이미지 첨부</span>
+                  <ImageIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem]" />
                 </button>
                 <input
                   type="file"
@@ -939,39 +1086,28 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   ref={fileInputRef}
                   onChange={(e) => {
                     handleImageUpload(e);
-                    // After short delay, if no text provided, let the user know they can just send or type something.
                     setTimeout(() => {
-                      const inputField = document.querySelector('input[placeholder]');
-                      if (inputField) {
-                        (inputField as HTMLInputElement).focus();
-                      }
+                      focusInput();
                     }, 100);
                   }}
                 />
-              </div>
-
-              <div className="flex gap-1.5 md:gap-2 shrink-0">
-                <button
-                  onClick={toggleMicRecord}
-                  className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border transition-colors shadow-sm font-bold text-[11px] md:text-xs tracking-tight whitespace-nowrap ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
-                >
-                  {isMicRecording ? <StopIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-rose-500" /> : <VoiceIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-slate-600" />}
-                  <span className="pt-[1px]">{isMicRecording ? '정지' : '음성 입력'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="max-w-4xl mx-auto flex items-center gap-2">
-              <div className="flex-1 flex flex-row items-center gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-5 md:pl-7 rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={isMicRecording ? "음성을 듣고 있어요... 말씀하시면 텍스트로 입력됩니다" : randomPlaceholder}
+                  placeholder={activePlaceholder}
                   disabled={isMicRecording}
                   className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
                   autoComplete="off"
                 />
+                <button
+                  onClick={toggleMicRecord}
+                  className={`flex h-10 w-10 md:h-11 md:w-11 shrink-0 items-center justify-center rounded-full border transition-colors shadow-sm ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  aria-label={isMicRecording ? '음성 입력 정지' : '음성 입력 시작'}
+                  title={isMicRecording ? '음성 입력 정지' : '음성 입력 시작'}
+                >
+                  {isMicRecording ? <StopIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-rose-500" /> : <VoiceIcon className="w-4 h-4 md:w-[1.125rem] md:h-[1.125rem] text-slate-600" />}
+                </button>
                 <button
                   id="chat-send-button"
                   onClick={() => handleSend()}
