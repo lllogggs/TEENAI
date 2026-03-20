@@ -776,13 +776,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                       onClick={() => openSession(session.id)}
                       className={`w-full text-left rounded-2xl border px-3 py-2.5 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
                         <p className="text-[11px] font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
-                        {isActive && (
-                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-brand-700 border border-brand-100">
-                            진행 중
-                          </span>
-                        )}
                       </div>
                       <p className="mt-1.5 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
                     </button>
