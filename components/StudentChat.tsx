@@ -730,80 +730,92 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       <div className="flex-1 overflow-hidden flex flex-row min-h-0">
         {/* Sidebar */}
-        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[76px]'} lg:block border-r border-slate-100 bg-white/80 backdrop-blur-sm transition-all duration-300 overflow-hidden`}>
-          <div className={`flex h-full flex-col ${isSidebarOpen ? 'w-[320px]' : 'w-[76px]'}`}>
-            <div className={`border-b border-slate-100 bg-white/95 ${isSidebarOpen ? 'p-4 md:p-5' : 'flex justify-center px-3 py-4'}`}>
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen((prev) => !prev)}
-                aria-label={isSidebarOpen ? '대화 목록 접기' : '대화 목록 열기'}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16"></path></svg>
-              </button>
-            </div>
-
-            {isSidebarOpen ? (
-              <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3">
+        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[76px]'} lg:block border-r border-slate-100 bg-white/80 backdrop-blur-sm transition-[width] duration-300 ease-in-out overflow-hidden`}>
+          <div className={`flex h-full flex-col transition-[width] duration-300 ease-in-out ${isSidebarOpen ? 'w-[320px]' : 'w-[76px]'}`}>
+            <div className={`border-b border-slate-100 bg-white/95 transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
+              <div className={`flex items-center gap-2 ${isSidebarOpen ? '' : 'justify-center'}`}>
                 <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen((prev) => !prev)}
+                  aria-label={isSidebarOpen ? '대화 목록 접기' : '대화 목록 열기'}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16"></path></svg>
+                </button>
+                <button
+                  type="button"
                   onClick={handleNewSession}
-                  className={`w-full rounded-[1.25rem] border py-4 text-base md:text-lg font-black transition-colors ${
-                    sessions.length === 0
-                      ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                      : 'border-brand-100 bg-brand-50 text-brand-900 shadow-sm hover:bg-brand-100'
+                  aria-label="새 대화 시작"
+                  className={`flex items-center justify-center gap-2 rounded-[1.1rem] border text-base font-black whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${
+                    isSidebarOpen
+                      ? 'flex-1 border-brand-100 bg-brand-50 px-4 py-3.5 text-brand-900 shadow-sm hover:bg-brand-100 opacity-100 translate-x-0'
+                      : 'w-0 border-transparent bg-transparent px-0 py-3 text-transparent opacity-0 -translate-x-2 pointer-events-none'
                   }`}
                 >
-                  + 새 대화
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v14M5 12h14" />
+                  </svg>
+                  <span>+ 새 대화</span>
                 </button>
-                {sessions.map((session) => {
-                  const isActive = session.id === currentSessionId;
-                  return (
-                    <div key={session.id} className="relative group">
-                      <button
-                        onClick={() => openSession(session.id)}
-                        className={`w-full text-left rounded-2xl border px-3 py-2.5 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
-                          {isActive && (
-                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-brand-700 border border-brand-100">
-                              진행 중
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1.5 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
-                      </button>
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (window.confirm('이 대화를 삭제하시겠습니까? (삭제된 대화는 복구할 수 없습니다)')) {
-                            const { error } = await supabase
-                              .from('chat_sessions')
-                              .update({ is_deleted_by_student: true })
-                              .eq('id', session.id);
-
-                            if (!error) {
-                              setSessions((prev) => prev.filter((s) => s.id !== session.id));
-                              if (currentSessionId === session.id) {
-                                setCurrentSessionId(null);
-                                setMessages([]);
-                              }
-                            } else {
-                              alert('삭제 실패: ' + error.message);
-                            }
-                          }
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-red-500 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                        title="대화 삭제"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                      </button>
-                    </div>
-                  );
-                })}
-                {sessions.length === 0 && <p className="text-sm text-slate-400 px-1">첫 대화를 시작해 보세요.</p>}
               </div>
-            ) : null}
+            </div>
+
+            <div
+              aria-hidden={!isSidebarOpen}
+              className={`h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 transition-all duration-200 ease-out ${
+                isSidebarOpen
+                  ? 'opacity-100 translate-x-0 delay-75 pointer-events-auto'
+                  : 'opacity-0 -translate-x-2 pointer-events-none'
+              }`}
+            >
+              {sessions.map((session) => {
+                const isActive = session.id === currentSessionId;
+                return (
+                  <div key={session.id} className="relative group">
+                    <button
+                      onClick={() => openSession(session.id)}
+                      className={`w-full text-left rounded-2xl border px-3 py-2.5 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
+                        {isActive && (
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-brand-700 border border-brand-100">
+                            진행 중
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('이 대화를 삭제하시겠습니까? (삭제된 대화는 복구할 수 없습니다)')) {
+                          const { error } = await supabase
+                            .from('chat_sessions')
+                            .update({ is_deleted_by_student: true })
+                            .eq('id', session.id);
+
+                          if (!error) {
+                            setSessions((prev) => prev.filter((s) => s.id !== session.id));
+                            if (currentSessionId === session.id) {
+                              setCurrentSessionId(null);
+                              setMessages([]);
+                            }
+                          } else {
+                            alert('삭제 실패: ' + error.message);
+                          }
+                        }
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-red-500 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+                      title="대화 삭제"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                  </div>
+                );
+              })}
+              {sessions.length === 0 && <p className="text-sm text-slate-400 px-1">첫 대화를 시작해 보세요.</p>}
+            </div>
           </div>
         </aside>
 
