@@ -688,6 +688,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     inputField?.focus();
   };
 
+  const quickPrompts = useMemo(() => modeConfig.placeholders.slice(0, 3), [modeConfig.placeholders]);
+
   const renderMessageContent = (text: string) => {
     const imgRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
     const match = text.match(imgRegex);
@@ -711,34 +713,55 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="flex h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
-      <header className="px-3 md:px-8 py-1.5 md:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.4rem)] bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20 shrink-0">
-        <div className="flex items-center gap-2 md:gap-5">
-          <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-md shadow-brand-900/10 rounded-xl md:rounded-2xl" />
-          <div>
-            <h1 className="text-2xl md:text-2xl font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
-            <div className="flex items-center gap-1.5 mt-0.5 select-none">
-              <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <p className="text-[9px] md:text-[10px] text-emerald-600 font-black tracking-[0.24em] whitespace-nowrap">실시간 멘토링</p>
+    <div className="flex h-[100dvh] bg-[radial-gradient(circle_at_top,#ffffff_0%,#f8fafc_48%,#eef4ff_100%)] flex-col overflow-hidden">
+      <header className="sticky top-0 z-20 shrink-0 border-b border-white/70 bg-white/85 px-3 md:px-8 py-2 md:py-3.5 pt-[calc(env(safe-area-inset-top,0px)+0.55rem)] backdrop-blur-2xl shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 md:gap-5">
+            <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-lg shadow-brand-900/10 rounded-2xl ring-1 ring-slate-200/60" />
+            <div>
+              <h1 className="text-[1.65rem] md:text-[1.75rem] font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
+              <div className="mt-1 flex items-center gap-2 select-none">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] md:text-[10px] font-black tracking-[0.2em] text-emerald-700 shadow-sm shadow-emerald-100/40">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  실시간 멘토링
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 md:gap-3">
-          <button onClick={onLogout} className="text-slate-500 hover:text-red-500 font-bold text-[11px] md:text-xs tracking-tight transition-colors ml-1 md:ml-2">로그아웃</button>
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              onClick={onLogout}
+              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-[11px] font-black tracking-tight text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-hidden flex flex-row min-h-0">
         {/* Sidebar */}
-        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[76px]'} lg:block min-h-0 border-r border-slate-100 bg-white/80 backdrop-blur-sm transition-[width] duration-300 ease-in-out overflow-hidden`}>
-          <div className={`flex h-full min-h-0 flex-col transition-[width] duration-300 ease-in-out ${isSidebarOpen ? 'w-[320px]' : 'w-[76px]'}`}>
-            <div className={`shrink-0 border-b border-slate-100 bg-white/95 transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
+        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[84px]'} lg:block min-h-0 border-r border-white/60 bg-white/72 backdrop-blur-xl transition-[width] duration-300 ease-in-out overflow-hidden`}>
+          <div className={`flex h-full min-h-0 flex-col transition-[width] duration-300 ease-in-out ${isSidebarOpen ? 'w-[320px]' : 'w-[84px]'}`}>
+            <div className={`shrink-0 border-b border-slate-100/80 bg-white/90 transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
+              <div className={`mb-3 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
+                {isSidebarOpen && (
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Conversations</p>
+                    <p className="mt-1 text-sm font-bold text-slate-700">대화 목록</p>
+                  </div>
+                )}
+                <span className={`${isSidebarOpen ? 'inline-flex' : 'hidden'} rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500`}>
+                  {sessions.length}
+                </span>
+              </div>
+
               <div className={`flex items-center gap-2 ${isSidebarOpen ? '' : 'justify-center'}`}>
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen((prev) => !prev)}
                   aria-label={isSidebarOpen ? '대화 목록 접기' : '대화 목록 열기'}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16"></path></svg>
                 </button>
@@ -746,10 +769,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   type="button"
                   onClick={handleNewSession}
                   aria-label="새 대화 시작"
-                  className={`flex items-center justify-center gap-2 rounded-[1.1rem] border text-base font-black whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${
+                  className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-black whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${
                     isSidebarOpen
-                      ? 'flex-1 border-brand-100 bg-brand-50 px-4 py-3.5 text-brand-900 shadow-sm hover:bg-brand-100 opacity-100 translate-x-0'
-                      : 'w-0 border-transparent bg-transparent px-0 py-3 text-transparent opacity-0 -translate-x-2 pointer-events-none'
+                      ? 'flex-1 border-brand-100 bg-gradient-to-r from-brand-900 to-[#4338ca] px-4 text-white shadow-md shadow-brand-900/15 hover:-translate-y-0.5 hover:shadow-lg opacity-100 translate-x-0'
+                      : 'w-0 border-transparent bg-transparent px-0 text-transparent opacity-0 -translate-x-2 pointer-events-none'
                   }`}
                 >
                   <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -760,9 +783,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div
+              <div
               aria-hidden={!isSidebarOpen}
-              className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 transition-all duration-200 ease-out ${
+              className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-5 space-y-3 transition-all duration-200 ease-out ${
                 isSidebarOpen
                   ? 'opacity-100 translate-x-0 delay-75 pointer-events-auto'
                   : 'opacity-0 -translate-x-2 pointer-events-none'
@@ -774,12 +797,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   <div key={session.id} className="relative group">
                     <button
                       onClick={() => openSession(session.id)}
-                      className={`w-full text-left rounded-2xl border px-3 py-2.5 transition-all pr-10 ${isActive ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-100/60' : 'border-slate-100 bg-white hover:border-brand-200'}`}
+                      className={`w-full text-left rounded-[1.35rem] border px-3.5 py-3 transition-all pr-10 shadow-sm ${isActive ? 'border-brand-200 bg-gradient-to-br from-brand-50 via-white to-brand-50/60 shadow-brand-100/70 ring-1 ring-brand-100/70' : 'border-white bg-white/90 hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md hover:shadow-slate-200/60'}`}
                     >
                       <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-brand-500' : 'bg-slate-300'}`}></span>
                         <p className="text-[11px] font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
                       </div>
-                      <p className="mt-1.5 text-sm font-bold text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
+                      <p className="mt-2 text-sm font-black text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
                     </button>
                     <button
                       onClick={async (e) => {
@@ -825,19 +849,19 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
         {/* Chat Area */}
         <section className={`${showMobileChat ? 'block' : 'hidden'} lg:flex flex-1 flex flex-col min-h-0 bg-slate-50/50 relative overflow-hidden`}>
-          <div className="px-4 md:px-8 pt-2 md:pt-3 pb-1.5 md:pb-2 bg-transparent shrink-0">
+          <div className="px-4 md:px-8 pt-2.5 md:pt-4 pb-2 md:pb-3 bg-transparent shrink-0">
             <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-2 text-slate-500">
               <button
                 onClick={() => setShowMobileChat(false)}
                 aria-label="대화 목록 열기"
-                className="flex lg:hidden h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                className="flex lg:hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
               </button>
 
-              <div className="hidden lg:flex items-center gap-2 min-w-0">
+              <div className="hidden lg:flex items-center gap-2 min-w-0 rounded-full border border-white/80 bg-white/80 px-3 py-1.5 shadow-sm backdrop-blur">
                 {activeSession?.title && (
-                  <p className="text-xs font-semibold text-slate-400 truncate">
+                  <p className="text-xs font-semibold text-slate-500 truncate">
                     {activeSession.title}
                   </p>
                 )}
@@ -875,17 +899,35 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             {isEmptyState ? (
               <div className="flex min-h-full items-center justify-center">
                 <div className="mx-auto flex w-full max-w-3xl flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="rounded-[1.75rem] border border-slate-100/80 bg-white/92 p-5 md:p-7 shadow-sm backdrop-blur-md">
+                  <div className="rounded-[2rem] border border-white/80 bg-white/92 p-6 md:p-8 shadow-[0_20px_60px_rgba(37,99,235,0.08)] backdrop-blur-md">
                     <div className="flex flex-col items-center text-center gap-5 md:gap-6">
-                      <div className="flex h-40 w-40 items-center justify-center rounded-[2rem] bg-gradient-to-br from-slate-50 to-brand-50 shadow-inner shadow-brand-100/60 md:h-48 md:w-48">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-[11px] font-black tracking-[0.18em] text-brand-700">
+                        맞춤형 AI 멘토
+                      </span>
+                      <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] bg-gradient-to-br from-slate-50 via-white to-brand-50 shadow-inner shadow-brand-100/60 ring-1 ring-brand-100/40 md:h-44 md:w-44">
                         <RandomAnimalIcon className="h-28 w-28 md:h-36 md:w-36 drop-shadow-md" />
                       </div>
                       <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight text-balance">
                         {modeConfig.heroTitle}
                       </h2>
-                      <p className="text-sm md:text-base font-semibold text-slate-400">
-                        메시지를 입력하면 바로 대화를 시작할 수 있어요.
+                      <p className="max-w-md text-sm md:text-base font-semibold leading-relaxed text-slate-400">
+                        메시지를 입력하면 바로 대화를 시작할 수 있어요. 아래 예시처럼 편하게 시작해도 좋아요.
                       </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {quickPrompts.map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => {
+                              setInput(prompt);
+                              focusInput();
+                            }}
+                            className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -895,9 +937,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                     <div
-                      className={`max-w-[84%] md:max-w-[78%] p-5 md:p-7 rounded-[2rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
-                        ? 'bg-brand-900 text-white rounded-tr-none'
-                        : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none shadow-md shadow-slate-200/50'
+                      className={`max-w-[84%] md:max-w-[78%] p-[18px] md:p-6 rounded-[1.75rem] text-[15px] leading-relaxed shadow-sm font-medium tracking-tight whitespace-pre-wrap ${m.role === 'user'
+                        ? 'bg-gradient-to-br from-brand-900 to-[#312e81] text-white rounded-tr-[0.5rem] shadow-brand-900/15'
+                        : 'bg-white/95 text-slate-800 border border-white rounded-tl-[0.5rem] shadow-lg shadow-slate-200/60 ring-1 ring-slate-100/70'
                         }`}
                     >
                       {renderMessageContent(m.text)}
@@ -929,9 +971,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             )}
 
-            <div className="max-w-3xl mx-auto mb-1.5 md:mb-2 flex flex-col gap-1.5">
+            <div className="max-w-3xl mx-auto mb-2 md:mb-2.5 flex flex-col gap-1.5">
               <div className="flex flex-wrap items-center gap-2 px-0">
-                <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm shrink-0">
+                <div className="flex items-center gap-1 rounded-full border border-white/80 bg-white/90 p-1 shadow-md shadow-slate-200/40 shrink-0 backdrop-blur">
                 {([
                   { value: '대화', label: '대화 모드' },
                   { value: '공부', label: '학습 모드' },
@@ -945,7 +987,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                       className={`rounded-full px-3 md:px-4 py-1.5 text-[11px] md:text-xs font-bold tracking-tight transition-colors whitespace-nowrap ${
                         isActive
                           ? 'bg-brand-900 text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100'
+                          : 'text-slate-500 hover:bg-slate-100'
                       }`}
                       aria-pressed={isActive}
                     >
@@ -958,10 +1000,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             </div>
 
             <div className="max-w-3xl mx-auto flex items-center gap-2">
-              <div className="flex-1 flex flex-row items-center gap-2 md:gap-3 bg-white/90 backdrop-blur-2xl p-2 md:p-3 pl-3 md:pl-4 pr-2 rounded-[2rem] md:rounded-[3.5rem] border border-white shadow-xl shadow-slate-300/40 ring-1 ring-slate-200/50 transition-all focus-within:ring-brand-500/30">
+              <div className="flex-1 flex flex-row items-center gap-2 md:gap-3 bg-white/92 backdrop-blur-2xl p-2.5 md:p-3 pl-3 md:pl-4 pr-2.5 rounded-[2rem] md:rounded-[3.5rem] border border-white shadow-[0_20px_45px_rgba(148,163,184,0.22)] ring-1 ring-slate-200/60 transition-all focus-within:-translate-y-0.5 focus-within:ring-brand-500/30">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-10 w-10 md:h-11 md:w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800"
                   aria-label={chatMode === '공부' ? '문제 사진 올리기' : '이미지 첨부'}
                   title={chatMode === '공부' ? '문제 사진 올리기' : '이미지 첨부'}
                 >
@@ -985,12 +1027,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                   placeholder={activePlaceholder}
                   disabled={isMicRecording}
-                  className="flex-1 w-full bg-transparent border-none py-2 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
+                  className="flex-1 w-full bg-transparent border-none py-2.5 md:py-3 text-[15px] focus:outline-none font-bold text-slate-700 placeholder-slate-400 disabled:opacity-50"
                   autoComplete="off"
                 />
                 <button
                   onClick={toggleMicRecord}
-                  className={`flex h-10 w-10 md:h-11 md:w-11 shrink-0 items-center justify-center rounded-full border transition-colors shadow-sm ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all shadow-sm ${isMicRecording ? 'bg-rose-100 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-700 hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800'}`}
                   aria-label={isMicRecording ? '음성 입력 정지' : '음성 입력 시작'}
                   title={isMicRecording ? '음성 입력 정지' : '음성 입력 시작'}
                 >
@@ -1000,7 +1042,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   id="chat-send-button"
                   onClick={() => handleSend()}
                   disabled={loading || (!input.trim() && !imageThumbnail) || isMicRecording}
-                  className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center bg-brand-900 text-white hover:bg-black hover:-translate-y-0.5 active:scale-95 transition-all shadow-lg shadow-brand-900/20 disabled:bg-slate-300 disabled:shadow-none"
+                  className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center bg-gradient-to-br from-brand-900 to-[#4338ca] text-white hover:-translate-y-0.5 active:scale-95 transition-all shadow-lg shadow-brand-900/25 disabled:bg-slate-300 disabled:shadow-none"
                 >
                   <svg className="w-5 h-5 md:w-6 md:h-6 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
                 </button>
