@@ -937,9 +937,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" d="M14.5 6.5L9 12l5.5 5.5M20 6.5L14.5 12 20 17.5" />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 7h10M4 12h16M4 17h10" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M15 9l3 3-3 3" />
+                    <svg className="h-5 w-5 transition-transform group-hover:scale-105" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M5 7h14M5 12h14M5 17h14" />
                     </svg>
                   )}
                 </button>
