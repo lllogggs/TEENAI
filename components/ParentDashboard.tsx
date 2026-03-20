@@ -71,6 +71,11 @@ const riskText: Record<SessionRiskLevel, string> = {
   caution: '위험',
 };
 
+const sessionModeLabelMap = {
+  conversation: '대화 모드',
+  study: '학습 모드',
+} as const;
+
 const riskBarTheme: Record<SessionRiskLevel, { fill: string; text: string; border: string }> = {
   stable: { fill: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200' },
   normal: { fill: 'bg-amber-400', text: 'text-amber-700', border: 'border-amber-200' },
@@ -761,6 +766,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                             <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">학생이 삭제함</span>
                           )}
                         </h4>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">
+                            {sessionModeLabelMap[session.chat_mode || 'conversation']}
+                          </span>
+                        </div>
 
                         {/* Permanent Delete Button (Only for sessions deleted by student) */}
                         {session.is_deleted_by_student && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { User, ChatMessage, ChatSession, SessionRiskLevel, StudentSettings } from '../types';
+import { User, ChatMessage, ChatSession, ChatSessionMode, SessionRiskLevel, StudentSettings } from '../types';
 import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
@@ -169,10 +169,24 @@ const findLatestStudyImage = (chatMessages: ChatMessage[]) => {
   return null;
 };
 
+const MODE_VALUE_MAP: Record<'대화' | '공부', ChatSessionMode> = {
+  대화: 'conversation',
+  공부: 'study',
+};
+
+const MODE_LABEL_MAP: Record<ChatSessionMode, '대화' | '공부'> = {
+  conversation: '대화',
+  study: '공부',
+};
+
 const MODE_CONFIG = {
   대화: {
-    heroTitle: '편하게 물어보세요',
     loadingText: '답변을 준비하고 있어요...',
+    heroMessages: [
+      '안녕하세요! 오늘은 어떤 이야기를 나눠볼까요?',
+      '편하게 말을 걸어주세요. 같이 이야기해봐요.',
+      '궁금한 것부터 가볍게 시작해봐도 좋아요.',
+    ],
     placeholders: [
       '궁금한 걸 적어보세요.',
       '사진과 함께 물어보세요.',
@@ -180,8 +194,12 @@ const MODE_CONFIG = {
     ],
   },
   공부: {
-    heroTitle: '막힌 부분부터 풀어요',
     loadingText: '힌트와 다음 질문을 정리하고 있어요...',
+    heroMessages: [
+      '문제를 같이 풀어볼까요?',
+      '막힌 문제부터 하나씩 같이 정리해봐요.',
+      '어려운 부분을 보내주면 함께 풀어볼게요.',
+    ],
     placeholders: [
       '막힌 부분을 적어보세요.',
       '문제 사진을 올려보세요.',
@@ -383,6 +401,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const modeConfig = MODE_CONFIG[chatMode];
   const isEmptyState = messages.length === 0;
   const [placeholderSeed] = useState(() => Math.floor(Math.random() * 1000));
+  const [heroSeed] = useState(() => Math.floor(Math.random() * 1000));
   const activePlaceholder = useMemo(() => {
     if (isMicRecording) return '음성을 듣고 있어요...';
     if (chatMode === '공부' && imageThumbnail) return '막힌 부분을 적어보세요.';
@@ -390,6 +409,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const placeholders = modeConfig.placeholders;
     return placeholders[placeholderSeed % placeholders.length];
   }, [chatMode, imageThumbnail, isMicRecording, modeConfig.placeholders, pinnedStudyImage, placeholderSeed]);
+  const activeHeroMessage = useMemo(() => {
+    const heroMessages = modeConfig.heroMessages;
+    return heroMessages[heroSeed % heroMessages.length];
+  }, [heroSeed, modeConfig.heroMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -448,13 +471,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   // useEffect on currentSessionId removed to avoid wiping optimistic messages on session creation
 
-  const createSession = async () => {
+  const createSession = async (mode: ChatSessionMode) => {
     const { data, error } = await supabase
       .from('chat_sessions')
       .insert({
         student_id: user.id,
         tone_level: 'low',
         title: '새 대화',
+        chat_mode: mode,
       })
       .select('*')
       .single();
@@ -471,9 +495,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     return created.id;
   };
 
-  const ensureSession = async (): Promise<string | null> => {
+  const ensureSession = async (mode: ChatSessionMode): Promise<string | null> => {
     if (currentSessionId) return currentSessionId;
-    return createSession();
+    return createSession(mode);
   };
 
   const getAuthHeaders = async () => {
@@ -597,7 +621,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setLoading(true);
     setMessages((prev) => [...prev, userMsg]);
 
-    const sessionId = await ensureSession();
+    const sessionId = await ensureSession(MODE_VALUE_MAP[chatMode]);
     if (!sessionId) {
       setLoading(false);
       return;
@@ -668,7 +692,10 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   const openSession = (sessionId: string) => {
+    const selectedSession = sessions.find((session) => session.id === sessionId);
+    const savedMode = selectedSession?.chat_mode || 'conversation';
     setCurrentSessionId(sessionId);
+    setChatMode(MODE_LABEL_MAP[savedMode]);
     fetchMessages(sessionId);
     setShowMobileChat(true);
     setErrorNotice('');
@@ -688,7 +715,32 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     inputField?.focus();
   };
 
-  const quickPrompts = useMemo(() => modeConfig.placeholders.slice(0, 3), [modeConfig.placeholders]);
+  const handleModeChange = (nextMode: '대화' | '공부') => {
+    if (nextMode === chatMode) return;
+
+    const lockedMode = activeSession?.chat_mode || (currentSessionId ? 'conversation' : null);
+    const nextModeValue = MODE_VALUE_MAP[nextMode];
+
+    if (!lockedMode && messages.length === 0) {
+      setChatMode(nextMode);
+      return;
+    }
+
+    if (lockedMode === nextModeValue) {
+      setChatMode(nextMode);
+      return;
+    }
+
+    const shouldStartNewSession = window.confirm(
+      '이 대화는 이미 ' +
+      `${MODE_LABEL_MAP[lockedMode as ChatSessionMode]} 모드로 저장되어 있어요.\n새 대화를 시작할까요?`
+    );
+
+    if (!shouldStartNewSession) return;
+
+    handleNewSession();
+    setChatMode(nextMode);
+  };
 
   const renderMessageContent = (text: string) => {
     const imgRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
@@ -720,12 +772,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-lg shadow-brand-900/10 rounded-2xl ring-1 ring-slate-200/60" />
             <div>
               <h1 className="text-[1.65rem] md:text-[1.75rem] font-black text-brand-900 tracking-tight select-none">포틴AI</h1>
-              <div className="mt-1 flex items-center gap-2 select-none">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] md:text-[10px] font-black tracking-[0.2em] text-emerald-700 shadow-sm shadow-emerald-100/40">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  실시간 멘토링
-                </span>
-              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
@@ -804,6 +850,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                         <p className="text-[11px] font-bold text-slate-500">{formatSessionRelative(session.started_at)}</p>
                       </div>
                       <p className="mt-2 text-sm font-black text-slate-800 line-clamp-1">{session.title || '새 대화'}</p>
+                      <div className="mt-2">
+                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                          {MODE_LABEL_MAP[session.chat_mode || 'conversation']} 모드
+                        </span>
+                      </div>
                     </button>
                     <button
                       onClick={async (e) => {
@@ -901,33 +952,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                 <div className="mx-auto flex w-full max-w-3xl flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <div className="rounded-[2rem] border border-white/80 bg-white/92 p-6 md:p-8 shadow-[0_20px_60px_rgba(37,99,235,0.08)] backdrop-blur-md">
                     <div className="flex flex-col items-center text-center gap-5 md:gap-6">
-                      <span className="inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-[11px] font-black tracking-[0.18em] text-brand-700">
-                        맞춤형 AI 멘토
-                      </span>
                       <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] bg-gradient-to-br from-slate-50 via-white to-brand-50 shadow-inner shadow-brand-100/60 ring-1 ring-brand-100/40 md:h-44 md:w-44">
                         <RandomAnimalIcon className="h-28 w-28 md:h-36 md:w-36 drop-shadow-md" />
                       </div>
                       <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight text-balance">
-                        {modeConfig.heroTitle}
+                        {activeHeroMessage}
                       </h2>
-                      <p className="max-w-md text-sm md:text-base font-semibold leading-relaxed text-slate-400">
-                        메시지를 입력하면 바로 대화를 시작할 수 있어요. 아래 예시처럼 편하게 시작해도 좋아요.
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        {quickPrompts.map((prompt) => (
-                          <button
-                            key={prompt}
-                            type="button"
-                            onClick={() => {
-                              setInput(prompt);
-                              focusInput();
-                            }}
-                            className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800"
-                          >
-                            {prompt}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -983,7 +1013,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <button
                       key={modeOption.value}
                       type="button"
-                      onClick={() => setChatMode(modeOption.value)}
+                      onClick={() => handleModeChange(modeOption.value)}
                       className={`rounded-full px-3 md:px-4 py-1.5 text-[11px] md:text-xs font-bold tracking-tight transition-colors whitespace-nowrap ${
                         isActive
                           ? 'bg-brand-900 text-white shadow-sm'
