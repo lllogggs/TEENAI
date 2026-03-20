@@ -711,8 +711,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
-      <header className="px-3 md:px-8 py-1.5 md:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.4rem)] bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20">
+    <div className="flex h-[100dvh] bg-[#F8FAFC] flex-col overflow-hidden">
+      <header className="px-3 md:px-8 py-1.5 md:py-3 pt-[calc(env(safe-area-inset-top,0px)+0.4rem)] bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center sticky top-0 z-20 shrink-0">
         <div className="flex items-center gap-2 md:gap-5">
           <ForteenLogo className="w-11 h-11 md:w-12 md:h-12 shrink-0 shadow-md shadow-brand-900/10 rounded-xl md:rounded-2xl" />
           <div>
@@ -730,9 +730,9 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       <div className="flex-1 overflow-hidden flex flex-row min-h-0">
         {/* Sidebar */}
-        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[76px]'} lg:block border-r border-slate-100 bg-white/80 backdrop-blur-sm transition-[width] duration-300 ease-in-out overflow-hidden`}>
-          <div className={`flex h-full flex-col transition-[width] duration-300 ease-in-out ${isSidebarOpen ? 'w-[320px]' : 'w-[76px]'}`}>
-            <div className={`border-b border-slate-100 bg-white/95 transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
+        <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[76px]'} lg:block min-h-0 border-r border-slate-100 bg-white/80 backdrop-blur-sm transition-[width] duration-300 ease-in-out overflow-hidden`}>
+          <div className={`flex h-full min-h-0 flex-col transition-[width] duration-300 ease-in-out ${isSidebarOpen ? 'w-[320px]' : 'w-[76px]'}`}>
+            <div className={`shrink-0 border-b border-slate-100 bg-white/95 transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
               <div className={`flex items-center gap-2 ${isSidebarOpen ? '' : 'justify-center'}`}>
                 <button
                   type="button"
@@ -762,7 +762,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             <div
               aria-hidden={!isSidebarOpen}
-              className={`h-full overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 transition-all duration-200 ease-out ${
+              className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-3 transition-all duration-200 ease-out ${
                 isSidebarOpen
                   ? 'opacity-100 translate-x-0 delay-75 pointer-events-auto'
                   : 'opacity-0 -translate-x-2 pointer-events-none'
@@ -850,7 +850,31 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 md:px-8 md:py-5 space-y-4 md:space-y-5 custom-scrollbar relative">
+          {chatMode === '공부' && pinnedStudyImage && (
+            <div className="pointer-events-none absolute inset-x-4 top-[3.25rem] z-10 md:inset-x-8 md:top-[4.25rem]">
+              <div className="mx-auto w-full max-w-3xl pointer-events-auto">
+                <div className="relative rounded-[1.5rem] border border-brand-100 bg-white/96 p-2.5 shadow-lg shadow-slate-200/50 backdrop-blur-sm md:p-3">
+                  <button
+                    type="button"
+                    onClick={() => setLockedStudyImage(null)}
+                    aria-label="고정된 문제 사진 닫기"
+                    className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-slate-900/75 text-sm font-black text-white transition-colors hover:bg-slate-900"
+                  >
+                    ×
+                  </button>
+                  <div className="overflow-hidden rounded-[1.25rem] border border-slate-200 bg-slate-50">
+                    <img
+                      src={pinnedStudyImage}
+                      alt="Pinned study problem"
+                      className="h-44 md:h-56 w-full object-contain bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`flex-1 min-h-0 overflow-y-auto px-4 py-3 md:px-8 md:py-5 space-y-4 md:space-y-5 custom-scrollbar relative ${chatMode === '공부' && pinnedStudyImage ? 'pt-56 md:pt-72' : ''}`}>
             {errorNotice && <div className="mx-auto w-full max-w-3xl text-sm text-red-600 font-bold">{errorNotice}</div>}
 
             {isEmptyState ? (
@@ -873,41 +897,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               </div>
             ) : (
               <div className="pb-24 md:pb-28 max-w-3xl mx-auto w-full">
-                {chatMode === '공부' && pinnedStudyImage && (
-                  <div className="sticky top-0 z-10 pb-4">
-                    <div className="rounded-[1.75rem] border border-brand-100 bg-white/95 p-3 md:p-4 shadow-md shadow-slate-200/40 backdrop-blur-sm">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] md:text-xs font-black tracking-[0.18em] text-brand-700">학습 모드</p>
-                          <p className="text-xs md:text-sm font-bold text-slate-600">추가 질문을 해도 문제풀이를 끝낼 때까지 이 사진을 위에 고정해 둘게요.</p>
-                          <p className="mt-1 text-[11px] md:text-xs font-semibold text-slate-500">
-                            새 문제 사진을 올리면 현재 고정 사진이 그 사진으로 바뀌어요.
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] md:text-[11px] font-black text-brand-800">
-                            문제 사진
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setLockedStudyImage(null)}
-                            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] md:text-[11px] font-black text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
-                          >
-                            문제풀이 끝내기
-                          </button>
-                        </div>
-                      </div>
-                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                        <img
-                          src={pinnedStudyImage}
-                          alt="Pinned study problem"
-                          className="max-h-56 md:max-h-72 w-full object-contain bg-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                     <div
@@ -937,9 +926,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
           <div className="sticky bottom-0 left-0 right-0 px-4 md:px-8 pb-[calc(env(safe-area-inset-bottom,0px)+0.5px)] md:pb-[2.5px] lg:pb-[3.5px] pt-2 md:pt-3 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent">
             {imageThumbnail && (
-              <div className="max-w-3xl mx-auto mb-2 relative inline-block">
-                <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
-                <button onClick={() => setImageThumbnail(null)} className="absolute -top-2 -right-2 bg-slate-800 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px]">&times;</button>
+              <div className="max-w-3xl mx-auto mb-2 flex w-full justify-start">
+                <div className="relative inline-flex">
+                  <img src={imageThumbnail} alt="Thumbnail preview" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
+                  <button onClick={() => setImageThumbnail(null)} className="absolute -top-2 -right-2 bg-slate-800 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px]">&times;</button>
+                </div>
               </div>
             )}
 
