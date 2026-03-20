@@ -897,14 +897,14 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         {/* Sidebar */}
         <aside className={`${showMobileChat ? 'hidden' : 'block'} ${isSidebarOpen ? 'lg:w-[320px]' : 'lg:w-[84px]'} lg:block min-h-0 border-r border-white/60 bg-white/72 backdrop-blur-xl transition-[width] duration-300 ease-in-out overflow-hidden`}>
           <div className={`flex h-full min-h-0 flex-col transition-[width] duration-300 ease-in-out ${isSidebarOpen ? 'w-[320px]' : 'w-[84px]'}`}>
-            <div className={`shrink-0 border-b border-slate-100/80 bg-white/90 transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
+            <div className={`shrink-0 border-b border-slate-100/80 bg-white/90 select-none transition-all duration-300 ${isSidebarOpen ? 'p-4 md:p-5' : 'px-3 py-4'}`}>
               <div className={`mb-3 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
                 {isSidebarOpen && (
-                  <div className="min-w-0">
+                  <div className="min-w-0 cursor-default pl-1">
                     <p className="text-sm font-bold text-slate-700">대화 목록</p>
                   </div>
                 )}
-                <span className={`${isSidebarOpen ? 'inline-flex' : 'hidden'} rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500`}>
+                <span className={`${isSidebarOpen ? 'inline-flex' : 'hidden'} cursor-default rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500`}>
                   {sessions.length}
                 </span>
               </div>
@@ -914,7 +914,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   type="button"
                   onClick={handleNewSession}
                   aria-label="새 대화 시작"
-                  className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-black whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${
+                  draggable={false}
+                  className={`flex h-11 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border text-sm font-black transition-all duration-300 ease-in-out ${
                     isSidebarOpen
                       ? 'flex-1 border-brand-100 bg-gradient-to-r from-brand-900 to-[#4338ca] px-4 text-white shadow-md shadow-brand-900/15 hover:-translate-y-0.5 hover:shadow-lg opacity-100 translate-x-0'
                       : 'w-0 border-transparent bg-transparent px-0 text-transparent opacity-0 -translate-x-2 pointer-events-none'
@@ -929,6 +930,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   type="button"
                   onClick={() => setIsSidebarOpen((prev) => !prev)}
                   aria-label={isSidebarOpen ? '대화 목록 접기' : '대화 목록 열기'}
+                  draggable={false}
                   className={`group flex h-11 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 ${
                     isSidebarOpen
                       ? 'w-[3.35rem] border-brand-100 bg-gradient-to-br from-white via-brand-50/70 to-brand-100/60 text-brand-900 hover:border-brand-200 hover:shadow-brand-100/70'
@@ -950,7 +952,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
               <div
               aria-hidden={!isSidebarOpen}
-              className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 md:p-5 space-y-3 transition-all duration-200 ease-out ${
+              className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar select-none p-4 md:p-5 space-y-3 transition-all duration-200 ease-out ${
                 isSidebarOpen
                   ? 'opacity-100 translate-x-0 delay-75 pointer-events-auto'
                   : 'opacity-0 -translate-x-2 pointer-events-none'
@@ -962,7 +964,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                   <div key={session.id} className="relative group">
                     <button
                       onClick={() => openSession(session.id)}
-                      className={`w-full text-left rounded-[1.35rem] border px-3.5 py-3 transition-all pr-10 shadow-sm ${isActive ? 'border-brand-200 bg-gradient-to-br from-brand-50 via-white to-brand-50/60 shadow-brand-100/70 ring-1 ring-brand-100/70' : 'border-white bg-white/90 hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md hover:shadow-slate-200/60'}`}
+                      draggable={false}
+                      className={`w-full cursor-default text-left rounded-[1.35rem] border px-3.5 py-3 transition-all pr-10 shadow-sm ${isActive ? 'border-brand-200 bg-gradient-to-br from-brand-50 via-white to-brand-50/60 shadow-brand-100/70 ring-1 ring-brand-100/70' : 'border-white bg-white/90 hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md hover:shadow-slate-200/60'}`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-brand-500' : 'bg-slate-300'}`}></span>
