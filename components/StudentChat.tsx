@@ -208,6 +208,8 @@ const MODE_CONFIG = {
   },
 } as const;
 
+const ENABLE_STUDY_IMAGE_PINNING = false;
+
 interface ModeSwitchConfirmModalProps {
   isOpen: boolean;
   currentModeLabel: '대화' | '공부';
@@ -494,6 +496,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   const activeSession = useMemo(() => sessions.find((session) => session.id === currentSessionId) || null, [sessions, currentSessionId]);
   const pinnedStudyImage = useMemo(() => {
+    if (!ENABLE_STUDY_IMAGE_PINNING) return null;
     if (imageThumbnail) return imageThumbnail;
     if (chatMode !== '공부') return null;
     return lockedStudyImage;
