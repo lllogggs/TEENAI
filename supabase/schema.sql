@@ -30,6 +30,7 @@ create index if not exists idx_student_profiles_parent_user_id
 create table if not exists public.chat_sessions (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null references public.users(id) on delete cascade,
+  chat_mode text not null default 'conversation' check (chat_mode in ('conversation', 'study')),
   tone_level text not null default 'low' check (tone_level in ('low', 'medium', 'high')),
   title text not null default '새 대화',
   topic_tags text[] not null default '{}',
@@ -208,6 +209,20 @@ create policy "safety_alerts_insert_student"
 alter table public.chat_sessions
   add column if not exists risk_level text not null default 'normal'
   check (risk_level in ('stable', 'normal', 'caution'));
+
+alter table public.chat_sessions
+  add column if not exists chat_mode text not null default 'conversation';
+
+update public.chat_sessions
+set chat_mode = 'conversation'
+where chat_mode is null;
+
+alter table public.chat_sessions
+  drop constraint if exists chat_sessions_chat_mode_check;
+
+alter table public.chat_sessions
+  add constraint chat_sessions_chat_mode_check
+  check (chat_mode in ('conversation', 'study'));
 
 create or replace function public.generate_parent_invite_code()
 returns text
