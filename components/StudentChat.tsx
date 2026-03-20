@@ -805,14 +805,6 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
               <div className={`flex items-center gap-2 ${isSidebarOpen ? '' : 'justify-center'}`}>
                 <button
                   type="button"
-                  onClick={() => setIsSidebarOpen((prev) => !prev)}
-                  aria-label={isSidebarOpen ? '대화 목록 접기' : '대화 목록 열기'}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16"></path></svg>
-                </button>
-                <button
-                  type="button"
                   onClick={handleNewSession}
                   aria-label="새 대화 시작"
                   className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-black whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${
@@ -825,6 +817,18 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v14M5 12h14" />
                   </svg>
                   <span>새 대화</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen((prev) => !prev)}
+                  aria-label={isSidebarOpen ? '대화 목록 접기' : '대화 목록 열기'}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200"
+                >
+                  {isSidebarOpen ? (
+                    <span className="text-lg font-black leading-none tracking-[-0.2em]">&lt;&lt;</span>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16"></path></svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -949,17 +953,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
             {isEmptyState ? (
               <div className="flex min-h-full items-center justify-center">
-                <div className="mx-auto flex w-full max-w-3xl flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="rounded-[2rem] border border-white/80 bg-white/92 p-6 md:p-8 shadow-[0_20px_60px_rgba(37,99,235,0.08)] backdrop-blur-md">
-                    <div className="flex flex-col items-center text-center gap-5 md:gap-6">
-                      <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] bg-gradient-to-br from-slate-50 via-white to-brand-50 shadow-inner shadow-brand-100/60 ring-1 ring-brand-100/40 md:h-44 md:w-44">
-                        <RandomAnimalIcon className="h-28 w-28 md:h-36 md:w-36 drop-shadow-md" />
-                      </div>
-                      <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight text-balance">
-                        {activeHeroMessage}
-                      </h2>
-                    </div>
+                <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center gap-5 md:gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] bg-gradient-to-br from-slate-50 via-white to-brand-50 shadow-inner shadow-brand-100/60 ring-1 ring-brand-100/40 md:h-44 md:w-44">
+                    <RandomAnimalIcon className="h-28 w-28 md:h-36 md:w-36 drop-shadow-md" />
                   </div>
+                  <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight text-balance">
+                    {activeHeroMessage}
+                  </h2>
                 </div>
               </div>
             ) : (
