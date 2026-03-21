@@ -1067,8 +1067,8 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
             {isEmptyState ? (
               <div className="flex min-h-full items-center justify-center">
                 <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center gap-5 md:gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] bg-gradient-to-br from-slate-50 via-white to-brand-50 shadow-inner shadow-brand-100/60 ring-1 ring-brand-100/40 md:h-44 md:w-44">
-                    <RandomAnimalIcon className="h-28 w-28 md:h-36 md:w-36 drop-shadow-md" />
+                  <div className="flex h-36 w-36 items-center justify-center md:h-44 md:w-44">
+                    <RandomAnimalIcon className="h-28 w-28 md:h-36 md:w-36" />
                   </div>
                   <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight text-balance">
                     {activeHeroMessage}
