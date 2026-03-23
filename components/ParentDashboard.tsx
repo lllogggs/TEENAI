@@ -710,15 +710,18 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
                   value={renewalCode}
                   onChange={(event) => setRenewalCode(event.target.value.toUpperCase())}
                   placeholder="초대코드를 입력해주세요"
+                  disabled={isRenewalSubmitting}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black tracking-[0.2em] text-slate-800 uppercase"
                 />
                 {renewalStatus ? <p className={`text-xs font-bold ${renewalStatus.includes('연장되었습니다') ? 'text-emerald-600' : 'text-rose-500'}`}>{renewalStatus}</p> : null}
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => {
+                      if (isRenewalSubmitting) return;
                       setShowRenewalPrompt(false);
                       setRenewalStatus('');
                     }}
+                    disabled={isRenewalSubmitting}
                     className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-500"
                   >
                     닫기

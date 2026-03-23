@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireSupabaseUser } from '../_lib/request-guards.js';
+import { consumeRateLimit, requireSupabaseUser } from '../_lib/request-guards.js';
 import { serverSupabaseEnv, serverSupabaseEnvHints } from '../_lib/supabase-env.js';
 
 const supabaseUrl = serverSupabaseEnv.url;
@@ -8,6 +8,14 @@ const serviceRoleKey = serverSupabaseEnv.serviceRoleKey;
 const normalizeInviteCode = (value: unknown): string => {
   if (typeof value !== 'string') return '';
   return value.trim().toUpperCase();
+};
+
+const INVITE_CODE_FAILURE_LIMIT = 4;
+const INVITE_CODE_FAILURE_WINDOW_MS = 5 * 60 * 1000;
+
+const respondInviteCodeRateLimit = (res: any, retryAfterSec: number) => {
+  res.setHeader('Retry-After', String(retryAfterSec));
+  res.status(429).json({ error: '잠시 후 다시 시도해주세요.' });
 };
 
 export default async function handler(req: any, res: any) {
@@ -73,6 +81,8 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const inviteCodeRateLimitKey = `renew-student-subscription:invalid-invite:${auth.userId}`;
+
   const { data: codeRow, error: codeError } = await adminClient
     .from('admin_codes')
     .select('code, is_active, is_used, use_count, max_uses, expires_at, subscription_days')
@@ -86,6 +96,17 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!codeRow) {
+    const rateLimitResult = await consumeRateLimit(
+      inviteCodeRateLimitKey,
+      INVITE_CODE_FAILURE_LIMIT,
+      INVITE_CODE_FAILURE_WINDOW_MS,
+    );
+
+    if (!rateLimitResult.allowed) {
+      respondInviteCodeRateLimit(res, rateLimitResult.retryAfterSec);
+      return;
+    }
+
     res.status(400).json({ error: '유효하지 않은 초대코드입니다.' });
     return;
   }

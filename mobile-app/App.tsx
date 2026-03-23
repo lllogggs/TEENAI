@@ -4,11 +4,11 @@ import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
 import {
   ActivityIndicator,
   BackHandler,
   Platform,
-  Pressable,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -17,6 +17,8 @@ import {
   Linking as NativeLinking,
 } from 'react-native';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
+
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -83,9 +85,10 @@ export default function App() {
   const webUrl = useMemo(() => getWebUrl(), []);
   const allowedOrigins = useMemo(() => (webUrl ? getAllowedOrigins(webUrl) : []), [webUrl]);
   const webViewRef = useRef<WebView>(null);
+  const webViewToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasLoadError, setHasLoadError] = useState(false);
+  const [showNetworkToast, setShowNetworkToast] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
 
@@ -122,8 +125,21 @@ export default function App() {
     setCanGoBack(navState.canGoBack);
   }, []);
 
+  const showNetworkErrorToast = useCallback(() => {
+    setShowNetworkToast(true);
+
+    if (webViewToastTimeoutRef.current) {
+      clearTimeout(webViewToastTimeoutRef.current);
+    }
+
+    webViewToastTimeoutRef.current = setTimeout(() => {
+      setShowNetworkToast(false);
+      webViewToastTimeoutRef.current = null;
+    }, 2500);
+  }, []);
+
   const reloadWebView = useCallback(() => {
-    setHasLoadError(false);
+    setShowNetworkToast(false);
     setIsLoading(true);
     webViewRef.current?.reload();
   }, []);
@@ -221,6 +237,12 @@ export default function App() {
     return () => sub.remove();
   }, [sendOAuthResultToWeb]);
 
+  React.useEffect(() => () => {
+    if (webViewToastTimeoutRef.current) {
+      clearTimeout(webViewToastTimeoutRef.current);
+    }
+  }, []);
+
   if (!webUrl || webUrl.includes('YOUR-WEB-APP-URL')) {
     return (
       <SafeAreaView style={styles.fallbackContainer}>
@@ -239,70 +261,66 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" translucent backgroundColor="transparent" />
 
-      {hasLoadError ? (
-        <View style={styles.errorContainer}>
-          <View style={styles.errorBox}>
-            <Text style={styles.title}>연결에 문제가 있어요</Text>
-            <Text style={styles.description}>
-              네트워크 상태를 확인하고 다시 시도해주세요.
-            </Text>
-            <Pressable onPress={reloadWebView} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>다시 시도</Text>
-            </Pressable>
+      <WebView
+        ref={webViewRef}
+        source={{ uri: webUrl }}
+        style={styles.webview}
+        startInLoadingState
+        renderLoading={() => (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563eb" />
           </View>
-        </View>
-      ) : (
-        <WebView
-          ref={webViewRef}
-          source={{ uri: webUrl }}
-          style={styles.webview}
-          startInLoadingState
-          renderLoading={() => (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2563eb" />
-            </View>
-          )}
-          pullToRefreshEnabled
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#2563eb" />
-          }
-          allowsBackForwardNavigationGestures
-          javaScriptEnabled
-          domStorageEnabled
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled
-          setSupportMultipleWindows={false}
-          onNavigationStateChange={onNavigationStateChange}
-          onLoadStart={() => {
-            setIsLoading(true);
-            setHasLoadError(false);
-          }}
-          onLoadEnd={() => {
-            setIsLoading(false);
-            sendPushTokenToWeb(expoPushToken);
-          }}
-          onError={() => {
-            setHasLoadError(true);
-            setIsLoading(false);
-          }}
-          onMessage={(event) => {
-            try {
-              const payload = JSON.parse(event.nativeEvent.data);
-              if (payload?.type === 'oauth_start' && payload?.url) {
-                NativeLinking.openURL(payload.url);
-              }
-            } catch {
-              // noop
+        )}
+        pullToRefreshEnabled
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#2563eb" />
+        }
+        allowsBackForwardNavigationGestures
+        javaScriptEnabled
+        domStorageEnabled
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        setSupportMultipleWindows={false}
+        onNavigationStateChange={onNavigationStateChange}
+        onLoadStart={() => {
+          setIsLoading(true);
+        }}
+        onLoadEnd={() => {
+          setIsLoading(false);
+          sendPushTokenToWeb(expoPushToken);
+          SplashScreen.hideAsync().catch(() => undefined);
+        }}
+        onError={() => {
+          setIsLoading(false);
+          showNetworkErrorToast();
+        }}
+        onHttpError={() => {
+          setIsLoading(false);
+          showNetworkErrorToast();
+        }}
+        onMessage={(event) => {
+          try {
+            const payload = JSON.parse(event.nativeEvent.data);
+            if (payload?.type === 'oauth_start' && payload?.url) {
+              NativeLinking.openURL(payload.url);
             }
-          }}
-          onShouldStartLoadWithRequest={({ url }) => handleShouldStartLoad(url)}
-        />
-      )}
+          } catch {
+            // noop
+          }
+        }}
+        onShouldStartLoadWithRequest={({ url }) => handleShouldStartLoad(url)}
+      />
 
-      {isLoading && !hasLoadError ? (
+      {isLoading ? (
         <View pointerEvents="none" style={styles.loadingOverlay}>
           <ActivityIndicator size="small" color="#1d4ed8" />
           <Text style={styles.loadingText}>불러오는 중...</Text>
+        </View>
+      ) : null}
+
+      {showNetworkToast ? (
+        <View pointerEvents="none" style={styles.toastContainer}>
+          <Text style={styles.toastText}>네트워크 연결이 불안정합니다</Text>
         </View>
       ) : null}
     </SafeAreaView>
@@ -335,6 +353,20 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#eff6ff',
   },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 28,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+  },
+  toastText: {
+    fontSize: 13,
+    color: '#ffffff',
+    fontWeight: '600',
+  },
   loadingText: {
     fontSize: 13,
     color: '#1e3a8a',
@@ -358,25 +390,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 24,
-  },
-  errorBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
-    gap: 10,
-  },
   title: {
     fontSize: 20,
     fontWeight: '700',
@@ -387,18 +400,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#334155',
-  },
-  retryButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    borderRadius: 12,
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  retryButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
