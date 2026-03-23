@@ -9,6 +9,7 @@ type RateLimitEntry = {
 type RateLimitResult = {
   allowed: boolean;
   retryAfterSec: number;
+  currentCount: number;
 };
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
@@ -45,19 +46,20 @@ const enforceMemoryRateLimit = (key: string, maxRequests: number, windowMs: numb
 
   if (!existing || now >= existing.resetAt) {
     rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, retryAfterSec: 0 };
+    return { allowed: true, retryAfterSec: 0, currentCount: 1 };
   }
 
   if (existing.count >= maxRequests) {
     return {
       allowed: false,
       retryAfterSec: Math.max(Math.ceil((existing.resetAt - now) / 1000), 1),
+      currentCount: existing.count,
     };
   }
 
   existing.count += 1;
   rateLimitStore.set(key, existing);
-  return { allowed: true, retryAfterSec: 0 };
+  return { allowed: true, retryAfterSec: 0, currentCount: existing.count };
 };
 
 export const requireSupabaseUser = async (req: any, res: any): Promise<{ userId: string; ip: string } | null> => {
@@ -107,7 +109,7 @@ export const requireSupabaseUser = async (req: any, res: any): Promise<{ userId:
   return { userId: data.user.id, ip: getClientIp(req) };
 };
 
-export const enforceRateLimit = async (res: any, key: string, maxRequests: number, windowMs: number): Promise<boolean> => {
+export const consumeRateLimit = async (key: string, maxRequests: number, windowMs: number): Promise<RateLimitResult> => {
   let result: RateLimitResult | null = null;
 
   if (adminSupabase) {
@@ -122,13 +124,18 @@ export const enforceRateLimit = async (res: any, key: string, maxRequests: numbe
       result = {
         allowed: Boolean(row?.allowed),
         retryAfterSec: Number(row?.retry_after_sec || 0),
+        currentCount: Number(row?.current_count || 0),
       };
     } else {
       console.error('Persistent rate limit fallback engaged:', error.message || error);
     }
   }
 
-  const finalResult = result || enforceMemoryRateLimit(key, maxRequests, windowMs);
+  return result || enforceMemoryRateLimit(key, maxRequests, windowMs);
+};
+
+export const enforceRateLimit = async (res: any, key: string, maxRequests: number, windowMs: number): Promise<boolean> => {
+  const finalResult = await consumeRateLimit(key, maxRequests, windowMs);
   if (!finalResult.allowed) {
     res.setHeader('Retry-After', String(finalResult.retryAfterSec));
     res.status(429).json({ error: 'Too many requests' });
