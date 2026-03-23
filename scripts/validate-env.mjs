@@ -1,6 +1,9 @@
 const requiredClientVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
 const requiredServerVars = ['GEMINI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
 
+const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
+const validationTarget = (targetArg?.split('=')[1] || 'all').toLowerCase();
+
 const isPlaceholder = (value = '') => {
   const normalized = String(value).trim().toLowerCase();
   return (
@@ -14,20 +17,27 @@ const isPlaceholder = (value = '') => {
 
 const collectMissing = (keys) => keys.filter((key) => isPlaceholder(process.env[key]));
 
-const missingClient = collectMissing(requiredClientVars);
-const missingServer = collectMissing(requiredServerVars);
+const shouldCheckClient = validationTarget === 'all' || validationTarget === 'client';
+const shouldCheckServer = validationTarget === 'all' || validationTarget === 'server';
+
+const missingClient = shouldCheckClient ? collectMissing(requiredClientVars) : [];
+const missingServer = shouldCheckServer ? collectMissing(requiredServerVars) : [];
 
 if (missingClient.length === 0 && missingServer.length === 0) {
-  console.log('[env-check] OK: required runtime variables are configured.');
+  console.log(`[env-check] OK: required ${validationTarget} runtime variables are configured.`);
   process.exit(0);
 }
 
 const skipValidation = process.env.SKIP_ENV_VALIDATION === '1';
+const expectedTargets = [];
+if (shouldCheckClient) expectedTargets.push('VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY');
+if (shouldCheckServer) expectedTargets.push('SUPABASE_SERVICE_ROLE_KEY', 'GEMINI_API_KEY');
+
 const report = [
-  '[env-check] Missing required environment variables for deploy/runtime.',
+  `[env-check] Missing required ${validationTarget} environment variables for deploy/runtime.`,
   missingClient.length ? `- Client: ${missingClient.join(', ')}` : '',
   missingServer.length ? `- Server: ${missingServer.join(', ')}` : '',
-  'Expected Vercel Production variables: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY.',
+  `Expected variables for this check: ${expectedTargets.join(', ')}.`,
   'Set variables in Vercel Project Settings > Environment Variables.',
   'If you intentionally want to bypass this check in local build, set SKIP_ENV_VALIDATION=1.',
 ].filter(Boolean).join('\n');

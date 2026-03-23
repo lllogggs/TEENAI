@@ -1,14 +1,13 @@
 import React from 'react';
 import appLogo from '../logo.png';
 
-// Common icon properties
 interface IconProps extends React.SVGProps<SVGSVGElement> {
     size?: number | string;
 }
 
-// -----------------------------------------------------------------------------
-// Unified Icons for Forteen AI Chat UI
-// -----------------------------------------------------------------------------
+interface ImgIconProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+    size?: number | string;
+}
 
 export const SparklesIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
     <svg
@@ -23,7 +22,7 @@ export const SparklesIcon: React.FC<IconProps> = ({ size = 24, className = '', .
         className={`text-brand-500 ${className}`}
         {...props}
     >
-        <path d="Mm4 14l-2 2 2 2 2-2-2-2z" /> {/* Placeholder, will implement clean sparkles */}
+        <path d="Mm4 14l-2 2 2 2 2-2-2-2z" />
         <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a4.4 4.4 0 0 1 0-8.562L8.5 2.337A2 2 0 0 0 9.937.9L11.519-5.235a4.4 4.4 0 0 1 8.562 0L21.663.9A2 2 0 0 0 23.1 2.337l1.582 6.135a4.4 4.4 0 0 1 0 8.562L23.1 18.663a2 2 0 0 0-1.437 1.437l-1.582 6.135a4.4 4.4 0 0 1-8.562 0L9.937 20.1z" />
     </svg>
 );
@@ -101,11 +100,7 @@ export const StopIcon: React.FC<IconProps> = ({ size = 24, className = '', ...pr
     </svg>
 );
 
-// -----------------------------------------------------------------------------
-// Brand Logo
-// -----------------------------------------------------------------------------
-
-export const ForteenLogo: React.FC<IconProps> = ({ size = 32, className = '', ...props }) => (
+export const ForteenLogo: React.FC<ImgIconProps> = ({ size = 32, className = '', ...props }) => (
     <img
         src={appLogo}
         width={size}
@@ -116,18 +111,15 @@ export const ForteenLogo: React.FC<IconProps> = ({ size = 32, className = '', ..
     />
 );
 
-// -----------------------------------------------------------------------------
-// Animal Mentors Icons (IMGs)
-// -----------------------------------------------------------------------------
-
 const createAnimalImg = (src: string, alt: string) => {
-    const ImgIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+    const ImgIcon: React.FC<ImgIconProps> = ({ size = 24, className = '', ...props }) => (
         <img
             src={src}
             width={size}
             height={size}
             className={`object-contain rounded-xl drop-shadow-sm ${className}`}
             alt={alt}
+            {...props}
         />
     );
     return ImgIcon;

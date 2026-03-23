@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { User, ChatMessage, ChatSession, ChatSessionMode, SessionRiskLevel, StudentSettings } from '../types';
+import { User, ChatMessage, ChatSession, ChatSessionMode, StudentSettings } from '../types';
 import { supabase } from '../utils/supabase';
 import { normalizeRiskLevel } from '../utils/common';
 import { DANGER_KEYWORDS } from '../constants';
@@ -7,306 +7,26 @@ import PrivacyPolicyModal from './PrivacyPolicyModal';
 import { ForteenLogo, AnimalIcons, ImageIcon, VoiceIcon, StopIcon } from './Icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import ModeSwitchConfirmModal from './student-chat/ModeSwitchConfirmModal';
+import {
+  buildSystemPromptFromSettings,
+  DEFAULT_SETTINGS,
+  ENABLE_STUDY_IMAGE_PINNING,
+  findLatestStudyImage,
+  formatSessionRelative,
+  MODE_CONFIG,
+  MODE_LABEL_MAP,
+  MODE_VALUE_MAP,
+  normalizeSettings,
+  NormalizedSettings,
+  riskColorMap,
+  riskLabelMap,
+} from '../utils/studentChat';
 
 interface StudentChatProps {
   user: User;
   onLogout: () => void;
 }
-
-type MentorTone = 'kind' | 'rational' | 'friendly';
-
-interface NormalizedSettings {
-  guardrails: {
-    sexual_block: boolean;
-    self_directed_mode: boolean;
-    overuse_prevent: boolean;
-    clean_language: boolean;
-  };
-  mentor_tone: MentorTone;
-  parent_instructions: string[];
-  ai_style_prompt: string;
-}
-
-const DEFAULT_SETTINGS: NormalizedSettings = {
-  guardrails: {
-    sexual_block: true,
-    self_directed_mode: true,
-    overuse_prevent: true,
-    clean_language: true,
-  },
-  mentor_tone: 'kind',
-  parent_instructions: [],
-  ai_style_prompt: '',
-};
-
-const riskLabelMap: Record<SessionRiskLevel, string> = {
-  stable: '안정',
-  normal: '주의',
-  caution: '위험',
-};
-
-const riskColorMap: Record<SessionRiskLevel, string> = {
-  stable: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  normal: 'bg-amber-50 text-amber-700 border-amber-100',
-  caution: 'bg-rose-50 text-rose-700 border-rose-100',
-};
-
-const normalizeSettings = (settings?: StudentSettings | null): NormalizedSettings => {
-  const guardrails = (settings?.guardrails as Record<string, unknown> | undefined) || {};
-  const mentorTone = settings?.mentor_tone || settings?.mentor_style;
-
-  return {
-    guardrails: {
-      sexual_block:
-        typeof guardrails.sexual_block === 'boolean'
-          ? guardrails.sexual_block
-          : typeof guardrails.block_harmful === 'boolean'
-            ? guardrails.block_harmful
-            : DEFAULT_SETTINGS.guardrails.sexual_block,
-      self_directed_mode:
-        typeof guardrails.self_directed_mode === 'boolean'
-          ? guardrails.self_directed_mode
-          : typeof guardrails.self_directed === 'boolean'
-            ? guardrails.self_directed
-            : DEFAULT_SETTINGS.guardrails.self_directed_mode,
-      overuse_prevent:
-        typeof guardrails.overuse_prevent === 'boolean'
-          ? guardrails.overuse_prevent
-          : typeof guardrails.anti_overuse === 'boolean'
-            ? guardrails.anti_overuse
-            : DEFAULT_SETTINGS.guardrails.overuse_prevent,
-      clean_language:
-        typeof guardrails.clean_language === 'boolean'
-          ? guardrails.clean_language
-          : typeof guardrails.language_filter === 'boolean'
-            ? guardrails.language_filter
-            : DEFAULT_SETTINGS.guardrails.clean_language,
-    },
-    mentor_tone: mentorTone === 'kind' || mentorTone === 'rational' || mentorTone === 'friendly' ? mentorTone : DEFAULT_SETTINGS.mentor_tone,
-    parent_instructions: Array.isArray(settings?.parent_instructions)
-      ? settings.parent_instructions.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-      : [],
-    ai_style_prompt: typeof settings?.ai_style_prompt === 'string' ? settings.ai_style_prompt : '',
-  };
-};
-
-const buildSystemPromptFromSettings = (settings: NormalizedSettings) => {
-  const guardrailLines: string[] = [];
-  if (settings.guardrails.sexual_block) {
-    guardrailLines.push('- 성범죄/부적절/착취 대화 요청은 안전하게 차단하고 도움 채널을 안내하세요.');
-  }
-  if (settings.guardrails.self_directed_mode) {
-    guardrailLines.push('- 정답을 바로 제시하기보다 학생이 스스로 사고하도록 질문형 코칭을 섞어 주세요.');
-  }
-  if (settings.guardrails.overuse_prevent) {
-    guardrailLines.push('- 과도한 사용이 감지되면 짧은 휴식을 권장하세요.');
-  }
-  if (settings.guardrails.clean_language) {
-    guardrailLines.push('- 거친 표현은 정중하고 건강한 표현으로 교정해 주세요.');
-  }
-
-  const mentorStyleInstructionMap: Record<MentorTone, string> = {
-    kind: '다정하고 따뜻한 톤',
-    rational: '차분하고 구조적인 톤',
-    friendly: '친근하고 편안한 톤',
-  };
-
-  return [
-    '[Parent Guardrails]',
-    guardrailLines.length ? guardrailLines.join('\n') : '- 별도 가드레일 없음',
-    '',
-    '[Mentor Tone]',
-    `- ${mentorStyleInstructionMap[settings.mentor_tone]}`,
-    '',
-    '[Parent Instructions]',
-    settings.parent_instructions.length
-      ? settings.parent_instructions.map((instruction, index) => `${index + 1}. ${instruction}`).join('\n')
-      : '- 없음',
-    '',
-    '[AI Style Prompt Override]',
-    settings.ai_style_prompt || '- 없음',
-  ].join('\n');
-};
-
-const formatSessionTime = (iso: string) => {
-  const date = new Date(iso);
-  return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
-
-const formatSessionRelative = (iso: string) => {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.max(Math.floor(diffMs / 60000), 0);
-
-  if (diffMinutes < 1) return '방금 전';
-  if (diffMinutes < 60) return `${diffMinutes}분 전`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}시간 전`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) return '어제';
-  if (diffDays < 7) return `${diffDays}일 전`;
-
-  return formatSessionTime(iso);
-};
-
-const extractImageFromMessage = (text: string) => {
-  const match = text.match(/\[IMAGE\](.*?)\[\/IMAGE\]/);
-  return match?.[1] || null;
-};
-
-const findLatestStudyImage = (chatMessages: ChatMessage[]) => {
-  for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
-    const message = chatMessages[i];
-    if (message.role !== 'user') continue;
-
-    const embeddedImage = extractImageFromMessage(message.text);
-    if (embeddedImage) return embeddedImage;
-  }
-
-  return null;
-};
-
-const MODE_VALUE_MAP: Record<'대화' | '공부', ChatSessionMode> = {
-  대화: 'conversation',
-  공부: 'study',
-};
-
-const MODE_LABEL_MAP: Record<ChatSessionMode, '대화' | '공부'> = {
-  conversation: '대화',
-  study: '공부',
-};
-
-const MODE_CONFIG = {
-  대화: {
-    loadingText: '답변을 준비하고 있어요...',
-    heroMessages: [
-      '안녕하세요! 오늘은 어떤 이야기를 나눠볼까요?',
-      '편하게 말을 걸어주세요. 같이 이야기해봐요.',
-      '궁금한 것부터 가볍게 시작해봐도 좋아요.',
-    ],
-    placeholders: [
-      '궁금한 걸 적어보세요.',
-      '사진과 함께 물어보세요.',
-      '고민을 짧게 적어보세요.',
-    ],
-  },
-  공부: {
-    loadingText: '힌트와 다음 질문을 정리하고 있어요...',
-    heroMessages: [
-      '문제를 같이 풀어볼까요?',
-      '막힌 문제부터 하나씩 같이 정리해봐요.',
-      '어려운 부분을 보내주면 함께 풀어볼게요.',
-    ],
-    placeholders: [
-      '막힌 부분을 적어보세요.',
-      '문제 사진을 올려보세요.',
-      '힌트가 필요한 곳을 적어보세요.',
-    ],
-  },
-} as const;
-
-const ENABLE_STUDY_IMAGE_PINNING = false;
-
-interface ModeSwitchConfirmModalProps {
-  isOpen: boolean;
-  currentModeLabel: '대화' | '공부';
-  nextModeLabel: '대화' | '공부';
-  onConfirm: () => void;
-  onClose: () => void;
-}
-
-const ModeSwitchConfirmModal: React.FC<ModeSwitchConfirmModalProps> = ({
-  isOpen,
-  currentModeLabel,
-  nextModeLabel,
-  onConfirm,
-  onClose,
-}) => {
-  useEffect(() => {
-    if (!isOpen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6">
-      <button
-        type="button"
-        aria-label="모드 전환 안내 닫기"
-        className="absolute inset-0 bg-slate-950/45 backdrop-blur-[6px]"
-        onClick={onClose}
-      />
-
-      <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(180deg,#ffffff_0%,#f8faff_100%)] shadow-[0_30px_90px_rgba(15,23,42,0.28)] animate-in fade-in zoom-in-95 duration-200">
-        <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-brand-500 via-brand-700 to-[#7c3aed]" />
-
-        <div className="p-6 md:p-7">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-gradient-to-br from-brand-900 via-[#312e81] to-[#7c3aed] text-white shadow-lg shadow-brand-900/20">
-              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-500">Mode Switch</p>
-              <h2 className="mt-2 text-[1.45rem] font-black tracking-tight text-slate-900">
-                {nextModeLabel === '공부' ? '학습 모드로 바꿔볼까요?' : '대화 모드로 돌아갈까요?'}
-              </h2>
-              <p className="mt-3 text-sm font-bold leading-6 text-slate-600">
-                지금 대화는 <span className="text-slate-900">{currentModeLabel} 모드</span>로 저장되고 있어요.
-                <br />
-                <span className="text-slate-900">{nextModeLabel} 모드</span>로 바꾸면 새 대화가 열리고, 지금까지의 내용은 그대로 안전하게 남아 있어요.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-[1.5rem] border border-brand-100 bg-brand-50/70 px-4 py-3.5">
-            <p className="text-sm font-bold leading-6 text-slate-700">
-              괜찮다면 새 대화에서 <span className="text-brand-700">{nextModeLabel} 모드</span>로 이어서 시작할게요.
-            </p>
-          </div>
-
-          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50"
-            >
-              이대로 있을래요
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-gradient-to-r from-brand-900 via-[#312e81] to-[#4338ca] px-6 text-sm font-black text-white shadow-lg shadow-brand-900/20 transition-all hover:-translate-y-0.5 hover:shadow-xl"
-            >
-              {nextModeLabel} 모드로 전환
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
   const RandomAnimalIcon = useMemo(() => {

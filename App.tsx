@@ -1,51 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { User, UserRole } from './types';
-import Auth from './components/Auth';
-import StudentChat from './components/StudentChat';
-import ParentDashboard from './components/ParentDashboard';
-import AdminDashboard from './components/AdminDashboard';
-import AdminAuth from './components/AdminAuth';
 import { isSupabaseConfigured, supabase } from './utils/supabase';
+import { ensureProfileLoaded } from './services/authProfile';
+import {
+  DEMO_MODE_STORAGE_KEY,
+  PENDING_SOCIAL_INVITE_REQUIRED_KEY,
+  PENDING_SOCIAL_ROLE_KEY,
+  PENDING_SOCIAL_SIGNUP_KEY,
+} from './utils/auth/constants';
+import { getMissingSupabaseEnvVars, getSignupName, shouldEnableDemoMode } from './utils/auth/runtime';
+import { getOAuthRedirectUrl } from './utils/auth/oauth';
 
-const PENDING_SOCIAL_ROLE_KEY = 'forteenai_pending_social_role';
-const PENDING_SOCIAL_SIGNUP_KEY = 'forteenai_pending_social_signup';
-const PENDING_SOCIAL_INVITE_REQUIRED_KEY = 'forteenai_pending_social_invite_required';
+const Auth = lazy(() => import('./components/Auth'));
+const StudentChat = lazy(() => import('./components/StudentChat'));
+const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const AdminAuth = lazy(() => import('./components/AdminAuth'));
 
-const getSignupName = (email: string) => {
-  const emailPrefix = email.split('@')[0]?.trim();
-  return emailPrefix || 'User';
-};
-
-
-const requiredSupabaseEnvVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
-const DEMO_MODE_STORAGE_KEY = 'forteenai_demo_mode';
-
-const getMissingSupabaseEnvVars = () => requiredSupabaseEnvVars.filter((key) => {
-  const env = import.meta.env as Record<string, string | undefined>;
-  const value = env[key];
-  return !value || String(value).includes('placeholder');
-});
-
-
-const shouldEnableDemoMode = () => {
-  if (typeof window === 'undefined') return false;
-
-  const query = new URLSearchParams(window.location.search);
-  const byQuery = query.get('demo') === '1';
-  const byStorage = window.localStorage.getItem(DEMO_MODE_STORAGE_KEY) === 'true';
-  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
-  return byQuery || byStorage || isLocal;
-};
-
-const getOAuthRedirectUrl = (isNativeWebView: boolean) => {
-  if (isNativeWebView) return 'forteenai://auth/callback';
-  if (typeof window === 'undefined') return 'http://localhost:5173/auth/callback';
-  if (window.location.hostname === 'forteenai.com' || window.location.hostname === 'www.forteenai.com') {
-    return 'https://forteenai.com/auth/callback';
-  }
-  return 'http://localhost:5173/auth/callback';
-};
+const AppShellFallback = () => (
+  <div className="h-screen flex items-center justify-center">로딩 중...</div>
+);
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -54,6 +28,29 @@ function App() {
   const [pendingSocialUser, setPendingSocialUser] = useState<{ id: string; email: string; role: UserRole } | null>(null);
   const [socialInviteCode, setSocialInviteCode] = useState('');
   const [isDemoMode, setIsDemoMode] = useState(() => !isSupabaseConfigured && shouldEnableDemoMode());
+
+  const loadProfile = async (userId: string, fallbackEmail: string, fromSocialCallback = false) => {
+    try {
+      const result = await ensureProfileLoaded(supabase, userId, fallbackEmail, fromSocialCallback);
+      if (result.status === 'user') {
+        setUser(result.user);
+        return;
+      }
+
+      if (result.status === 'pending-social-invite') {
+        setPendingSocialUser(result.pendingUser);
+        return;
+      }
+
+      if (result.shouldAlert) {
+        alert('프로필 생성이 아직 완료되지 않았습니다. 잠시 후 다시 로그인해주세요.');
+      }
+    } catch (loadError) {
+      console.error('Profile load error:', loadError);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const checkSession = async () => {
@@ -82,9 +79,10 @@ function App() {
           await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
         }
       }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await ensureProfileLoaded(session.user.id, session.user.email || '', isAuthCallback);
+        await loadProfile(session.user.id, session.user.email || '', isAuthCallback);
       } else {
         setLoading(false);
       }
@@ -94,7 +92,7 @@ function App() {
       }
     };
 
-    checkSession();
+    void checkSession();
   }, []);
 
   useEffect(() => {
@@ -108,7 +106,7 @@ function App() {
         const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
         if (error) throw error;
         if (data.user) {
-          await ensureProfileLoaded(data.user.id, data.user.email || '', true);
+          await loadProfile(data.user.id, data.user.email || '', true);
         }
       } catch (err) {
         console.error('social_oauth_result parse/set session error', err);
@@ -120,134 +118,6 @@ function App() {
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, []);
-
-  const ensureProfileLoaded = async (userId: string, fallbackEmail: string, fromSocialCallback = false) => {
-    try {
-      let profile: any = null;
-      let lastError: any = null;
-
-      for (let i = 0; i < 10; i += 1) {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (data) {
-          profile = data;
-          break;
-        }
-
-        lastError = error;
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-
-      if (profile) {
-        if (fromSocialCallback) {
-          const pendingRole = localStorage.getItem(PENDING_SOCIAL_ROLE_KEY);
-          const pendingSignup = localStorage.getItem(PENDING_SOCIAL_SIGNUP_KEY) === 'true';
-          if (pendingRole && pendingRole !== profile.role) {
-            alert(`기존 계정의 역할(${profile.role})이 우선 적용됩니다.`);
-          }
-          if (pendingSignup && profile.role === UserRole.STUDENT) {
-            setPendingSocialUser({ id: profile.id, email: profile.email, role: profile.role as UserRole });
-            localStorage.setItem(PENDING_SOCIAL_INVITE_REQUIRED_KEY, 'true');
-            setLoading(false);
-            return;
-          }
-          localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
-          localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
-        }
-        setUser(profile as User);
-        return;
-      }
-
-      if (fromSocialCallback) {
-        const pendingRole = localStorage.getItem(PENDING_SOCIAL_ROLE_KEY) as UserRole | null;
-        const socialRole = pendingRole === UserRole.PARENT || pendingRole === UserRole.STUDENT
-          ? pendingRole
-          : UserRole.STUDENT;
-        const socialName = getSignupName(fallbackEmail);
-
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 31);
-
-        const pendingSignup = localStorage.getItem(PENDING_SOCIAL_SIGNUP_KEY) === 'true';
-
-        const { data: insertedProfile, error: insertError } = await supabase
-          .from('users')
-          .upsert({
-            id: userId,
-            email: fallbackEmail,
-            role: socialRole,
-            name: socialName,
-            subscription_expires_at: expiresAt.toISOString(),
-          }, { onConflict: 'id' })
-          .select('*')
-          .single();
-
-        localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
-        localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
-
-        if (insertError) {
-          console.error('social users upsert error:', insertError);
-          throw insertError;
-        }
-
-        if (insertedProfile) {
-          if (pendingSignup && insertedProfile.role === UserRole.STUDENT) {
-            setPendingSocialUser({ id: insertedProfile.id, email: insertedProfile.email, role: insertedProfile.role as UserRole });
-            localStorage.setItem(PENDING_SOCIAL_INVITE_REQUIRED_KEY, 'true');
-            setLoading(false);
-            return;
-          }
-          setUser(insertedProfile as User);
-          return;
-        }
-      }
-
-      const { data: userInfo } = await supabase.auth.getUser();
-      const metadata = userInfo.user?.user_metadata || {};
-      const metadataRole = metadata.role === UserRole.PARENT || metadata.role === UserRole.STUDENT
-        ? metadata.role
-        : UserRole.STUDENT;
-      const metadataName = typeof metadata.name === 'string' && metadata.name.trim()
-        ? metadata.name.trim()
-        : getSignupName(fallbackEmail || userInfo.user?.email || '');
-      const metadataEmail = userInfo.user?.email || fallbackEmail;
-
-      if (userInfo.user && metadataEmail) {
-        const { data: repairedProfile, error: repairError } = await supabase
-          .from('users')
-          .upsert({
-            id: userId,
-            email: metadataEmail,
-            role: metadataRole,
-            name: metadataName,
-            subscription_expires_at: metadata.subscription_expires_at || null,
-          }, { onConflict: 'id' })
-          .select('*')
-          .single();
-
-        if (!repairError && repairedProfile) {
-          setUser(repairedProfile as User);
-          return;
-        }
-
-        console.error('users profile repair upsert error:', repairError);
-      }
-
-      console.error('users profile lookup error:', lastError);
-      if (fallbackEmail) {
-        alert('프로필 생성이 아직 완료되지 않았습니다. 잠시 후 다시 로그인해주세요.');
-      }
-    } catch (loadError) {
-      console.error('Profile load error:', loadError);
-    } finally {
-      setLoading(false);
-    }
-  };
-
 
   const completeSocialInviteVerification = async () => {
     if (!pendingSocialUser) return;
@@ -284,7 +154,7 @@ function App() {
     localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
     setPendingSocialUser(null);
     setSocialInviteCode('');
-    await ensureProfileLoaded(pendingSocialUser.id, pendingSocialUser.email);
+    await loadProfile(pendingSocialUser.id, pendingSocialUser.email);
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple', role: UserRole, isSignup: boolean) => {
@@ -330,7 +200,6 @@ function App() {
 
   const handleAuth = async (email: string, password: string, role: UserRole, code?: string, isSignup?: boolean) => {
     if (!isSupabaseConfigured) {
-      // Mock Auth logic
       const { MockDb } = await import('./services/mockDb');
       try {
         setAuthLoading(true);
@@ -345,7 +214,7 @@ function App() {
           }
         } else {
           const mockUsers = JSON.parse(localStorage.getItem('forteenai_users') || '[]');
-          const u = mockUsers.find((u: any) => u.email === email && u.role === role);
+          const u = mockUsers.find((mockUser: any) => mockUser.email === email && mockUser.role === role);
           if (u) setUser(u);
           else throw new Error('계정을 찾을 수 없습니다.');
         }
@@ -370,7 +239,7 @@ function App() {
           const normalizedCode = code.trim().toUpperCase();
           const { data: parents } = await supabase
             .from('users')
-            .select('id, my_invite_code') // Fetch invite code to verify correct parent if needed, but ID is enough
+            .select('id, my_invite_code')
             .eq('my_invite_code', normalizedCode)
             .eq('role', UserRole.PARENT)
             .limit(1);
@@ -379,7 +248,6 @@ function App() {
             throw new Error('유효하지 않은 초대 코드입니다.');
           }
 
-          // Check if parent has reached student limit (max 3)
           const { count, error: countError } = await supabase
             .from('student_profiles')
             .select('user_id', { count: 'exact', head: true })
@@ -413,7 +281,7 @@ function App() {
           if (parentLoginError) throw parentLoginError;
 
           if (parentLoginData.user) {
-            await ensureProfileLoaded(parentLoginData.user.id, parentLoginData.user.email || email);
+            await loadProfile(parentLoginData.user.id, parentLoginData.user.email || email);
             return;
           }
 
@@ -423,7 +291,6 @@ function App() {
         const normalizedInviteCode = role === UserRole.STUDENT ? code?.trim().toUpperCase() : undefined;
         const signupName = getSignupName(email);
 
-        // Default 31 days trial
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 31);
 
@@ -434,7 +301,7 @@ function App() {
             data: {
               role,
               name: signupName,
-              subscription_expires_at: expiresAt.toISOString(), // Save to user metadata for easy access trigger
+              subscription_expires_at: expiresAt.toISOString(),
               ...(role === UserRole.STUDENT
                 ? {
                   parent_user_id: parentId,
@@ -462,7 +329,7 @@ function App() {
         }
 
         if (authData.session?.user) {
-          await ensureProfileLoaded(authData.session.user.id, email);
+          await loadProfile(authData.session.user.id, email);
           return;
         }
 
@@ -472,7 +339,7 @@ function App() {
         if (error) throw error;
 
         if (data.user) {
-          await ensureProfileLoaded(data.user.id, data.user.email || email);
+          await loadProfile(data.user.id, data.user.email || email);
         }
       }
     } catch (err: any) {
@@ -482,7 +349,6 @@ function App() {
     }
   };
 
-
   const handleAdminLogin = async (email: string, password: string) => {
     try {
       setAuthLoading(true);
@@ -490,7 +356,7 @@ function App() {
       if (error) throw error;
       if (!data.user) throw new Error('로그인에 실패했습니다.');
 
-      await ensureProfileLoaded(data.user.id, data.user.email || email);
+      await loadProfile(data.user.id, data.user.email || email);
     } catch (err: any) {
       alert(err.message || '관리자 로그인 중 오류가 발생했습니다.');
     } finally {
@@ -506,7 +372,7 @@ function App() {
   };
 
   if (loading) {
-    return <div className="h-screen flex items-center justify-center">로딩 중...</div>;
+    return <AppShellFallback />;
   }
 
   if (!isSupabaseConfigured && !isDemoMode) {
@@ -542,7 +408,6 @@ function App() {
     );
   }
 
-
   if (pendingSocialUser) {
     return (
       <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center p-4">
@@ -571,10 +436,10 @@ function App() {
 
   if (!user) {
     if (isAdminPath) {
-      return <>{demoModeBadge}<AdminAuth loading={authLoading} onLogin={handleAdminLogin} /></>;
+      return <Suspense fallback={<AppShellFallback />}>{demoModeBadge}<AdminAuth loading={authLoading} onLogin={handleAdminLogin} /></Suspense>;
     }
 
-    return <>{demoModeBadge}<Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} /></>;
+    return <Suspense fallback={<AppShellFallback />}>{demoModeBadge}<Auth onLogin={handleAuth} onSocialLogin={handleSocialLogin} loading={authLoading} /></Suspense>;
   }
 
   if (isAdminPath) {
@@ -590,12 +455,12 @@ function App() {
       );
     }
 
-    return <>{demoModeBadge}<AdminDashboard user={user} onLogout={handleLogout} /></>;
+    return <Suspense fallback={<AppShellFallback />}>{demoModeBadge}<AdminDashboard user={user} onLogout={handleLogout} /></Suspense>;
   }
 
   return user.role === UserRole.STUDENT
-    ? <>{demoModeBadge}<StudentChat user={user} onLogout={handleLogout} /></>
-    : <>{demoModeBadge}<ParentDashboard user={user} onLogout={handleLogout} /></>;
+    ? <Suspense fallback={<AppShellFallback />}>{demoModeBadge}<StudentChat user={user} onLogout={handleLogout} /></Suspense>
+    : <Suspense fallback={<AppShellFallback />}>{demoModeBadge}<ParentDashboard user={user} onLogout={handleLogout} /></Suspense>;
 }
 
 export default App;
