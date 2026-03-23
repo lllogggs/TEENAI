@@ -41,12 +41,12 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    if (!validateOptionalBase64DataUrl(imageData, /^image\/(jpeg|jpg|png|webp)$/i, 3 * 1024 * 1024)) {
+    if (!validateOptionalBase64DataUrl(imageData, /^image\/(jpeg|jpg|png|webp)$/i, 2 * 1024 * 1024)) {
       res.status(400).json({ error: 'Invalid imageData format or image too large.' });
       return;
     }
 
-    if (!validateOptionalBase64DataUrl(audioData, /^audio\/(webm|wav|mpeg|mp3|ogg|mp4)$/i, 5 * 1024 * 1024)) {
+    if (!validateOptionalBase64DataUrl(audioData, /^audio\/(webm|wav|mpeg|mp3|ogg|mp4)$/i, 2 * 1024 * 1024)) {
       res.status(400).json({ error: 'Invalid audioData format or audio too large.' });
       return;
     }
@@ -101,10 +101,13 @@ export default async function handler(req: any, res: any) {
     let userParts: any[] = [{ text: userMessage }];
 
     if (imageData) {
+      const match = imageData.match(/^data:(image\/[^;]+);base64,/);
+      const mimeType = match ? match[1] : 'image/jpeg';
+
       userParts.push({
         inlineData: {
-          data: imageData.replace(/^data:image\/\w+;base64,/, ''),
-          mimeType: 'image/jpeg'
+          data: imageData.replace(/^data:image\/[^;]+;base64,/, ''),
+          mimeType: mimeType
         }
       });
     }
@@ -121,7 +124,7 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const result = await chat.sendMessage({ message: userParts });
+    const result = await chat.sendMessage(userParts);
     const responseText = result.text || '';
 
     if (supabaseUrl && serviceRoleKey) {

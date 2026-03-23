@@ -91,6 +91,7 @@ export default function App() {
   const [showNetworkToast, setShowNetworkToast] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
 
   const sendPushTokenToWeb = useCallback((token: string | null) => {
     if (!token) return;
@@ -102,7 +103,7 @@ export default function App() {
   }, []);
 
   const routeWebViewToParentDashboard = useCallback(() => {
-    webViewRef.current?.injectJavaScript(injectParentRouteScript);
+    setPendingRoute('/parent');
   }, []);
 
   const sendOAuthResultToWeb = useCallback((url: string) => {
@@ -281,6 +282,8 @@ export default function App() {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         setSupportMultipleWindows={false}
+        bounces={false}
+        overScrollMode="never"
         onNavigationStateChange={onNavigationStateChange}
         onLoadStart={() => {
           setIsLoading(true);
@@ -289,6 +292,10 @@ export default function App() {
           setIsLoading(false);
           sendPushTokenToWeb(expoPushToken);
           SplashScreen.hideAsync().catch(() => undefined);
+          if (pendingRoute) {
+            webViewRef.current?.injectJavaScript(`window.location.href = '${pendingRoute}'; true;`);
+            setPendingRoute(null);
+          }
         }}
         onError={() => {
           setIsLoading(false);
