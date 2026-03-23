@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
 import {
   ActivityIndicator,
@@ -16,6 +18,16 @@ import {
 } from 'react-native';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 const getWebUrl = () => {
   const url = Constants.expoConfig?.extra?.webAppUrl as string | undefined;
   return url?.trim();
@@ -30,6 +42,43 @@ const getAllowedOrigins = (url: string): string[] => {
   }
 };
 
+const injectParentRouteScript = `window.location.href = '/parent'; true;`;
+
+async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (!Device.isDevice) {
+    return null;
+  }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== 'granted') {
+    const permissionResult = await Notifications.requestPermissionsAsync();
+    finalStatus = permissionResult.status;
+  }
+
+  if (finalStatus !== 'granted') {
+    return null;
+  }
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#2563eb',
+    });
+  }
+
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId) {
+    return null;
+  }
+
+  const pushToken = await Notifications.getExpoPushTokenAsync({ projectId });
+  return pushToken.data;
+}
+
 export default function App() {
   const webUrl = useMemo(() => getWebUrl(), []);
   const allowedOrigins = useMemo(() => (webUrl ? getAllowedOrigins(webUrl) : []), [webUrl]);
@@ -38,6 +87,20 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+
+  const sendPushTokenToWeb = useCallback((token: string | null) => {
+    if (!token) return;
+
+    const payload = JSON.stringify({ type: 'expo_push_token', token });
+    webViewRef.current?.injectJavaScript(
+      `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`
+    );
+  }, []);
+
+  const routeWebViewToParentDashboard = useCallback(() => {
+    webViewRef.current?.injectJavaScript(injectParentRouteScript);
+  }, []);
 
   const sendOAuthResultToWeb = useCallback((url: string) => {
     try {
@@ -94,6 +157,46 @@ export default function App() {
     [allowedOrigins],
   );
 
+  useEffect(() => {
+    registerForPushNotificationsAsync()
+      .then((token) => {
+        if (token) {
+          setExpoPushToken(token);
+        }
+      })
+      .catch(() => undefined);
+
+    const notificationResponseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url;
+      if (url === '/parent') {
+        routeWebViewToParentDashboard();
+        return;
+      }
+
+      routeWebViewToParentDashboard();
+    });
+
+    return () => {
+      notificationResponseSubscription.remove();
+    };
+  }, [routeWebViewToParentDashboard]);
+
+  useEffect(() => {
+    if (!expoPushToken) return;
+    sendPushTokenToWeb(expoPushToken);
+  }, [expoPushToken, sendPushTokenToWeb]);
+
+  useEffect(() => {
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        const url = response?.notification.request.content.data?.url;
+        if (url === '/parent') {
+          routeWebViewToParentDashboard();
+        }
+      })
+      .catch(() => undefined);
+  }, [routeWebViewToParentDashboard]);
+
   React.useEffect(() => {
     if (Platform.OS !== 'android') {
       return;
@@ -109,8 +212,6 @@ export default function App() {
 
     return () => subscription.remove();
   }, [canGoBack]);
-
-
 
   React.useEffect(() => {
     const sub = Linking.addEventListener('url', ({ url }) => sendOAuthResultToWeb(url));
@@ -176,12 +277,14 @@ export default function App() {
             setIsLoading(true);
             setHasLoadError(false);
           }}
-          onLoadEnd={() => setIsLoading(false)}
+          onLoadEnd={() => {
+            setIsLoading(false);
+            sendPushTokenToWeb(expoPushToken);
+          }}
           onError={() => {
             setHasLoadError(true);
             setIsLoading(false);
           }}
-
           onMessage={(event) => {
             try {
               const payload = JSON.parse(event.nativeEvent.data);

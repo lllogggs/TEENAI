@@ -30,6 +30,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "mobile-app"
+    "mobile-app",
+    "supabase/functions"
   ]
 }

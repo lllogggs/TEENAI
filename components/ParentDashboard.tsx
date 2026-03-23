@@ -12,11 +12,13 @@ interface ConnectedStudent {
   user_id: string;
   parent_user_id?: string;
   settings: StudentSettings;
+  subscription_expires_at?: string | null;
 }
 
 interface StudentAccount {
   name: string;
   email: string;
+  subscription_expires_at?: string | null;
 }
 
 type MentorTone = 'kind' | 'rational' | 'friendly';
@@ -170,6 +172,10 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
   const [studentsError, setStudentsError] = useState('');
   const [sessionsError, setSessionsError] = useState('');
   const [messagesError, setMessagesError] = useState('');
+  const [renewalCode, setRenewalCode] = useState('');
+  const [renewalStatus, setRenewalStatus] = useState('');
+  const [isRenewalSubmitting, setIsRenewalSubmitting] = useState(false);
+  const [showRenewalPrompt, setShowRenewalPrompt] = useState(false);
 
   const selectedStudent = useMemo(
     () => connectedStudents.find((student) => student.user_id === selectedStudentId) || null,
@@ -178,6 +184,12 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
   const normalizedSettings = useMemo(() => normalizeSettings(selectedStudent?.settings), [selectedStudent]);
   const selectedStudentAccount = studentAccounts[selectedStudentId];
+  const selectedStudentSubscriptionExpiresAt = selectedStudent?.subscription_expires_at || selectedStudentAccount?.subscription_expires_at || null;
+  const isSelectedStudentExpired = useMemo(() => {
+    if (!selectedStudentSubscriptionExpiresAt) return false;
+    const expiresAt = new Date(selectedStudentSubscriptionExpiresAt).getTime();
+    return Number.isFinite(expiresAt) && expiresAt < Date.now();
+  }, [selectedStudentSubscriptionExpiresAt]);
 
   const displayStudentName = useMemo(() => {
     const customName = normalizedSettings.parent_student_name.trim();
@@ -339,7 +351,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       setStudentsError('');
       const { data: profiles, error: profileError } = await supabase
         .from('student_profiles')
-        .select('user_id, settings, parent_user_id')
+        .select('user_id, settings, parent_user_id, users!student_profiles_user_id_fkey(subscription_expires_at)')
         .eq('parent_user_id', user.id);
 
       if (profileError) {
@@ -349,11 +361,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
         return;
       }
 
-      const mappedProfiles: ConnectedStudent[] = (profiles || []).map((profile) => ({
-        user_id: profile.user_id,
-        parent_user_id: profile.parent_user_id || undefined,
-        settings: toStudentSettings(normalizeSettings(profile.settings as StudentSettings)),
-      }));
+      const mappedProfiles: ConnectedStudent[] = (profiles || []).map((profile) => {
+        const profileUser = Array.isArray(profile.users) ? profile.users[0] : profile.users;
+        return {
+          user_id: profile.user_id,
+          parent_user_id: profile.parent_user_id || undefined,
+          settings: toStudentSettings(normalizeSettings(profile.settings as StudentSettings)),
+          subscription_expires_at: profileUser?.subscription_expires_at || null,
+        };
+      });
 
       setConnectedStudents(mappedProfiles);
       const studentIds = mappedProfiles.map((profile) => profile.user_id);
@@ -366,7 +382,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('id, name, email')
+        .select('id, name, email, subscription_expires_at')
         .in('id', studentIds);
 
       if (usersError) {
@@ -374,7 +390,11 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       }
 
       const accountMap = (usersData || []).reduce<Record<string, StudentAccount>>((acc, account) => {
-        acc[account.id] = { name: account.name, email: account.email };
+        acc[account.id] = {
+          name: account.name,
+          email: account.email,
+          subscription_expires_at: account.subscription_expires_at || null,
+        };
         return acc;
       }, {});
 
@@ -475,6 +495,60 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     setNameDraft(normalizedSettings.parent_student_name || selectedStudentAccount?.name || '');
   }, [normalizedSettings.parent_student_name, selectedStudentAccount?.name]);
 
+  useEffect(() => {
+    if (isSelectedStudentExpired) {
+      setShowRenewalPrompt(true);
+      return;
+    }
+
+    setShowRenewalPrompt(false);
+    setRenewalCode('');
+    setRenewalStatus('');
+  }, [isSelectedStudentExpired, selectedStudentId]);
+
+  useEffect(() => {
+    const registerPushToken = async (token: string) => {
+      const trimmedToken = token.trim();
+      if (!trimmedToken) return;
+
+      const { error } = await supabase
+        .from('parent_push_tokens')
+        .upsert(
+          {
+            parent_user_id: user.id,
+            expo_push_token: trimmedToken,
+            platform: 'expo',
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: 'parent_user_id,expo_push_token' }
+        );
+
+      if (error) {
+        console.error('[ParentDashboard] parent push token save error:', error);
+      }
+    };
+
+    const handlePushTokenMessage = (event: Event) => {
+      const payload = (event as MessageEvent).data;
+      try {
+        const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
+        if (parsed?.type === 'expo_push_token' && typeof parsed.token === 'string') {
+          registerPushToken(parsed.token);
+        }
+      } catch (messageError) {
+        console.error('[ParentDashboard] push token message parse error:', messageError);
+      }
+    };
+
+    window.addEventListener('message', handlePushTokenMessage as EventListener);
+    document.addEventListener('message', handlePushTokenMessage as EventListener);
+
+    return () => {
+      window.removeEventListener('message', handlePushTokenMessage as EventListener);
+      document.removeEventListener('message', handlePushTokenMessage as EventListener);
+    };
+  }, [user.id]);
+
   const updateStudentSettings = async (nextSettings: NormalizedSettings) => {
     if (!selectedStudentId) return;
     setSaveStatus('');
@@ -553,6 +627,58 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     }
   };
 
+  const handleRenewSubscription = async () => {
+    if (!selectedStudentId) return;
+
+    const normalizedCode = renewalCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      setRenewalStatus('초대코드를 입력해주세요.');
+      return;
+    }
+
+    setIsRenewalSubmitting(true);
+    setRenewalStatus('');
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      const response = await fetch('/api/parent/renew-student-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ studentId: selectedStudentId, inviteCode: normalizedCode }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '기간 연장에 실패했습니다.');
+      }
+
+      const nextExpiresAt = payload?.subscription_expires_at || null;
+      setConnectedStudents((prev) => prev.map((student) => (
+        student.user_id === selectedStudentId
+          ? { ...student, subscription_expires_at: nextExpiresAt }
+          : student
+      )));
+      setStudentAccounts((prev) => ({
+        ...prev,
+        [selectedStudentId]: prev[selectedStudentId]
+          ? { ...prev[selectedStudentId], subscription_expires_at: nextExpiresAt }
+          : prev[selectedStudentId],
+      }));
+      setRenewalStatus('이용 기간이 연장되었습니다.');
+      setRenewalCode('');
+      setShowRenewalPrompt(false);
+    } catch (renewError) {
+      console.error('[ParentDashboard] renew subscription error:', renewError);
+      setRenewalStatus(renewError instanceof Error ? renewError.message : '기간 연장 중 오류가 발생했습니다.');
+    } finally {
+      setIsRenewalSubmitting(false);
+    }
+  };
+
   if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-brand-900">데이터 동기화 중...</div>;
 
   return (
@@ -573,6 +699,43 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
       </header>
 
       <main className="max-w-6xl mx-auto px-3 md:px-6 lg:px-7 py-3 md:py-4 space-y-2">
+        {showRenewalPrompt && selectedStudent ? (
+          <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/45 px-4">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100">
+              <p className="text-sm font-black text-rose-500 mb-2">초대코드를 입력해주세요</p>
+              <h2 className="text-xl font-black text-slate-900 mb-2">{displayStudentName} 학생의 이용 기간이 만료되었습니다.</h2>
+              <p className="text-sm font-bold text-slate-500 mb-4">새로운 초대코드를 입력하여 기간을 연장할 수 있습니다.</p>
+              <div className="space-y-3">
+                <input
+                  value={renewalCode}
+                  onChange={(event) => setRenewalCode(event.target.value.toUpperCase())}
+                  placeholder="초대코드를 입력해주세요"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black tracking-[0.2em] text-slate-800 uppercase"
+                />
+                {renewalStatus ? <p className={`text-xs font-bold ${renewalStatus.includes('연장되었습니다') ? 'text-emerald-600' : 'text-rose-500'}`}>{renewalStatus}</p> : null}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setShowRenewalPrompt(false);
+                      setRenewalStatus('');
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-500"
+                  >
+                    닫기
+                  </button>
+                  <button
+                    onClick={handleRenewSubscription}
+                    disabled={isRenewalSubmitting}
+                    className="px-4 py-2 rounded-xl bg-brand-900 text-white text-sm font-black shadow-lg shadow-brand-900/20 disabled:opacity-50"
+                  >
+                    {isRenewalSubmitting ? '확인 중...' : '기간 연장'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {connectedStudents.length === 0 ? (
           <div className="max-w-4xl mx-auto mt-4 md:mt-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
             <div className="premium-card p-8 md:p-14 text-center relative overflow-hidden">

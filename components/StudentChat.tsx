@@ -208,7 +208,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     if (user.subscription_expires_at) {
       const expires = new Date(user.subscription_expires_at);
       if (expires < new Date()) {
-        alert('서비스 이용 기간이 만료되었습니다. 관리자에게 문의하세요.');
+        alert('사용 어려우니 부모님에게 연락해주세요');
         onLogout();
       }
     }
