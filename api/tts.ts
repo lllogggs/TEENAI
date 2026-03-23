@@ -21,8 +21,8 @@ export default async function handler(req: any, res: any) {
     const authContext = await requireSupabaseUser(req, res);
     if (!authContext) return;
 
-    const rateAllowed = enforceRateLimit(res, `tts:user:${authContext.userId}`, 10, 60_000)
-        && enforceRateLimit(res, `tts:ip:${authContext.ip}`, 30, 60_000);
+    const rateAllowed = await enforceRateLimit(res, `tts:user:${authContext.userId}`, 10, 60_000)
+        && await enforceRateLimit(res, `tts:ip:${authContext.ip}`, 30, 60_000);
     if (!rateAllowed) return;
 
     const { text } = req.body || {};

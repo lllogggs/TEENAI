@@ -28,7 +28,7 @@
 배포/캡처 전에 아래 체크를 먼저 실행하세요.
 
 ```bash
-node scripts/validate-env.mjs
+node scripts/validate-env.mjs --target=client
 ```
 
 환경변수가 없어도 화면 캡처/리뷰를 진행해야 할 때는 아래 방법 중 하나로 데모 모드를 켜세요.
@@ -52,6 +52,11 @@ Supabase SQL Editor에서 아래 순서대로 실행하세요.
    - `20260217_add_chat_title.sql`
    - `20260218_fix_chat_sessions_title_and_risk_constraint.sql`
    - `20260220_admin_codes_and_ops_tables.sql`
+   - `20260309_admin_role_and_usage.sql`
+   - `20260309_sync_auth_users_to_public_users.sql`
+   - `20260311_invite_code_edit_and_subscription_days.sql`
+   - `20260320_add_chat_mode_to_sessions.sql`
+   - `20260323_persistent_rate_limits.sql`
 
 > 참고: `supabase_schema.sql`은 더 이상 실행 대상이 아니며, 과거 내용을 migration으로 이관한 안내 파일입니다.
 
@@ -70,14 +75,15 @@ Supabase SQL Editor에서 아래 순서대로 실행하세요.
 
 ## Vercel Environment Variables
 
-Vercel Production 환경에는 아래 환경 변수를 반드시 설정해야 `npm run build`와 서버리스 런타임이 함께 정상 동작합니다.
+Vercel Production 환경에는 아래 환경 변수를 반드시 설정해야 클라이언트 빌드와 서버리스 런타임이 함께 정상 동작합니다.
 
 - `GEMINI_API_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (부모 등록코드 기반 서버 회원가입 API에서 사용)
+- `VITE_SUPABASE_AUTH_REDIRECT_URL` (선택, 소셜 로그인 콜백 URL을 강제로 지정할 때만 사용)
 
-배포 전에는 Vercel Project Settings > Environment Variables에서 위 4개 값이 모두 **Production** 타깃에 연결되어 있는지 확인하세요. 특히 로컬 테스트용 키를 그대로 복사하지 않았는지, Supabase 프로젝트 URL/Anon Key/Service Role Key가 동일한 프로덕션 프로젝트를 가리키는지 교차 검증하는 것을 권장합니다.
+배포 전에는 `node scripts/validate-env.mjs --target=client`와 `node scripts/validate-env.mjs --target=server`로 각각 점검한 뒤, Vercel Project Settings > Environment Variables에서 위 4개 값이 모두 **Production** 타깃에 연결되어 있는지 확인하세요. 특히 로컬 테스트용 키를 그대로 복사하지 않았는지, Supabase 프로젝트 URL/Anon Key/Service Role Key가 동일한 프로덕션 프로젝트를 가리키는지 교차 검증하는 것을 권장합니다.
 
 ## Notes
 

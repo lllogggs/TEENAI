@@ -40,8 +40,8 @@ export default async function handler(req: any, res: any) {
   const authContext = await requireSupabaseUser(req, res);
   if (!authContext) return;
 
-  const rateAllowed = enforceRateLimit(res, `meta:user:${authContext.userId}`, 15, 60_000)
-    && enforceRateLimit(res, `meta:ip:${authContext.ip}`, 45, 60_000);
+  const rateAllowed = await enforceRateLimit(res, `meta:user:${authContext.userId}`, 15, 60_000)
+    && await enforceRateLimit(res, `meta:ip:${authContext.ip}`, 45, 60_000);
   if (!rateAllowed) return;
 
   const apiKey = process.env.GEMINI_API_KEY;

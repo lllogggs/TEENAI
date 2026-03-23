@@ -1,5 +1,5 @@
 
-import { User, UserRole, ChatSession, SafetyAlert, StudentProfile, ToneLevel, AISettings } from '../types';
+import { User, UserRole, ChatSession, SafetyAlert, StudentProfile, StudentSettings, ToneLevel, AISettings } from '../types';
 
 const STORAGE_KEYS = {
   USERS: 'forteenai_users',
@@ -9,7 +9,7 @@ const STORAGE_KEYS = {
   PENDING_INVITES: 'forteenai_pending_invites'
 };
 
-const DEFAULT_SETTINGS: AISettings = {
+const DEFAULT_SETTINGS: StudentSettings = {
   toneType: 'gentle',
   strictSafety: true,
   eduMode: true,
@@ -59,7 +59,7 @@ const seedTestData = () => {
       user_id: student!.id,
       invite_code: 'TEST66',
       parent_user_id: parent!.id,
-      settings: DEFAULT_SETTINGS
+      settings: DEFAULT_SETTINGS as StudentSettings
     });
     localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
   }
@@ -73,6 +73,7 @@ const seedTestData = () => {
         id: 'sample_1',
         student_id: student!.id,
         share_mode: true,
+        title: '샘플 대화 1',
         started_at: Date.now() - 172800000, // 2일 전
         ended_at: Date.now() - 172700000,
         messages: [
@@ -90,6 +91,7 @@ const seedTestData = () => {
         id: 'sample_2',
         student_id: student!.id,
         share_mode: true,
+        title: '샘플 대화 2',
         started_at: Date.now() - 86400000, // 1일 전
         ended_at: Date.now() - 86300000,
         messages: [
@@ -148,7 +150,7 @@ export const MockDb = {
     let profile = profiles.find(p => p.user_id === user!.id);
 
     if (!profile) {
-      profile = { user_id: user.id, invite_code: inviteCode, parent_user_id: parentId, settings: DEFAULT_SETTINGS };
+      profile = { user_id: user.id, invite_code: inviteCode, parent_user_id: parentId, settings: DEFAULT_SETTINGS as StudentSettings };
       profiles.push(profile);
     } else {
       profile.parent_user_id = parentId;
@@ -157,12 +159,12 @@ export const MockDb = {
     return user;
   },
 
-  updateStudentSettings: async (studentId: string, settings: AISettings) => {
+  updateStudentSettings: async (studentId: string, settings: StudentSettings | AISettings) => {
     const profiles: StudentProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
     // Changed userId to user_id to match StudentProfile interface
     const idx = profiles.findIndex(p => p.user_id === studentId);
     if (idx !== -1) {
-      profiles[idx].settings = settings;
+      profiles[idx].settings = settings as StudentSettings;
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
     }
   },
@@ -219,7 +221,9 @@ export const MockDb = {
   getStudentSessions: (studentId: string): ChatSession[] => {
     const sessions: ChatSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
     // Changed studentId to student_id and startedAt to started_at to match ChatSession interface
-    return sessions.filter(s => s.student_id === studentId).sort((a, b) => b.started_at - a.started_at);
+    return sessions
+      .filter((s) => s.student_id === studentId)
+      .sort((a, b) => Number(b.started_at) - Number(a.started_at));
   },
 
   createAlert: async (alert: SafetyAlert) => {
@@ -231,6 +235,8 @@ export const MockDb = {
   getParentAlerts: (studentId: string): SafetyAlert[] => {
     const alerts: SafetyAlert[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALERTS) || '[]');
     // Changed studentId to student_id and createdAt to created_at to match SafetyAlert interface
-    return alerts.filter(a => a.student_id === studentId).sort((a, b) => b.created_at - a.created_at);
+    return alerts
+      .filter((a) => a.student_id === studentId)
+      .sort((a, b) => Number(b.created_at) - Number(a.created_at));
   }
 };

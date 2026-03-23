@@ -1,4 +1,4 @@
-import { SessionRiskLevel } from './types.ts';
+import { SessionRiskLevel } from '../types';
 
 /**
  * Normalizes a raw string value into a valid SessionRiskLevel.

@@ -82,21 +82,25 @@ export interface MessageRow {
 export interface SafetyAlert {
   id: string;
   student_id: string;
-  created_at: string;
+  created_at: string | number;
   message: string;
 }
 
 export interface ChatSession {
   id: string;
   student_id: string;
-  title: string;
-  started_at: string;
+  title?: string;
+  started_at: string | number;
+  ended_at?: string | number;
   chat_mode?: ChatSessionMode;
   topic_tags: string[];
   output_types: string[];
   tone_level: ToneLevel;
   student_intent?: string;
   ai_intervention?: string;
+  summary?: string;
+  messages?: ChatMessage[];
+  share_mode?: boolean;
   risk_level?: SessionRiskLevel;
   is_deleted_by_student?: boolean;
 }

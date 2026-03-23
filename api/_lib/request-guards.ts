@@ -6,10 +6,22 @@ type RateLimitEntry = {
   resetAt: number;
 };
 
+type RateLimitResult = {
+  allowed: boolean;
+  retryAfterSec: number;
+};
+
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 const SUPABASE_URL = serverSupabaseEnv.url;
 const SUPABASE_ANON_KEY = serverSupabaseEnv.anonKey;
+const SUPABASE_SERVICE_ROLE_KEY = serverSupabaseEnv.serviceRoleKey;
+
+const adminSupabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  : null;
 
 const getBearerToken = (req: any): string | null => {
   const header = req.headers?.authorization || req.headers?.Authorization;
@@ -25,6 +37,27 @@ const getClientIp = (req: any): string => {
     return xff.split(',')[0].trim();
   }
   return req.socket?.remoteAddress || 'unknown-ip';
+};
+
+const enforceMemoryRateLimit = (key: string, maxRequests: number, windowMs: number): RateLimitResult => {
+  const now = Date.now();
+  const existing = rateLimitStore.get(key);
+
+  if (!existing || now >= existing.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, retryAfterSec: 0 };
+  }
+
+  if (existing.count >= maxRequests) {
+    return {
+      allowed: false,
+      retryAfterSec: Math.max(Math.ceil((existing.resetAt - now) / 1000), 1),
+    };
+  }
+
+  existing.count += 1;
+  rateLimitStore.set(key, existing);
+  return { allowed: true, retryAfterSec: 0 };
 };
 
 export const requireSupabaseUser = async (req: any, res: any): Promise<{ userId: string; ip: string } | null> => {
@@ -74,24 +107,34 @@ export const requireSupabaseUser = async (req: any, res: any): Promise<{ userId:
   return { userId: data.user.id, ip: getClientIp(req) };
 };
 
-export const enforceRateLimit = (res: any, key: string, maxRequests: number, windowMs: number): boolean => {
-  const now = Date.now();
-  const existing = rateLimitStore.get(key);
+export const enforceRateLimit = async (res: any, key: string, maxRequests: number, windowMs: number): Promise<boolean> => {
+  let result: RateLimitResult | null = null;
 
-  if (!existing || now >= existing.resetAt) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
+  if (adminSupabase) {
+    const { data, error } = await adminSupabase.rpc('consume_rate_limit', {
+      p_key: key,
+      p_max_requests: maxRequests,
+      p_window_ms: windowMs,
+    });
+
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] : data;
+      result = {
+        allowed: Boolean(row?.allowed),
+        retryAfterSec: Number(row?.retry_after_sec || 0),
+      };
+    } else {
+      console.error('Persistent rate limit fallback engaged:', error.message || error);
+    }
   }
 
-  if (existing.count >= maxRequests) {
-    const retryAfterSec = Math.max(Math.ceil((existing.resetAt - now) / 1000), 1);
-    res.setHeader('Retry-After', String(retryAfterSec));
+  const finalResult = result || enforceMemoryRateLimit(key, maxRequests, windowMs);
+  if (!finalResult.allowed) {
+    res.setHeader('Retry-After', String(finalResult.retryAfterSec));
     res.status(429).json({ error: 'Too many requests' });
     return false;
   }
 
-  existing.count += 1;
-  rateLimitStore.set(key, existing);
   return true;
 };
 
