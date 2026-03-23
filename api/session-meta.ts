@@ -115,7 +115,14 @@ export default async function handler(req: any, res: any) {
     });
 
     const raw = result.text || '{}';
-    const parsed = JSON.parse(extractJsonObject(raw));
+    let parsed: any;
+
+    try {
+      parsed = JSON.parse(extractJsonObject(raw));
+    } catch {
+      parsed = {};
+    }
+
     const nextTitle = sanitizeTitle(parsed?.title);
     const fallbackTitle = title && title !== '새 대화' ? title : sanitizeTitle(firstMessage).slice(0, 20) || '새 대화';
 

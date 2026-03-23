@@ -12,7 +12,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.forteenai.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "학습 문제 사진 촬영 및 첨부를 위해 권한이 필요합니다.",
+        "NSCameraUsageDescription": "학습 문제 사진 촬영 및 첨부를 위해 권한이 필요합니다.",
+        "NSMicrophoneUsageDescription": "학습 문제 사진 촬영 및 첨부를 위해 권한이 필요합니다."
       }
     },
     "android": {
@@ -35,6 +38,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "scheme": "forteenai"
+    "scheme": "forteenai",
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }

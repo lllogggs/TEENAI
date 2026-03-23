@@ -42,6 +42,15 @@ const getClientIp = (req: any): string => {
 
 const enforceMemoryRateLimit = (key: string, maxRequests: number, windowMs: number): RateLimitResult => {
   const now = Date.now();
+
+  if (rateLimitStore.size > 1000) {
+    for (const [k, value] of rateLimitStore.entries()) {
+      if (now >= value.resetAt) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+
   const existing = rateLimitStore.get(key);
 
   if (!existing || now >= existing.resetAt) {
