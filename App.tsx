@@ -4,6 +4,8 @@ import { isSupabaseConfigured, supabase } from './utils/supabase';
 import { ensureProfileLoaded } from './services/authProfile';
 import {
   DEMO_MODE_STORAGE_KEY,
+  MOBILE_MESSAGE_SOURCE,
+  OAUTH_BRIDGE_NONCE_KEY,
   PENDING_SOCIAL_INVITE_REQUIRED_KEY,
   PENDING_SOCIAL_ROLE_KEY,
   PENDING_SOCIAL_SIGNUP_KEY,
@@ -20,6 +22,14 @@ const AdminAuth = lazy(() => import('./components/AdminAuth'));
 const AppShellFallback = () => (
   <div className="h-screen flex items-center justify-center">로딩 중...</div>
 );
+
+const createOAuthBridgeNonce = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -97,14 +107,32 @@ function App() {
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
+      const expectedOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
       try {
+        if (event.origin && event.origin !== expectedOrigin) return;
+
         const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (raw?.type !== 'social_oauth_result') return;
+        if (raw?.source !== MOBILE_MESSAGE_SOURCE) return;
+
+        const expectedNonce = typeof window !== 'undefined' ? window.localStorage.getItem(OAUTH_BRIDGE_NONCE_KEY) : null;
+        if (!expectedNonce || raw?.nonce !== expectedNonce) {
+          console.warn('Rejected social_oauth_result due to nonce mismatch.');
+          return;
+        }
+
         const accessToken = raw?.accessToken;
         const refreshToken = raw?.refreshToken;
         if (!accessToken || !refreshToken) return;
+
         const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
         if (error) throw error;
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(OAUTH_BRIDGE_NONCE_KEY);
+        }
+
         if (data.user) {
           await loadProfile(data.user.id, data.user.email || '', true);
         }
@@ -168,6 +196,10 @@ function App() {
       localStorage.setItem(PENDING_SOCIAL_ROLE_KEY, role);
       localStorage.setItem(PENDING_SOCIAL_SIGNUP_KEY, String(Boolean(isSignup)));
       const isNativeWebView = typeof window !== 'undefined' && Boolean((window as any).ReactNativeWebView);
+      const oauthBridgeNonce = createOAuthBridgeNonce();
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(OAUTH_BRIDGE_NONCE_KEY, oauthBridgeNonce);
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -185,6 +217,7 @@ function App() {
           type: 'oauth_start',
           provider,
           url: data.url,
+          nonce: oauthBridgeNonce,
         }));
         return;
       }
@@ -193,6 +226,7 @@ function App() {
     } catch (err: any) {
       localStorage.removeItem(PENDING_SOCIAL_ROLE_KEY);
       localStorage.removeItem(PENDING_SOCIAL_SIGNUP_KEY);
+      localStorage.removeItem(OAUTH_BRIDGE_NONCE_KEY);
       alert(err.message || '소셜 로그인 중 오류가 발생했습니다.');
       setAuthLoading(false);
     }

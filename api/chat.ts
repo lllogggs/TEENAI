@@ -124,7 +124,7 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const result = await chat.sendMessage(userParts);
+    const result = await chat.sendMessage({ message: userParts });
     const responseText = result.text || '';
 
     if (supabaseUrl && serviceRoleKey) {

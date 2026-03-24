@@ -32,7 +32,7 @@ const getBearerToken = (req: any): string | null => {
   return token;
 };
 
-const getClientIp = (req: any): string => {
+export const getClientIp = (req: any): string => {
   const xff = req.headers?.['x-forwarded-for'];
   if (typeof xff === 'string' && xff.trim()) {
     return xff.split(',')[0].trim();

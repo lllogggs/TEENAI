@@ -66,3 +66,11 @@ test('formatSessionRelative returns humanized labels', () => {
   assert.equal(formatSessionRelative('2026-03-23T11:30:00Z', now), '30분 전');
   assert.equal(formatSessionRelative('2026-03-22T12:00:00Z', now), '어제');
 });
+
+
+test('resolveOAuthRedirectUrl falls back to local development callback on port 3000', () => {
+  assert.equal(
+    resolveOAuthRedirectUrl({ isNativeWebView: false, currentOrigin: undefined, envRedirectUrl: undefined }),
+    'http://localhost:3000/auth/callback',
+  );
+});

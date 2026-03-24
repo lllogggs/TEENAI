@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, ChatSession, MessageRow, StudentSettings, SessionRiskLevel } from '../types';
+import { MOBILE_MESSAGE_SOURCE } from '../utils/auth/constants';
 import { supabase } from '../utils/supabase';
 import { ForteenLogo } from './Icons';
 
@@ -529,9 +530,15 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ user, onLogout }) => 
     };
 
     const handlePushTokenMessage = (event: Event) => {
-      const payload = (event as MessageEvent).data;
+      const messageEvent = event as MessageEvent;
+      const payload = messageEvent.data;
+      const expectedOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
       try {
+        if (messageEvent.origin && messageEvent.origin !== expectedOrigin) return;
+
         const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
+        if (parsed?.source !== MOBILE_MESSAGE_SOURCE) return;
         if (parsed?.type === 'expo_push_token' && typeof parsed.token === 'string') {
           registerPushToken(parsed.token);
         }
