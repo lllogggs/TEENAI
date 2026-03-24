@@ -92,11 +92,12 @@ export default function App() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+  const pendingOAuthNonceRef = useRef<string | null>(null);
 
   const sendPushTokenToWeb = useCallback((token: string | null) => {
     if (!token) return;
 
-    const payload = JSON.stringify({ type: 'expo_push_token', token });
+    const payload = JSON.stringify({ type: 'expo_push_token', token, source: 'forteenai-mobile' });
     webViewRef.current?.injectJavaScript(
       `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`
     );
@@ -115,7 +116,13 @@ export default function App() {
       const refreshToken = query.get('refresh_token') || hash.get('refresh_token');
       if (!accessToken || !refreshToken) return;
 
-      const payload = JSON.stringify({ type: 'social_oauth_result', accessToken, refreshToken });
+      const payload = JSON.stringify({
+        type: 'social_oauth_result',
+        accessToken,
+        refreshToken,
+        nonce: pendingOAuthNonceRef.current,
+        source: 'forteenai-mobile',
+      });
       webViewRef.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`);
     } catch {
       // noop
@@ -153,6 +160,14 @@ export default function App() {
 
   const handleShouldStartLoad = useCallback(
     (requestUrl: string) => {
+      if (!requestUrl) return false;
+
+      const isHttpUrl = /^https?:/i.test(requestUrl);
+      if (!isHttpUrl) {
+        NativeLinking.openURL(requestUrl).catch(() => undefined);
+        return false;
+      }
+
       if (!allowedOrigins.length) {
         return true;
       }
@@ -162,11 +177,11 @@ export default function App() {
         const isAllowed = allowedOrigins.includes(requestOrigin);
 
         if (!isAllowed) {
-          // Keep navigation inside in-app WebView for store compliance.
-          return true;
+          NativeLinking.openURL(requestUrl).catch(() => undefined);
+          return false;
         }
       } catch {
-        return true;
+        return false;
       }
 
       return true;
@@ -309,6 +324,7 @@ export default function App() {
           try {
             const payload = JSON.parse(event.nativeEvent.data);
             if (payload?.type === 'oauth_start' && payload?.url) {
+              pendingOAuthNonceRef.current = typeof payload?.nonce === 'string' ? payload.nonce : null;
               NativeLinking.openURL(payload.url);
             }
           } catch {

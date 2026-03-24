@@ -1,4 +1,4 @@
-const LOCAL_AUTH_CALLBACK = 'http://localhost:5173/auth/callback';
+const LOCAL_AUTH_CALLBACK = 'http://localhost:3000/auth/callback';
 
 export const resolveOAuthRedirectUrl = ({
   isNativeWebView,

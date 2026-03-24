@@ -294,7 +294,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
   // useEffect on currentSessionId removed to avoid wiping optimistic messages on session creation
 
-  const createSession = async (mode: ChatSessionMode) => {
+  const createSession = async (mode: ChatSessionMode): Promise<ChatSession | null> => {
     const { data, error } = await supabase
       .from('chat_sessions')
       .insert({
@@ -315,11 +315,23 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     const created = data as ChatSession;
     setSessions((prev) => [created, ...prev]);
     setCurrentSessionId(created.id);
-    return created.id;
+    return created;
   };
 
-  const ensureSession = async (mode: ChatSessionMode): Promise<string | null> => {
-    if (currentSessionId) return currentSessionId;
+  const ensureSession = async (mode: ChatSessionMode): Promise<ChatSession | null> => {
+    if (currentSessionId) {
+      return sessions.find((session) => session.id === currentSessionId) || {
+        id: currentSessionId,
+        student_id: user.id,
+        tone_level: 'low',
+        started_at: new Date().toISOString(),
+        title: activeSession?.title || '새 대화',
+        chat_mode: mode,
+        topic_tags: [],
+        output_types: [],
+      } as ChatSession;
+    }
+
     return createSession(mode);
   };
 
@@ -366,10 +378,12 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     }
   };
 
-  const updateSessionMetaWithAI = async (sessionId: string, firstMessage: string, transcript: { role: 'user' | 'model'; content: string }[]) => {
-    const session = sessions.find((item) => item.id === sessionId);
-    if (!session) return;
-
+  const updateSessionMetaWithAI = async (
+    sessionId: string,
+    currentTitle: string,
+    firstMessage: string,
+    transcript: { role: 'user' | 'model'; content: string }[],
+  ) => {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch('/api/session-meta', {
@@ -378,7 +392,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         body: JSON.stringify({
           firstMessage,
           transcript,
-          title: session.title || '새 대화',
+          title: currentTitle || '새 대화',
         }),
       });
 
@@ -388,13 +402,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
       const payload = await response.json();
       const nextTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '새 대화';
-      // 충돌 해결: 전역 normalizeRiskLevel 함수를 사용하여 일관성 있게 값을 변환합니다.
       const nextRiskLevel = normalizeRiskLevel(payload.risk_level);
+      const resolvedTitle = currentTitle === '새 대화' ? nextTitle : currentTitle;
 
       const { error } = await supabase
         .from('chat_sessions')
         .update({
-          title: session.title === '새 대화' ? nextTitle : session.title,
+          title: resolvedTitle,
           risk_level: nextRiskLevel,
         })
         .eq('id', sessionId)
@@ -444,13 +458,13 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
     setLoading(true);
     setMessages((prev) => [...prev, userMsg]);
 
-    const sessionId = await ensureSession(MODE_VALUE_MAP[chatMode]);
-    if (!sessionId) {
+    const session = await ensureSession(MODE_VALUE_MAP[chatMode]);
+    if (!session) {
       setLoading(false);
       return;
     }
 
-    await persistMessage(sessionId, 'user', contentToPersist);
+    await persistMessage(session.id, 'user', contentToPersist);
 
     // [최우선] API 호출 비용 최적화 로직
     const isDanger = DANGER_KEYWORDS.some((keyword) => userText.includes(keyword));
@@ -464,7 +478,7 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
 
     if (shouldUpdateMeta) {
       // (불필요한 await 없이 비동기로 실행)
-      updateSessionMetaWithAI(sessionId, userText, [...nextHistory, { role: 'user', content: userText }]);
+      updateSessionMetaWithAI(session.id, session.title || '새 대화', userText, [...nextHistory, { role: 'user', content: userText }]);
     }
 
     if (isDanger) {
@@ -495,8 +509,16 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
         }),
       });
 
-      const data = await response.json();
-      const aiText = data.text || '잠시 대화가 어려워요. 다시 시도해볼까요?';
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data?.error === 'string' && data.error.trim() ? data.error : 'AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
+      }
+
+      const aiText = typeof data?.text === 'string' ? data.text.trim() : '';
+      if (!aiText) {
+        throw new Error('AI 응답이 비어 있습니다. 다시 시도해 주세요.');
+      }
+
       const aiMsg: ChatMessage = {
         role: 'model',
         text: aiText,
@@ -504,11 +526,11 @@ const StudentChat: React.FC<StudentChatProps> = ({ user, onLogout }) => {
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-      await persistMessage(sessionId, 'model', aiText);
+      await persistMessage(session.id, 'model', aiText);
 
     } catch (err) {
       console.error('chat response error:', err);
-      setErrorNotice('AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
+      setErrorNotice(err instanceof Error ? err.message : 'AI 응답 생성 중 문제가 발생했습니다. 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }

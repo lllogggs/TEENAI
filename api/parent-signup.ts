@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { consumeRateLimit, getClientIp } from './_lib/request-guards.js';
 import { serverSupabaseEnv, serverSupabaseEnvHints } from './_lib/supabase-env.js';
 
 const supabaseUrl = serverSupabaseEnv.url;
@@ -22,7 +23,21 @@ export default async function handler(req: any, res: any) {
 
   const email = String(req.body?.email || '').trim().toLowerCase();
   const password = String(req.body?.password || '');
-  const registrationCode = String(req.body?.registrationCode || '').trim();
+  const registrationCode = String(req.body?.registrationCode || '').trim().toUpperCase();
+  const clientIp = getClientIp(req);
+
+  const signupRateLimits = await Promise.all([
+    consumeRateLimit(`parent-signup:ip:${clientIp}`, 10, 10 * 60 * 1000),
+    email ? consumeRateLimit(`parent-signup:email:${email}`, 5, 10 * 60 * 1000) : Promise.resolve({ allowed: true, retryAfterSec: 0, currentCount: 0 }),
+    registrationCode ? consumeRateLimit(`parent-signup:code:${registrationCode}`, 20, 10 * 60 * 1000) : Promise.resolve({ allowed: true, retryAfterSec: 0, currentCount: 0 }),
+  ]);
+
+  const blockedLimit = signupRateLimits.find((result) => !result.allowed);
+  if (blockedLimit) {
+    res.setHeader('Retry-After', String(blockedLimit.retryAfterSec));
+    res.status(429).json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' });
+    return;
+  }
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.status(400).json({ error: 'Invalid email format.' });
