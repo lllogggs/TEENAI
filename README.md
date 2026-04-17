@@ -14,6 +14,7 @@
    - `GEMINI_API_KEY=...` (serverless `/api/chat`, `/api/session-meta`, `/api/title`에서 사용)
    - `VITE_SUPABASE_URL=...`
    - `VITE_SUPABASE_ANON_KEY=...`
+   - 빠르게 시작하려면 `.env.example`를 복사해서 `.env.local`로 사용
 3. Run app:
    `npm run dev`
 
@@ -52,13 +53,32 @@ Supabase SQL Editor에서 아래 순서대로 실행하세요.
    - `20260217_add_chat_title.sql`
    - `20260218_fix_chat_sessions_title_and_risk_constraint.sql`
    - `20260220_admin_codes_and_ops_tables.sql`
+   - `20260228_limit_registration_code_uses.sql`
    - `20260309_admin_role_and_usage.sql`
    - `20260309_sync_auth_users_to_public_users.sql`
    - `20260311_invite_code_edit_and_subscription_days.sql`
    - `20260320_add_chat_mode_to_sessions.sql`
+   - `20260323_parent_push_and_subscription_extension.sql`
    - `20260323_persistent_rate_limits.sql`
 
 > 참고: `supabase_schema.sql`은 더 이상 실행 대상이 아니며, 과거 내용을 migration으로 이관한 안내 파일입니다.
+
+Supabase CLI를 사용할 때 `.env.local` 안의 JSON 문자열(`GOOGLE_APPLICATION_CREDENTIALS_JSON`) 때문에 dotenv 파싱이 깨질 수 있습니다. 이 저장소에서는 아래 래퍼 스크립트로 CLI를 실행하면 `.env.local`을 잠시 분리한 뒤 자동 복구합니다.
+
+```bash
+npm run db:projects
+npm run db:link
+npm run db:migrations
+```
+
+원격 migration 비교나 `db push`에는 프로젝트 링크 외에 원격 DB 비밀번호(`SUPABASE_DB_PASSWORD`)가 추가로 필요할 수 있습니다.
+
+현재 저장소는 원격 Supabase 프로젝트를 기준으로 migration history를 재정렬했습니다.
+
+- 활성 baseline migration: `supabase/migrations/20260417144403_remote_schema.sql`
+- 이전 개별 migration 파일 보관: `supabase/migrations_archive/`
+
+참고: Docker Desktop이 없는 환경에서는 `supabase db pull`이 정확한 remote schema export를 만들지 못할 수 있습니다. 이런 경우에는 baseline migration을 유지한 상태에서 이후 변경분만 새 migration으로 추가하는 흐름을 권장합니다.
 
 
 ## Mobile App (웹 쌍둥이 버전)

@@ -1,5 +1,42 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 const requiredClientVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
 const requiredServerVars = ['GEMINI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
+
+const loadLocalEnvFile = (filename) => {
+  const filepath = path.resolve(process.cwd(), filename);
+
+  if (!fs.existsSync(filepath)) {
+    return;
+  }
+
+  const contents = fs.readFileSync(filepath, 'utf8');
+
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match) continue;
+
+    const [, key, rawValue] = match;
+    if (process.env[key]) continue;
+
+    let value = rawValue.trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"'))
+      || (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+};
+
+loadLocalEnvFile('.env');
+loadLocalEnvFile('.env.local');
 
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
 const validationTarget = (targetArg?.split('=')[1] || 'all').toLowerCase();

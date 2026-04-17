@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "node scripts/lint.mjs",
-    "test": "node --test --experimental-strip-types tests/**/*.test.ts"
+    "test": "node --test --experimental-strip-types tests/**/*.test.ts",
+    "db:projects": "node scripts/run-supabase-cli.mjs projects list",
+    "db:link": "node scripts/run-supabase-cli.mjs link --project-ref hpoekvinyjbymnctggih",
+    "db:migrations": "node scripts/run-supabase-cli.mjs migration list",
+    "db:push": "node scripts/run-supabase-cli.mjs db push"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.0",
@@ -25,6 +29,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "supabase": "^2.92.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
